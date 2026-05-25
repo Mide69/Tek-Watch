@@ -2,14 +2,17 @@
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 import { DollarSign, TrendingUp, TrendingDown, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
-import { MOCK_COST_SUMMARY, MOCK_COST_BREAKDOWN } from '@/lib/mockData'
+import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
+import { useCost } from '@/hooks/useData'
 
-/** Pure-CSS daily cost bar chart — no Recharts */
-function DailyCostBars({ data }: { data: { time?: string; date?: string; cost: number }[] }) {
-  const maxC = Math.max(...data.map(d => d.cost))
+const SERVICE_COLORS = ['#6366f1','#3b82f6','#f59e0b','#10b981','#f97316','#a78bfa','#06b6d4','#ec4899']
+
+function DailyCostBars({ data }: { data: { cost: number; label?: string; time?: string }[] }) {
+  const maxC = Math.max(...data.map(d => d.cost)) || 1
   return (
     <div>
       <div className="flex items-end gap-[3px] h-48">
@@ -18,34 +21,31 @@ function DailyCostBars({ data }: { data: { time?: string; date?: string; cost: n
             key={i}
             className="flex-1 rounded-sm transition-all cursor-default"
             style={{
-              height: `${(d.cost / maxC) * 100}%`,
+              height:     `${Math.max((d.cost / maxC) * 100, 2)}%`,
               background: i === data.length - 1 ? '#f97316' : '#6366f1',
-              opacity: i === data.length - 1 ? 1 : 0.6,
+              opacity:    i === data.length - 1 ? 1 : 0.6,
             }}
-            title={`${d.date ?? d.time ?? ''}: ${formatCurrency(d.cost)}`}
+            title={`${d.label ?? d.time ?? ''}: ${formatCurrency(d.cost)}`}
           />
         ))}
       </div>
       <div className="flex justify-between text-xs text-slate-500 mt-2">
-        <span>30 days ago</span>
+        <span>{data[0]?.label ?? 'Earlier'}</span>
         <span className="text-orange-400">Today</span>
       </div>
     </div>
   )
 }
 
-/** Pure-SVG donut chart — no Recharts */
-const SERVICE_COLORS = ['#6366f1','#3b82f6','#f59e0b','#10b981','#f97316','#a78bfa','#06b6d4','#ec4899']
-
 function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number }[] }) {
-  const total = data.reduce((s, d) => s + d.mtd_cost, 0)
-  const R = 70, CX = 90, CY = 90, TWO_PI = 2 * Math.PI
-  const CIRC = TWO_PI * R
+  const total = data.reduce((s, d) => s + d.mtd_cost, 0) || 1
+  const R = 70, CX = 90, CY = 90
+  const CIRC = 2 * Math.PI * R
 
   let offset = 0
   const segments = data.map((d, i) => {
     const frac = d.mtd_cost / total
-    const seg = { frac, offset, color: SERVICE_COLORS[i % SERVICE_COLORS.length] }
+    const seg  = { frac, offset, color: SERVICE_COLORS[i % SERVICE_COLORS.length] }
     offset += frac
     return seg
   })
@@ -65,7 +65,7 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
             transform={`rotate(-90 ${CX} ${CY})`}
           />
         ))}
-        <text x={CX} y={CY - 6} textAnchor="middle" fill="#f8fafc" fontSize={14} fontWeight="700">
+        <text x={CX} y={CY - 6}  textAnchor="middle" fill="#f8fafc" fontSize={14} fontWeight="700">
           {formatCurrency(total)}
         </text>
         <text x={CX} y={CY + 12} textAnchor="middle" fill="#64748b" fontSize={10}>
@@ -86,26 +86,36 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
 }
 
 export default function CostPage() {
-  const { loading: authLoading } = useAuth()
+  const { customerId }       = useAuth()
+  const { timeRange }        = useDashboard()
+  const { data, isLoading }  = useCost()
 
-  if (authLoading) return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
-      </div>
-    </DashboardLayout>
-  )
+  if (isLoading || !data) {
+    return (
+      <DashboardLayout customerId={customerId || undefined}>
+        <div className="space-y-6">
+          <div className="h-8 w-40 bg-white/[0.06] rounded animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[0,1,2].map(i => <CardSkeleton key={i} />)}
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
 
-  const { mtd_total: mtd, last_month_total: last, forecasted_monthly: forecast, daily_costs } = MOCK_COST_SUMMARY
+  const { summary, breakdown } = data
+  const { mtd_total: mtd, last_month_total: last, forecasted_monthly: forecast, daily_costs } = summary
   const trendUp  = mtd > last
   const trendPct = last > 0 ? Math.abs(((mtd - last) / last) * 100).toFixed(1) : '0'
 
   return (
-    <DashboardLayout>
+    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-white">Cost Analysis</h1>
-          <p className="text-slate-400 text-sm mt-0.5">AWS spend overview and per-service breakdown</p>
+          <p className="text-slate-400 text-sm mt-0.5">
+            AWS spend overview and per-service breakdown · {TIME_RANGE_LABELS[timeRange]}
+          </p>
         </div>
 
         {/* Summary cards */}
@@ -114,26 +124,26 @@ export default function CostPage() {
             {
               label: 'Month-to-Date',
               value: formatCurrency(mtd),
-              sub: `${trendUp ? '+' : '−'}${trendPct}% vs last month`,
-              icon: trendUp ? TrendingUp : TrendingDown,
+              sub:   `${trendUp ? '+' : '−'}${trendPct}% vs last month`,
+              icon:  trendUp ? TrendingUp : TrendingDown,
               color: trendUp ? 'text-red-400' : 'text-emerald-400',
-              bg: trendUp ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20',
+              bg:    trendUp ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20',
             },
             {
               label: 'Forecasted Monthly',
               value: formatCurrency(forecast),
-              sub: 'Based on current trend',
-              icon: DollarSign,
+              sub:   'Based on current trend',
+              icon:  DollarSign,
               color: 'text-amber-400',
-              bg: 'bg-amber-500/10 border-amber-500/20',
+              bg:    'bg-amber-500/10 border-amber-500/20',
             },
             {
               label: 'Last Month Total',
               value: formatCurrency(last),
-              sub: 'Previous billing period',
-              icon: DollarSign,
+              sub:   'Previous billing period',
+              icon:  DollarSign,
               color: 'text-slate-300',
-              bg: 'bg-white/[0.04] border-white/[0.08]',
+              bg:    'bg-white/[0.04] border-white/[0.08]',
             },
           ].map(c => (
             <Card key={c.label}>
@@ -151,10 +161,12 @@ export default function CostPage() {
           ))}
         </div>
 
-        {/* Daily cost chart */}
+        {/* Daily cost chart — responds to time range */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Daily Spend — Last 30 Days</CardTitle>
+            <CardTitle className="text-base">
+              Daily Spend — {TIME_RANGE_LABELS[timeRange]}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <DailyCostBars data={daily_costs} />
@@ -171,7 +183,7 @@ export default function CostPage() {
               </div>
             </CardHeader>
             <CardContent>
-              <ServiceDonut data={MOCK_COST_BREAKDOWN.breakdown.map(d => ({ aws_service: d.aws_service, mtd_cost: d.mtd_cost }))} />
+              <ServiceDonut data={breakdown.breakdown.map(d => ({ aws_service: d.aws_service, mtd_cost: d.mtd_cost }))} />
             </CardContent>
           </Card>
 
@@ -181,7 +193,7 @@ export default function CostPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {MOCK_COST_BREAKDOWN.breakdown.map(svc => {
+                {breakdown.breakdown.map(svc => {
                   const pct = mtd > 0 ? ((svc.mtd_cost / mtd) * 100).toFixed(1) : '0'
                   return (
                     <div key={svc.aws_service} className="space-y-1">
@@ -221,9 +233,9 @@ export default function CostPage() {
                 </div>
                 <p className="text-sm text-slate-300 leading-relaxed">
                   Your <span className="text-amber-400 font-medium">Lambda spend is up 38.7% month-over-month</span>, driven by
-                  the <span className="font-medium text-white">acme-image-processor</span> function — invocations are up but cold-start
-                  duration has also spiked 340%, suggesting a recent package change. Your overall bill is trending toward{' '}
-                  <span className="font-medium text-white">{formatCurrency(forecast)}</span> this month,
+                  the <span className="font-medium text-white">acme-image-processor</span> function — invocations are up but
+                  cold-start duration has also spiked 340%, suggesting a recent package change. Your overall bill is trending
+                  toward <span className="font-medium text-white">{formatCurrency(forecast)}</span> this month,
                   which is 1.6% below last month&apos;s total — the savings come from EC2 right-sizing completed last week.
                 </p>
               </div>
