@@ -1,0 +1,263 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Tribe Watch Agent - Deploys monitoring agent in customer AWS account'
+
+Parameters:
+  CustomerID:
+    Type: String
+    Description: Your Tribe Watch Customer ID (e.g., TT-0001)
+    AllowedPattern: 'TT-\d{4}'
+  
+  IngestQueueURL:
+    Type: String
+    Description: Tribe Watch SQS ingest queue URL
+  
+  APIKey:
+    Type: String
+    Description: Your Tribe Watch API key
+    NoEcho: true
+  
+  AgentImageURI:
+    Type: String
+    Description: Tribe Watch agent Docker image URI
+    Default: '123456789012.dkr.ecr.eu-west-2.amazonaws.com/tribe-watch-agent:latest'
+  
+  ScheduleExpression:
+    Type: String
+    Description: How often the agent runs (cron expression)
+    Default: 'rate(5 minutes)'
+
+Resources:
+  # ECS Cluster
+  AgentCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub 'tribe-watch-agent-${CustomerID}'
+      CapacityProviders:
+        - FARGATE
+      DefaultCapacityProviderStrategy:
+        - CapacityProvider: FARGATE
+          Weight: 1
+
+  # IAM Role for Agent Task
+  AgentTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'TribeWatchAgentRole-${CustomerID}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/ReadOnlyAccess'
+      Policies:
+        - PolicyName: TribeWatchAgentPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'sqs:SendMessage'
+                  - 'sqs:SendMessageBatch'
+                Resource: !Sub 'arn:aws:sqs:*:*:tribe-watch-ingest-*'
+              - Effect: Allow
+                Action:
+                  - 'ce:GetCostAndUsage'
+                  - 'ce:GetCostForecast'
+                Resource: '*'
+
+  # IAM Role for ECS Task Execution
+  AgentExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'TribeWatchAgentExecutionRole-${CustomerID}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy'
+
+  # CloudWatch Log Group
+  AgentLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/ecs/tribe-watch-agent-${CustomerID}'
+      RetentionInDays: 7
+
+  # ECS Task Definition
+  AgentTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub 'tribe-watch-agent-${CustomerID}'
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      Cpu: '512'
+      Memory: '1024'
+      TaskRoleArn: !GetAtt AgentTaskRole.Arn
+      ExecutionRoleArn: !GetAtt AgentExecutionRole.Arn
+      ContainerDefinitions:
+        - Name: agent
+          Image: !Ref AgentImageURI
+          Essential: true
+          Environment:
+            - Name: TRIBE_WATCH_CUSTOMER_ID
+              Value: !Ref CustomerID
+            - Name: TRIBE_WATCH_INGEST_QUEUE_URL
+              Value: !Ref IngestQueueURL
+            - Name: TRIBE_WATCH_API_KEY
+              Value: !Ref APIKey
+            - Name: LOG_LEVEL
+              Value: INFO
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref AgentLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: agent
+
+  # EventBridge Scheduler Role
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'TribeWatchSchedulerRole-${CustomerID}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: RunECSTask
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ecs:RunTask'
+                Resource: !Ref AgentTaskDefinition
+              - Effect: Allow
+                Action:
+                  - 'iam:PassRole'
+                Resource:
+                  - !GetAtt AgentTaskRole.Arn
+                  - !GetAtt AgentExecutionRole.Arn
+
+  # Get Default VPC
+  DefaultVPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsHostnames: true
+      EnableDnsSupport: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'tribe-watch-vpc-${CustomerID}'
+
+  DefaultSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref DefaultVPC
+      CidrBlock: 10.0.1.0/24
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub 'tribe-watch-subnet-${CustomerID}'
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub 'tribe-watch-igw-${CustomerID}'
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref DefaultVPC
+      InternetGatewayId: !Ref InternetGateway
+
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref DefaultVPC
+      Tags:
+        - Key: Name
+          Value: !Sub 'tribe-watch-rt-${CustomerID}'
+
+  Route:
+    Type: AWS::EC2::Route
+    DependsOn: AttachGateway
+    Properties:
+      RouteTableId: !Ref RouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  SubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref DefaultSubnet
+      RouteTableId: !Ref RouteTable
+
+  # Security Group
+  AgentSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Tribe Watch Agent - outbound HTTPS only
+      VpcId: !Ref DefaultVPC
+      SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+          Description: HTTPS outbound for AWS API calls
+      Tags:
+        - Key: Name
+          Value: !Sub 'tribe-watch-agent-sg-${CustomerID}'
+
+  # EventBridge Schedule
+  AgentSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub 'tribe-watch-agent-${CustomerID}'
+      Description: !Sub 'Runs Tribe Watch agent every 5 minutes for ${CustomerID}'
+      ScheduleExpression: !Ref ScheduleExpression
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      Target:
+        Arn: !GetAtt AgentCluster.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+        EcsParameters:
+          TaskDefinitionArn: !Ref AgentTaskDefinition
+          LaunchType: FARGATE
+          NetworkConfiguration:
+            AwsvpcConfiguration:
+              Subnets:
+                - !Ref DefaultSubnet
+              SecurityGroups:
+                - !Ref AgentSecurityGroup
+              AssignPublicIp: ENABLED
+
+Outputs:
+  ClusterName:
+    Description: ECS Cluster name
+    Value: !Ref AgentCluster
+  
+  TaskDefinitionArn:
+    Description: Agent task definition ARN
+    Value: !Ref AgentTaskDefinition
+  
+  ScheduleName:
+    Description: EventBridge schedule name
+    Value: !Ref AgentSchedule
+  
+  LogGroupName:
+    Description: CloudWatch log group for agent logs
+    Value: !Ref AgentLogGroup

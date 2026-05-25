@@ -1,0 +1,149 @@
+version: '3.8'
+
+services:
+  # ── LocalStack — emulates AWS services for local development ─────────────
+  localstack:
+    image: localstack/localstack:3.4
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=sqs,dynamodb,secretsmanager,sns,ses,cognito-idp
+      - DEBUG=0
+      - DATA_DIR=/var/lib/localstack
+      - PERSISTENCE=1
+    volumes:
+      - localstack-data:/var/lib/localstack
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4566/_localstack/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Tribe Watch API ───────────────────────────────────────────────────────
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - AWS_REGION=eu-west-2
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+      - TIMESTREAM_DATABASE_NAME=tribe-watch
+      - TIMESTREAM_METRICS_TABLE=metrics
+      - TIMESTREAM_EVENTS_TABLE=events
+      - DYNAMODB_CUSTOMERS_TABLE=tribe_watch_customers
+      - DYNAMODB_ALERTS_TABLE=tribe_watch_alerts
+      - DYNAMODB_THRESHOLDS_TABLE=tribe_watch_thresholds
+      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
+      - COGNITO_CUSTOMER_USER_POOL_ID=${COGNITO_CUSTOMER_USER_POOL_ID:-}
+      - COGNITO_CUSTOMER_APP_CLIENT_ID=${COGNITO_CUSTOMER_APP_CLIENT_ID:-}
+      - COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID:-}
+      - COGNITO_ADMIN_APP_CLIENT_ID=${COGNITO_ADMIN_APP_CLIENT_ID:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - SNS_OPS_ALERTS_TOPIC_ARN=${SNS_OPS_ALERTS_TOPIC_ARN:-}
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./api:/app
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── Ingest Consumer ───────────────────────────────────────────────────────
+  ingest-consumer:
+    build:
+      context: ./ingest-consumer
+      dockerfile: Dockerfile
+    environment:
+      - AWS_REGION=eu-west-2
+      - ENVIRONMENT=dev
+      - LOG_LEVEL=INFO
+      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
+      - TIMESTREAM_DATABASE_NAME=tribe-watch
+      - TIMESTREAM_METRICS_TABLE=metrics
+      - TIMESTREAM_EVENTS_TABLE=events
+      - DYNAMODB_CUSTOMERS_TABLE=tribe_watch_customers
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./ingest-consumer:/app
+
+  # ── Customer Dashboard (Next.js) ──────────────────────────────────────────
+  dashboard:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_COGNITO_REGION=eu-west-2
+      - NEXT_PUBLIC_COGNITO_USER_POOL_ID=${COGNITO_CUSTOMER_USER_POOL_ID:-}
+      - NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=${COGNITO_CUSTOMER_APP_CLIENT_ID:-}
+    volumes:
+      - ./dashboard:/app
+      - dashboard-node-modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - api
+    profiles:
+      - frontend
+
+  # ── Admin Portal (Next.js) ────────────────────────────────────────────────
+  admin-portal:
+    image: node:20-alpine
+    working_dir: /app
+    ports:
+      - "3001:3001"
+    environment:
+      - NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+      - NEXT_PUBLIC_COGNITO_REGION=eu-west-2
+      - NEXT_PUBLIC_COGNITO_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID:-}
+      - NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=${COGNITO_ADMIN_APP_CLIENT_ID:-}
+    volumes:
+      - ./admin-portal:/app
+      - admin-node-modules:/app/node_modules
+    command: sh -c "npm install && npm run dev"
+    depends_on:
+      - api
+    profiles:
+      - frontend
+
+  # ── Agent (runs once for testing) ─────────────────────────────────────────
+  agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    environment:
+      - AWS_REGION=eu-west-2
+      - LOG_LEVEL=INFO
+      - TRIBE_WATCH_CUSTOMER_ID=TT-0001
+      - TRIBE_WATCH_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
+      - TRIBE_WATCH_API_KEY=test-api-key-12345
+      - AWS_ACCESS_KEY_ID=test
+      - AWS_SECRET_ACCESS_KEY=test
+      - AWS_ENDPOINT_URL=http://localstack:4566
+    depends_on:
+      localstack:
+        condition: service_healthy
+    volumes:
+      - ./agent:/app
+    profiles:
+      - agent
+
+volumes:
+  localstack-data:
+  dashboard-node-modules:
+  admin-node-modules:
