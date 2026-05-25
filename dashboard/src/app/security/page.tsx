@@ -3,50 +3,80 @@
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 import { Shield, Key, AlertTriangle, CheckCircle, Clock, Users } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
-import { MOCK_GUARDDUTY, MOCK_IAM, MOCK_ACM_CERTS, MOCK_CW_ALARMS } from '@/lib/mockData'
+import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
+import { useSecurity } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
 
 function SeverityBadge({ severity }: { severity: string }) {
   const s = severity.toUpperCase()
   if (s === 'CRITICAL' || s === 'HIGH') return <Badge variant="error">{s}</Badge>
-  if (s === 'MEDIUM') return <Badge variant="warning">{s}</Badge>
+  if (s === 'MEDIUM')                   return <Badge variant="warning">{s}</Badge>
   return <Badge variant="info">{s}</Badge>
 }
 
 function AlarmBadge({ state }: { state: string }) {
   if (state === 'ALARM') return <Badge variant="error">ALARM</Badge>
-  if (state === 'OK') return <Badge variant="success">OK</Badge>
+  if (state === 'OK')    return <Badge variant="success">OK</Badge>
   return <Badge variant="default">{state}</Badge>
 }
 
-export default function SecurityPage() {
-  const { loading: authLoading } = useAuth()
-
-  if (authLoading) return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
+function ComplianceBar({ label, score }: { label: string; score: number }) {
+  const color = score >= 90 ? 'bg-emerald-500' : score >= 75 ? 'bg-amber-500' : 'bg-red-500'
+  const text  = score >= 90 ? 'text-emerald-400' : score >= 75 ? 'text-amber-400' : 'text-red-400'
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-sm text-slate-300">{label}</span>
+        <span className={`text-sm font-bold ${text}`}>{score}%</span>
       </div>
-    </DashboardLayout>
+      <div className="h-2 bg-white/[0.06] rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${score}%` }} />
+      </div>
+    </div>
   )
+}
+
+export default function SecurityPage() {
+  const { customerId }      = useAuth()
+  const { timeRange }       = useDashboard()
+  const { data, isLoading } = useSecurity()
+
+  if (isLoading || !data) {
+    return (
+      <DashboardLayout customerId={customerId || undefined}>
+        <div className="space-y-6">
+          <div className="h-8 w-32 bg-white/[0.06] rounded animate-pulse" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const { guardduty, iam, certs, alarms, compliance } = data
+  const expiringCerts = certs.filter(c => c.days_to_expiry < 30).length
 
   return (
-    <DashboardLayout>
+    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-white">Security</h1>
-          <p className="text-slate-400 text-sm mt-0.5">GuardDuty · IAM · ACM · CloudWatch Alarms</p>
+          <p className="text-slate-400 text-sm mt-0.5">
+            GuardDuty · IAM · ACM · CloudWatch Alarms · {TIME_RANGE_LABELS[timeRange]}
+          </p>
         </div>
 
-        {/* Top row - summary tiles */}
+        {/* Summary tiles */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'GuardDuty Findings', value: MOCK_GUARDDUTY.length, color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20',     icon: AlertTriangle },
-            { label: 'Users w/o MFA',      value: MOCK_IAM.users_without_mfa, color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', icon: Users },
-            { label: 'Old Access Keys',    value: MOCK_IAM.old_access_keys,   color: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20', icon: Key },
-            { label: 'Certs Expiring <30d',value: MOCK_ACM_CERTS.filter(c => c.days_remaining < 30).length, color: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20', icon: Shield },
+            { label: 'GuardDuty Findings', value: guardduty.length,         color: 'text-red-400',     bg: 'bg-red-500/10 border-red-500/20',     icon: AlertTriangle },
+            { label: 'Users w/o MFA',      value: iam.users_without_mfa,    color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20', icon: Users },
+            { label: 'Old Access Keys',    value: iam.old_access_keys,      color: 'text-amber-400',   bg: 'bg-amber-500/10 border-amber-500/20', icon: Key },
+            { label: 'Certs Expiring <30d',value: expiringCerts,            color: expiringCerts > 0 ? 'text-red-400' : 'text-emerald-400', bg: expiringCerts > 0 ? 'bg-red-500/10 border-red-500/20' : 'bg-emerald-500/10 border-emerald-500/20', icon: Shield },
           ].map(s => (
             <Card key={s.label}>
               <CardContent className="p-4">
@@ -62,12 +92,34 @@ export default function SecurityPage() {
           ))}
         </div>
 
+        {/* Compliance Scores — time-range-aware */}
+        <Card className="border-indigo-500/20 bg-indigo-600/5">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold text-white">Compliance Posture</h3>
+                <p className="text-xs text-slate-400 mt-0.5">{TIME_RANGE_LABELS[timeRange]} snapshot</p>
+              </div>
+              <Badge variant="info">4 frameworks</Badge>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <ComplianceBar label="GDPR"           score={compliance.gdpr} />
+              <ComplianceBar label="Cyber Essentials" score={compliance.cyber_essentials} />
+              <ComplianceBar label="FCA"            score={compliance.fca} />
+              <ComplianceBar label="ISO 27001"      score={compliance.iso27001} />
+            </div>
+            <p className="text-xs text-slate-500 mt-3">
+              Scores reflect findings across {TIME_RANGE_LABELS[timeRange].toLowerCase()}. Longer ranges may show historical regressions.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* GuardDuty */}
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">GuardDuty Findings</h2>
           <div className="space-y-3">
-            {MOCK_GUARDDUTY.map(f => (
-              <Card key={f.id} className="border-amber-500/20 bg-amber-500/5">
+            {guardduty.map(f => (
+              <Card key={f.finding_id} className="border-amber-500/20 bg-amber-500/5">
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     <AlertTriangle className="w-4 h-4 text-amber-400 mt-0.5 flex-shrink-0" />
@@ -77,12 +129,12 @@ export default function SecurityPage() {
                         <span className="text-xs font-mono text-slate-400">{f.type.split(':')[0]}</span>
                         <span className="text-xs text-slate-500">{f.region}</span>
                       </div>
-                      <p className="text-sm font-medium text-white mb-1">{f.title}</p>
+                      <p className="text-sm font-medium text-white mb-1">{f.type.split('/')[1] || f.type}</p>
                       <p className="text-xs text-slate-400 leading-relaxed mb-2">{f.description}</p>
                       <div className="flex items-center gap-4 text-xs text-slate-500">
                         <span>{f.count} occurrences</span>
-                        <span>First: {formatRelativeTime(f.first_seen)}</span>
-                        <span>Last: {formatRelativeTime(f.last_seen)}</span>
+                        <span>Updated: {formatRelativeTime(f.updated_at)}</span>
+                        <span className="font-mono">{f.resource}</span>
                       </div>
                     </div>
                   </div>
@@ -92,7 +144,7 @@ export default function SecurityPage() {
           </div>
         </section>
 
-        {/* IAM + ACM side by side */}
+        {/* IAM + ACM */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* IAM Health */}
           <section>
@@ -100,12 +152,13 @@ export default function SecurityPage() {
             <Card>
               <CardContent className="p-4 space-y-3">
                 {[
-                  { label: 'Total IAM users',       value: MOCK_IAM.users_total,          ok: true },
-                  { label: 'Users without MFA',     value: MOCK_IAM.users_without_mfa,    ok: MOCK_IAM.users_without_mfa === 0 },
-                  { label: 'Old access keys (>90d)',value: MOCK_IAM.old_access_keys,       ok: MOCK_IAM.old_access_keys === 0 },
-                  { label: 'Unused roles (>90d)',   value: MOCK_IAM.unused_roles,          ok: MOCK_IAM.unused_roles === 0 },
-                  { label: 'Root MFA enabled',      value: MOCK_IAM.root_mfa_enabled ? 'Yes' : 'No', ok: MOCK_IAM.root_mfa_enabled },
-                  { label: 'Root access keys',      value: MOCK_IAM.root_access_keys ? 'Present' : 'None', ok: !MOCK_IAM.root_access_keys },
+                  { label: 'Total IAM users',            value: iam.users_total,          ok: true },
+                  { label: 'Users without MFA',          value: iam.users_without_mfa,    ok: iam.users_without_mfa === 0 },
+                  { label: 'Old access keys (>90d)',      value: iam.old_access_keys,      ok: iam.old_access_keys === 0 },
+                  { label: 'Overprivileged roles',        value: iam.overprivileged_roles, ok: iam.overprivileged_roles === 0 },
+                  { label: 'Unused credentials (>90d)',   value: iam.unused_credentials_90d, ok: iam.unused_credentials_90d === 0 },
+                  { label: 'Root MFA enabled',           value: iam.root_mfa_enabled ? 'Yes' : 'No', ok: iam.root_mfa_enabled },
+                  { label: 'Root access keys active',    value: iam.root_access_keys ? 'Present' : 'None', ok: !iam.root_access_keys },
                 ].map(item => (
                   <div key={item.label} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
                     <span className="text-sm text-slate-300">{item.label}</span>
@@ -126,17 +179,18 @@ export default function SecurityPage() {
             <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">ACM Certificates</h2>
             <Card>
               <CardContent className="p-4 space-y-3">
-                {MOCK_ACM_CERTS.map(cert => (
+                {certs.map(cert => (
                   <div key={cert.domain} className="flex items-center justify-between py-1.5 border-b border-white/[0.04] last:border-0">
                     <div>
                       <p className="text-sm font-medium text-slate-200">{cert.domain}</p>
                       <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
                         <Clock className="w-3 h-3" />
-                        {cert.days_remaining} days remaining
+                        {cert.days_to_expiry} days remaining
+                        {!cert.auto_renew && <span className="text-amber-400 ml-1">· manual renewal</span>}
                       </p>
                     </div>
-                    {cert.days_remaining < 30
-                      ? <Badge variant="warning">Expiring</Badge>
+                    {cert.days_to_expiry < 30
+                      ? <Badge variant="warning">Expiring Soon</Badge>
                       : <Badge variant="success">Valid</Badge>}
                   </div>
                 ))}
@@ -154,18 +208,24 @@ export default function SecurityPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      {['Alarm Name', 'State', 'Namespace', 'Metric'].map(h => (
+                      {['Alarm Name', 'State', 'Namespace', 'Metric', 'Threshold', 'Value'].map(h => (
                         <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_CW_ALARMS.map((a, idx) => (
-                      <tr key={a.name} className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 ? 'bg-white/[0.01]' : ''}`}>
-                        <td className="px-4 py-3 font-medium text-white">{a.name}</td>
+                    {alarms.map((a, idx) => (
+                      <tr key={a.alarm_name} className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 ? 'bg-white/[0.01]' : ''}`}>
+                        <td className="px-4 py-3 font-medium text-white">{a.alarm_name}</td>
                         <td className="px-4 py-3"><AlarmBadge state={a.state} /></td>
                         <td className="px-4 py-3 text-xs font-mono text-slate-400">{a.namespace}</td>
                         <td className="px-4 py-3 text-xs text-slate-400">{a.metric}</td>
+                        <td className="px-4 py-3 text-xs text-slate-400">{a.threshold}</td>
+                        <td className="px-4 py-3 text-xs">
+                          <span className={a.state === 'ALARM' ? 'text-red-400 font-semibold' : 'text-slate-300'}>
+                            {a.value}
+                          </span>
+                        </td>
                       </tr>
                     ))}
                   </tbody>

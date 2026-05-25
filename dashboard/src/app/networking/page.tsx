@@ -3,44 +3,55 @@
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
-import { MOCK_VPCS, MOCK_ELBS, MOCK_CLOUDFRONT } from '@/lib/mockData'
+import { useNetworking } from '@/hooks/useData'
 
 export default function NetworkingPage() {
-  const { loading: authLoading } = useAuth()
+  const { customerId }       = useAuth()
+  const { data, isLoading }  = useNetworking()
 
-  if (authLoading) return (
-    <DashboardLayout>
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-indigo-500" />
-      </div>
-    </DashboardLayout>
-  )
+  if (isLoading || !data) {
+    return (
+      <DashboardLayout customerId={customerId || undefined}>
+        <div className="space-y-6">
+          <div className="h-8 w-40 bg-white/[0.06] rounded animate-pulse" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
+          </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  const { vpcs, elbs, cloudfront } = data
 
   return (
-    <DashboardLayout>
+    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-white">Networking</h1>
-          <p className="text-slate-400 text-sm mt-0.5">VPC · Load Balancers · CloudFront</p>
+          <p className="text-slate-400 text-sm mt-0.5">
+            VPC · Load Balancers · CloudFront — {vpcs.length} VPCs, {elbs.length} LBs, {cloudfront.length} distributions
+          </p>
         </div>
 
         {/* VPCs */}
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">VPCs</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {MOCK_VPCS.map(vpc => (
-              <Card key={vpc.id}>
+            {vpcs.map(vpc => (
+              <Card key={vpc.vpc_id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="font-semibold text-white">{vpc.name}</span>
                     <Badge variant="success">{vpc.state}</Badge>
                   </div>
-                  <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="grid grid-cols-3 gap-3 text-center mb-3">
                     {[
-                      ['CIDR', vpc.cidr],
-                      ['Subnets', vpc.subnets],
-                      ['NAT GWs', vpc.nat_gateways],
+                      ['CIDR',         vpc.cidr],
+                      ['Subnets',      vpc.subnets],
+                      ['Route Tables', vpc.route_tables],
                     ].map(([k, v]) => (
                       <div key={String(k)} className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
                         <div className="text-xs text-slate-500">{k}</div>
@@ -48,7 +59,10 @@ export default function NetworkingPage() {
                       </div>
                     ))}
                   </div>
-                  <p className="text-xs text-slate-500 mt-3 font-mono">{vpc.id} · {vpc.region}</p>
+                  <div className="flex items-center justify-between text-xs text-slate-500">
+                    <span className="font-mono">{vpc.vpc_id}</span>
+                    <span>{vpc.region}</span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
@@ -64,29 +78,29 @@ export default function NetworkingPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-white/[0.06]">
-                      {['Name', 'Type', 'Scheme', 'Req/min', '5xx %', 'Latency', 'Targets'].map(h => (
+                      {['Name', 'Type', 'Scheme', 'Req/day', '5xx %', 'Latency', 'Targets'].map(h => (
                         <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {MOCK_ELBS.map((lb, idx) => (
+                    {elbs.map((lb, idx) => (
                       <tr key={lb.name} className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 ? 'bg-white/[0.01]' : ''}`}>
                         <td className="px-4 py-3 font-medium text-white">{lb.name}</td>
                         <td className="px-4 py-3"><Badge variant="info">{lb.type}</Badge></td>
                         <td className="px-4 py-3 text-xs text-slate-400">{lb.scheme}</td>
-                        <td className="px-4 py-3 text-slate-300">{lb.requests_pm.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-slate-300">{lb.request_count.toLocaleString()}</td>
                         <td className="px-4 py-3">
-                          <span className={lb.req_5xx_pct > 1 ? 'text-red-400 font-semibold' : 'text-emerald-400'}>
-                            {lb.req_5xx_pct.toFixed(2)}%
+                          <span className={lb.error_5xx > 1 ? 'text-red-400 font-semibold' : 'text-emerald-400'}>
+                            {lb.error_5xx.toFixed(2)}%
                           </span>
                         </td>
                         <td className="px-4 py-3 text-slate-300">{lb.latency_ms} ms</td>
                         <td className="px-4 py-3">
-                          <span className={lb.healthy_targets < lb.active_targets ? 'text-red-400' : 'text-emerald-400'}>
-                            {lb.healthy_targets}
+                          <span className={lb.healthy < lb.targets ? 'text-red-400' : 'text-emerald-400'}>
+                            {lb.healthy}
                           </span>
-                          <span className="text-slate-500 text-xs">/{lb.active_targets}</span>
+                          <span className="text-slate-500 text-xs">/{lb.targets}</span>
                         </td>
                       </tr>
                     ))}
@@ -101,7 +115,7 @@ export default function NetworkingPage() {
         <section>
           <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">CloudFront Distributions</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {MOCK_CLOUDFRONT.map(cf => (
+            {cloudfront.map(cf => (
               <Card key={cf.id}>
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between mb-3">
@@ -113,9 +127,9 @@ export default function NetworkingPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-center">
                     {[
-                      ['Req/min', cf.requests_pm.toLocaleString()],
-                      ['Error %', `${cf.error_pct.toFixed(2)}%`],
-                      ['Cache Hit', `${cf.cache_hit_pct.toFixed(1)}%`],
+                      ['Req/day',   cf.requests_day.toLocaleString()],
+                      ['Error %',   `${cf.error_rate.toFixed(2)}%`],
+                      ['Cache Hit', `${cf.cache_hit.toFixed(1)}%`],
                     ].map(([k, v]) => (
                       <div key={String(k)} className="p-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
                         <div className="text-xs text-slate-500">{k}</div>
