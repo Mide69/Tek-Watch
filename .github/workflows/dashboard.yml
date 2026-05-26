@@ -46,6 +46,9 @@ jobs:
       - name: Type check
         run: npm run type-check
 
+      - name: Unit tests
+        run: npm test
+
   build:
     needs: lint-and-typecheck
     runs-on: ubuntu-latest
