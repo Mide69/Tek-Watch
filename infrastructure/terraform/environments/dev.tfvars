@@ -26,5 +26,5 @@ sqs_message_retention_seconds  = 86400   # 1 day in dev
 sqs_dlq_max_receive_count      = 3
 
 # Domain — no cert needed for dev (HTTP only via ALB DNS)
-domain_name         = "dev.tribewatch.io"
-acm_certificate_arn = ""
+domain_name         = "dev.tekwatch.io"
+acm_certificate_arn = ""   # Set via GitHub secret ACM_CERT_ARN_DEV

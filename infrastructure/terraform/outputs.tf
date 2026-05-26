@@ -43,6 +43,11 @@ output "dynamodb_customers_table" {
   value       = module.dynamodb.customers_table_name
 }
 
+output "dynamodb_heartbeats_table" {
+  description = "DynamoDB heartbeats table name (used by silence-detector Lambda)"
+  value       = module.dynamodb.heartbeats_table_name
+}
+
 output "cognito_customer_user_pool_id" {
   description = "Cognito customer user pool ID"
   value       = module.cognito.customer_user_pool_id

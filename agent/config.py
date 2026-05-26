@@ -25,9 +25,9 @@ def load_config() -> AgentConfig:
         SystemExit: If any required environment variable is missing.
     """
     required = {
-        "TRIBE_WATCH_CUSTOMER_ID": os.environ.get("TRIBE_WATCH_CUSTOMER_ID", ""),
-        "TRIBE_WATCH_INGEST_QUEUE_URL": os.environ.get("TRIBE_WATCH_INGEST_QUEUE_URL", ""),
-        "TRIBE_WATCH_API_KEY": os.environ.get("TRIBE_WATCH_API_KEY", ""),
+        "TEK_WATCH_CUSTOMER_ID": os.environ.get("TEK_WATCH_CUSTOMER_ID", ""),
+        "TEK_WATCH_INGEST_QUEUE_URL": os.environ.get("TEK_WATCH_INGEST_QUEUE_URL", ""),
+        "TEK_WATCH_API_KEY": os.environ.get("TEK_WATCH_API_KEY", ""),
     }
 
     missing = [k for k, v in required.items() if not v]
@@ -36,9 +36,9 @@ def load_config() -> AgentConfig:
         raise SystemExit(1)
 
     return AgentConfig(
-        customer_id=required["TRIBE_WATCH_CUSTOMER_ID"],
-        ingest_queue_url=required["TRIBE_WATCH_INGEST_QUEUE_URL"],
-        api_key=required["TRIBE_WATCH_API_KEY"],
+        customer_id=required["TEK_WATCH_CUSTOMER_ID"],
+        ingest_queue_url=required["TEK_WATCH_INGEST_QUEUE_URL"],
+        api_key=required["TEK_WATCH_API_KEY"],
         log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         aws_region=os.environ.get("AWS_REGION", "eu-west-2"),
     )

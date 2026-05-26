@@ -1,5 +1,5 @@
 """
-Tribe Watch API — FastAPI application serving dashboards and running alerting engine.
+Tek Watch API — FastAPI application serving dashboards and running alerting engine.
 
 Endpoints:
   - Customer dashboard data (authenticated via Cognito JWT)
@@ -85,28 +85,28 @@ def create_app() -> FastAPI:
     config = load_config()
     
     app = FastAPI(
-        title="Tribe Watch API",
+        title="Tek Watch API",
         description="Cloud infrastructure monitoring platform by Tek Tribe Ltd",
         version="1.0.0",
         docs_url="/docs" if config.environment != "prod" else None,
         redoc_url="/redoc" if config.environment != "prod" else None,
         lifespan=lifespan,
     )
-    
+
     # CORS middleware
     app.add_middleware(
         CORSMiddleware,
         allow_origins=[
-            "http://localhost:3000",  # Dashboard dev
-            "http://localhost:3001",  # Admin portal dev
-            "https://app.tribewatch.io",
-            "https://admin.tribewatch.io",
-            "https://dev.tribewatch.io",
-            "https://staging.tribewatch.io",
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "https://app.tekwatch.io",
+            "https://admin.tekwatch.io",
+            "https://dev.tekwatch.io",
+            "https://staging.tekwatch.io",
         ],
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "DELETE", "PATCH"],
+        allow_headers=["Authorization", "Content-Type"],
     )
     
     # Health check

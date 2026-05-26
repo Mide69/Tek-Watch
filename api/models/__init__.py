@@ -1,1 +1,1 @@
-"""Tribe Watch API Pydantic models."""
+"""Tek Watch API Pydantic models."""

@@ -145,27 +145,27 @@ async def download_cloudformation_template(
     # Build the CloudFormation template as a dict and serialise to YAML
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
-        "Description": f"Tribe Watch Agent — {customer_id} ({customer.get('name', '')})",
+        "Description": f"Tek Watch Agent — {customer_id} ({customer.get('name', '')})",
         "Parameters": {
             "CustomerID": {
                 "Type": "String",
                 "Default": customer_id,
-                "Description": "Tribe Watch Customer ID",
+                "Description": "Tek Watch Customer ID",
             },
             "IngestQueueURL": {
                 "Type": "String",
                 "Default": config.sqs_ingest_queue_url,
-                "Description": "Tribe Watch SQS ingest queue URL",
+                "Description": "Tek Watch SQS ingest queue URL",
             },
             "APIKey": {
                 "Type": "String",
                 "NoEcho": True,
-                "Description": "Tribe Watch API key — enter the value provided by your admin",
+                "Description": "Tek Watch API key — enter the value provided by your admin",
             },
             "AgentImageURI": {
                 "Type": "String",
-                "Default": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/tribe-watch-agent:latest",
-                "Description": "Tribe Watch agent Docker image URI",
+                "Default": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/tek-watch-agent:latest",
+                "Description": "Tek Watch agent Docker image URI",
             },
             "ScheduleExpression": {
                 "Type": "String",
@@ -177,14 +177,14 @@ async def download_cloudformation_template(
             "AgentCluster": {
                 "Type": "AWS::ECS::Cluster",
                 "Properties": {
-                    "ClusterName": {"Fn::Sub": f"tribe-watch-agent-{customer_id}"},
+                    "ClusterName": {"Fn::Sub": f"tek-watch-agent-{customer_id}"},
                     "CapacityProviders": ["FARGATE"],
                 },
             },
             "AgentTaskRole": {
                 "Type": "AWS::IAM::Role",
                 "Properties": {
-                    "RoleName": {"Fn::Sub": f"TribeWatchAgentRole-{customer_id}"},
+                    "RoleName": {"Fn::Sub": f"TekWatchAgentRole-{customer_id}"},
                     "AssumeRolePolicyDocument": {
                         "Version": "2012-10-17",
                         "Statement": [{
@@ -195,13 +195,13 @@ async def download_cloudformation_template(
                     },
                     "ManagedPolicyArns": ["arn:aws:iam::aws:policy/ReadOnlyAccess"],
                     "Policies": [{
-                        "PolicyName": "TribeWatchSQSSend",
+                        "PolicyName": "TekWatchSQSSend",
                         "PolicyDocument": {
                             "Version": "2012-10-17",
                             "Statement": [{
                                 "Effect": "Allow",
                                 "Action": ["sqs:SendMessage", "sqs:SendMessageBatch"],
-                                "Resource": {"Fn::Sub": "arn:aws:sqs:*:*:tribe-watch-ingest-*"},
+                                "Resource": {"Fn::Sub": "arn:aws:sqs:*:*:tek-watch-ingest-*"},
                             }, {
                                 "Effect": "Allow",
                                 "Action": ["ce:GetCostAndUsage", "ce:GetCostForecast"],
@@ -214,7 +214,7 @@ async def download_cloudformation_template(
             "AgentExecutionRole": {
                 "Type": "AWS::IAM::Role",
                 "Properties": {
-                    "RoleName": {"Fn::Sub": f"TribeWatchAgentExecutionRole-{customer_id}"},
+                    "RoleName": {"Fn::Sub": f"TekWatchAgentExecutionRole-{customer_id}"},
                     "AssumeRolePolicyDocument": {
                         "Version": "2012-10-17",
                         "Statement": [{
@@ -231,14 +231,14 @@ async def download_cloudformation_template(
             "AgentLogGroup": {
                 "Type": "AWS::Logs::LogGroup",
                 "Properties": {
-                    "LogGroupName": {"Fn::Sub": f"/ecs/tribe-watch-agent-{customer_id}"},
+                    "LogGroupName": {"Fn::Sub": f"/ecs/tek-watch-agent-{customer_id}"},
                     "RetentionInDays": 7,
                 },
             },
             "AgentTaskDefinition": {
                 "Type": "AWS::ECS::TaskDefinition",
                 "Properties": {
-                    "Family": {"Fn::Sub": f"tribe-watch-agent-{customer_id}"},
+                    "Family": {"Fn::Sub": f"tek-watch-agent-{customer_id}"},
                     "NetworkMode": "awsvpc",
                     "RequiresCompatibilities": ["FARGATE"],
                     "Cpu": "512",
@@ -250,9 +250,9 @@ async def download_cloudformation_template(
                         "Image": {"Ref": "AgentImageURI"},
                         "Essential": True,
                         "Environment": [
-                            {"Name": "TRIBE_WATCH_CUSTOMER_ID", "Value": {"Ref": "CustomerID"}},
-                            {"Name": "TRIBE_WATCH_INGEST_QUEUE_URL", "Value": {"Ref": "IngestQueueURL"}},
-                            {"Name": "TRIBE_WATCH_API_KEY", "Value": {"Ref": "APIKey"}},
+                            {"Name": "TEK_WATCH_CUSTOMER_ID", "Value": {"Ref": "CustomerID"}},
+                            {"Name": "TEK_WATCH_INGEST_QUEUE_URL", "Value": {"Ref": "IngestQueueURL"}},
+                            {"Name": "TEK_WATCH_API_KEY", "Value": {"Ref": "APIKey"}},
                             {"Name": "LOG_LEVEL", "Value": "INFO"},
                         ],
                         "LogConfiguration": {
@@ -268,13 +268,13 @@ async def download_cloudformation_template(
             },
         },
         "Outputs": {
-            "CustomerID": {"Value": customer_id, "Description": "Tribe Watch Customer ID"},
+            "CustomerID": {"Value": customer_id, "Description": "Tek Watch Customer ID"},
             "ClusterName": {"Value": {"Ref": "AgentCluster"}, "Description": "ECS Cluster"},
         },
     }
 
     template_yaml = yaml.dump(template, default_flow_style=False, sort_keys=False)
-    filename = f"tribe-watch-agent-{customer_id}.yaml"
+    filename = f"tek-watch-agent-{customer_id}.yaml"
 
     return Response(
         content=template_yaml,

@@ -1,5 +1,5 @@
 /**
- * API client for Tribe Watch backend.
+ * API client for Tek Watch backend.
  * Handles authentication, request/response formatting, and error handling.
  */
 
@@ -50,13 +50,13 @@ class APIClient {
   setToken(token: string) {
     this.token = token
     if (typeof window !== 'undefined') {
-      localStorage.setItem('tribe_watch_token', token)
+      localStorage.setItem('tek_watch_token', token)
     }
   }
 
   getToken(): string | null {
     if (!this.token && typeof window !== 'undefined') {
-      this.token = localStorage.getItem('tribe_watch_token')
+      this.token = localStorage.getItem('tek_watch_token')
     }
     return this.token
   }
@@ -64,7 +64,7 @@ class APIClient {
   clearToken() {
     this.token = null
     if (typeof window !== 'undefined') {
-      localStorage.removeItem('tribe_watch_token')
+      localStorage.removeItem('tek_watch_token')
     }
   }
 

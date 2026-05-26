@@ -42,7 +42,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <Shield className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="font-bold text-sm">Tribe Watch</p>
+          <p className="font-bold text-sm">Tek Watch</p>
           <p className="text-xs text-gray-400">Admin Portal</p>
         </div>
       </div>

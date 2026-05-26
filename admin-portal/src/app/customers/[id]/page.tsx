@@ -96,7 +96,7 @@ export default function CustomerDetailPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `tribe-watch-agent-${id}.yaml`
+      a.download = `tek-watch-agent-${id}.yaml`
       a.click()
       URL.revokeObjectURL(url)
     } catch (e) {

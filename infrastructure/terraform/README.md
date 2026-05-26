@@ -1,6 +1,6 @@
-# Tribe Watch — Terraform Infrastructure
+# Tek Watch — Terraform Infrastructure
 
-Manages all central account AWS resources for the Tribe Watch platform.
+Manages all central account AWS resources for the Tek Watch platform.
 
 ## Architecture
 
@@ -21,19 +21,19 @@ modules/
 
 - Terraform >= 1.6.0
 - AWS CLI configured with admin credentials for the central account
-- S3 bucket for Terraform state: `tribe-watch-terraform-state`
-- DynamoDB table for state locking: `tribe-watch-terraform-locks`
+- S3 bucket for Terraform state: `tek-watch-terraform-state`
+- DynamoDB table for state locking: `tek-watch-terraform-locks`
 
 ### Create state backend (one-time)
 
 ```bash
-aws s3 mb s3://tribe-watch-terraform-state --region eu-west-2
+aws s3 mb s3://tek-watch-terraform-state --region eu-west-2
 aws s3api put-bucket-versioning \
-  --bucket tribe-watch-terraform-state \
+  --bucket tek-watch-terraform-state \
   --versioning-configuration Status=Enabled
 
 aws dynamodb create-table \
-  --table-name tribe-watch-terraform-locks \
+  --table-name tek-watch-terraform-locks \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
   --key-schema AttributeName=LockID,KeyType=HASH \
   --billing-mode PAY_PER_REQUEST \
@@ -48,7 +48,7 @@ aws dynamodb create-table \
 cd infrastructure/terraform
 
 terraform init \
-  -backend-config="key=tribe-watch/dev/terraform.tfstate"
+  -backend-config="key=tek-watch/dev/terraform.tfstate"
 
 terraform plan \
   -var-file="environments/dev.tfvars" \
@@ -62,7 +62,7 @@ terraform apply tfplan
 
 ```bash
 terraform init \
-  -backend-config="key=tribe-watch/staging/terraform.tfstate"
+  -backend-config="key=tek-watch/staging/terraform.tfstate"
 
 terraform apply \
   -var-file="environments/staging.tfvars" \
@@ -74,7 +74,7 @@ terraform apply \
 
 ```bash
 terraform init \
-  -backend-config="key=tribe-watch/prod/terraform.tfstate"
+  -backend-config="key=tek-watch/prod/terraform.tfstate"
 
 terraform plan \
   -var-file="environments/prod.tfvars" \
@@ -113,8 +113,8 @@ After first `terraform apply`:
    ```
 4. **Force ECS redeployment** after pushing images:
    ```bash
-   aws ecs update-service --cluster tribe-watch-dev --service api --force-new-deployment
-   aws ecs update-service --cluster tribe-watch-dev --service ingest-consumer --force-new-deployment
+   aws ecs update-service --cluster tek-watch-dev --service api --force-new-deployment
+   aws ecs update-service --cluster tek-watch-dev --service ingest-consumer --force-new-deployment
    ```
 5. **Subscribe ops email to SNS topic**:
    ```bash

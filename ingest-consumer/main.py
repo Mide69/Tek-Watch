@@ -1,5 +1,5 @@
 """
-Tribe Watch Ingest Consumer — long-running SQS poll loop.
+Tek Watch Ingest Consumer — long-running SQS poll loop.
 
 Polls the ingest SQS queue, validates messages, writes to Timestream,
 and deletes successfully processed messages.

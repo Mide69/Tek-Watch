@@ -19,7 +19,7 @@ services:
       timeout: 5s
       retries: 5
 
-  # ── Tribe Watch API ───────────────────────────────────────────────────────
+  # ── Tek Watch API ────────────────────────────────────────────────────────
   api:
     build:
       context: ./api
@@ -30,13 +30,13 @@ services:
       - AWS_REGION=eu-west-2
       - ENVIRONMENT=dev
       - LOG_LEVEL=INFO
-      - TIMESTREAM_DATABASE_NAME=tribe-watch
+      - TIMESTREAM_DATABASE_NAME=tek-watch
       - TIMESTREAM_METRICS_TABLE=metrics
       - TIMESTREAM_EVENTS_TABLE=events
-      - DYNAMODB_CUSTOMERS_TABLE=tribe_watch_customers
-      - DYNAMODB_ALERTS_TABLE=tribe_watch_alerts
-      - DYNAMODB_THRESHOLDS_TABLE=tribe_watch_thresholds
-      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
+      - DYNAMODB_CUSTOMERS_TABLE=tek_watch_customers
+      - DYNAMODB_ALERTS_TABLE=tek_watch_alerts
+      - DYNAMODB_THRESHOLDS_TABLE=tek_watch_thresholds
+      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tek-watch-ingest
       - COGNITO_CUSTOMER_USER_POOL_ID=${COGNITO_CUSTOMER_USER_POOL_ID:-}
       - COGNITO_CUSTOMER_APP_CLIENT_ID=${COGNITO_CUSTOMER_APP_CLIENT_ID:-}
       - COGNITO_ADMIN_USER_POOL_ID=${COGNITO_ADMIN_USER_POOL_ID:-}
@@ -67,11 +67,11 @@ services:
       - AWS_REGION=eu-west-2
       - ENVIRONMENT=dev
       - LOG_LEVEL=INFO
-      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
-      - TIMESTREAM_DATABASE_NAME=tribe-watch
+      - SQS_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tek-watch-ingest
+      - TIMESTREAM_DATABASE_NAME=tek-watch
       - TIMESTREAM_METRICS_TABLE=metrics
       - TIMESTREAM_EVENTS_TABLE=events
-      - DYNAMODB_CUSTOMERS_TABLE=tribe_watch_customers
+      - DYNAMODB_CUSTOMERS_TABLE=tek_watch_customers
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_ENDPOINT_URL=http://localstack:4566
@@ -129,9 +129,9 @@ services:
     environment:
       - AWS_REGION=eu-west-2
       - LOG_LEVEL=INFO
-      - TRIBE_WATCH_CUSTOMER_ID=TT-0001
-      - TRIBE_WATCH_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tribe-watch-ingest
-      - TRIBE_WATCH_API_KEY=test-api-key-12345
+      - TEK_WATCH_CUSTOMER_ID=TT-0001
+      - TEK_WATCH_INGEST_QUEUE_URL=http://localstack:4566/000000000000/tek-watch-ingest
+      - TEK_WATCH_API_KEY=test-api-key-12345
       - AWS_ACCESS_KEY_ID=test
       - AWS_SECRET_ACCESS_KEY=test
       - AWS_ENDPOINT_URL=http://localstack:4566

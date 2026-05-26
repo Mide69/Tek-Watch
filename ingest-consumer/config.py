@@ -50,19 +50,19 @@ def load_config() -> ConsumerConfig:
         # Local dev fallback — read directly from env
         secrets = {
             "sqs_ingest_queue_url": os.environ.get("SQS_INGEST_QUEUE_URL", ""),
-            "timestream_database_name": os.environ.get("TIMESTREAM_DATABASE_NAME", "tribe-watch"),
+            "timestream_database_name": os.environ.get("TIMESTREAM_DATABASE_NAME", "tek-watch"),
             "timestream_metrics_table": os.environ.get("TIMESTREAM_METRICS_TABLE", "metrics"),
             "timestream_events_table": os.environ.get("TIMESTREAM_EVENTS_TABLE", "events"),
-            "dynamodb_customers_table": os.environ.get("DYNAMODB_CUSTOMERS_TABLE", "tribe_watch_customers"),
+            "dynamodb_customers_table": os.environ.get("DYNAMODB_CUSTOMERS_TABLE", "tek_watch_customers"),
         }
 
     return ConsumerConfig(
         aws_region=aws_region,
         environment=environment,
         sqs_ingest_queue_url=secrets.get("sqs_ingest_queue_url", ""),
-        timestream_database_name=secrets.get("timestream_database_name", "tribe-watch"),
+        timestream_database_name=secrets.get("timestream_database_name", "tek-watch"),
         timestream_metrics_table=secrets.get("timestream_metrics_table", "metrics"),
         timestream_events_table=secrets.get("timestream_events_table", "events"),
-        dynamodb_customers_table=secrets.get("dynamodb_customers_table", "tribe_watch_customers"),
+        dynamodb_customers_table=secrets.get("dynamodb_customers_table", "tek_watch_customers"),
         log_level=log_level,
     )

@@ -5,8 +5,8 @@ import './globals.css'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Tribe Watch — Admin Portal',
-  description: 'Tribe Watch platform management for Tek Tribe staff',
+  title: 'Tek Watch — Admin Portal',
+  description: 'Tek Watch platform management for Tek Tribe staff',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

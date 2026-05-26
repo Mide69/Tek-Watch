@@ -88,7 +88,7 @@ class TestTimestreamQueryExecution:
             with patch("services.timestream.load_config") as mock_config:
                 mock_config.return_value = MagicMock(
                     aws_region="eu-west-2",
-                    timestream_database_name="tribe-watch",
+                    timestream_database_name="tek-watch",
                     timestream_metrics_table="metrics",
                     timestream_events_table="events",
                 )

@@ -17,7 +17,7 @@ class SQSPublisher:
     """Publishes MetricRecord objects to an SQS queue in batches of 10.
 
     Args:
-        session: boto3 Session with credentials for the Tribe Watch central account.
+        session: boto3 Session with credentials for the Tek Watch central account.
         queue_url: The SQS queue URL to publish to.
         api_key: The customer's agent API key (sent as a message attribute).
     """

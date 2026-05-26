@@ -70,7 +70,7 @@ export default function AdminLoginPage() {
               <Shield className="h-8 w-8 text-blue-600" />
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
-            <p className="text-sm text-gray-500 mt-1">Tribe Watch Platform Management</p>
+            <p className="text-sm text-gray-500 mt-1">Tek Watch Platform Management</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">

@@ -45,9 +45,9 @@ resource "aws_cognito_user_pool" "customers" {
   admin_create_user_config {
     allow_admin_create_user_only = true
     invite_message_template {
-      email_subject = "Your Tribe Watch account"
+      email_subject = "Your Tek Watch account"
       email_message = "Your Customer ID is {username} and temporary password is {####}"
-      sms_message   = "Your Tribe Watch temp password: {####}"
+      sms_message   = "Your Tek Watch temp password: {####}"
     }
   }
 

@@ -84,13 +84,13 @@ export async function authSignIn(customerId: string, password: string): Promise<
 export async function authSignOut(): Promise<void> {
   const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || ''
   if (!userPoolId) {
-    localStorage.removeItem('tribe_watch_token')
-    localStorage.removeItem('tribe_watch_customer_id')
+    localStorage.removeItem('tek_watch_token')
+    localStorage.removeItem('tek_watch_customer_id')
     return
   }
   await signOut()
-  localStorage.removeItem('tribe_watch_token')
-  localStorage.removeItem('tribe_watch_customer_id')
+  localStorage.removeItem('tek_watch_token')
+  localStorage.removeItem('tek_watch_customer_id')
 }
 
 /**
@@ -101,8 +101,8 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
   // Dev mode
   if (!userPoolId) {
-    const token = localStorage.getItem('tribe_watch_token')
-    const customerId = localStorage.getItem('tribe_watch_customer_id')
+    const token = localStorage.getItem('tek_watch_token')
+    const customerId = localStorage.getItem('tek_watch_customer_id')
     if (!token || !customerId) return null
     return { customerId, email: '', idToken: token }
   }

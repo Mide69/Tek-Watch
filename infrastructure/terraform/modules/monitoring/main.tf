@@ -1,18 +1,19 @@
-variable "name_prefix"              { type = string }
-variable "environment"              { type = string }
-variable "aws_region"               { type = string }
-variable "ecs_cluster_name"         { type = string }
-variable "api_service_name"         { type = string }
-variable "consumer_service_name"    { type = string }
-variable "sqs_ingest_queue_name"    { type = string }
-variable "sqs_dlq_name"             { type = string }
-variable "dynamodb_customers_table" { type = string }
+variable "name_prefix"               { type = string }
+variable "environment"               { type = string }
+variable "aws_region"                { type = string }
+variable "ops_alerts_topic_arn"      { type = string }
+variable "ecs_cluster_name"          { type = string }
+variable "api_service_name"          { type = string }
+variable "consumer_service_name"     { type = string }
+variable "sqs_ingest_queue_name"     { type = string }
+variable "sqs_dlq_name"              { type = string }
+variable "dynamodb_customers_table"  { type = string }
+variable "dynamodb_alerts_table"     { type = string }
+variable "dynamodb_heartbeats_table" { type = string }
 
-# ── SNS — Ops Alerts ──────────────────────────────────────────────────────────
-
-resource "aws_sns_topic" "ops_alerts" {
-  name = "${var.name_prefix}-ops-alerts"
-  tags = { Name = "${var.name_prefix}-ops-alerts" }
+variable "silence_threshold_minutes" {
+  type    = number
+  default = 20
 }
 
 # ── CloudWatch Alarms ─────────────────────────────────────────────────────────
@@ -32,8 +33,8 @@ resource "aws_cloudwatch_metric_alarm" "dlq_depth" {
 
   dimensions = { QueueName = var.sqs_dlq_name }
 
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
-  ok_actions    = [aws_sns_topic.ops_alerts.arn]
+  alarm_actions = [var.ops_alerts_topic_arn]
+  ok_actions    = [var.ops_alerts_topic_arn]
 
   tags = { Name = "${var.name_prefix}-dlq-depth-alarm" }
 }
@@ -74,7 +75,7 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
     }
   }
 
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  alarm_actions = [var.ops_alerts_topic_arn]
   tags          = { Name = "${var.name_prefix}-api-5xx-alarm" }
 }
 
@@ -96,7 +97,7 @@ resource "aws_cloudwatch_metric_alarm" "api_task_count" {
     ServiceName = var.api_service_name
   }
 
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  alarm_actions = [var.ops_alerts_topic_arn]
   tags          = { Name = "${var.name_prefix}-api-task-count-alarm" }
 }
 
@@ -118,7 +119,7 @@ resource "aws_cloudwatch_metric_alarm" "consumer_task_count" {
     ServiceName = var.consumer_service_name
   }
 
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  alarm_actions = [var.ops_alerts_topic_arn]
   tags          = { Name = "${var.name_prefix}-consumer-task-count-alarm" }
 }
 
@@ -137,71 +138,19 @@ resource "aws_cloudwatch_metric_alarm" "ingest_queue_depth" {
 
   dimensions = { QueueName = var.sqs_ingest_queue_name }
 
-  alarm_actions = [aws_sns_topic.ops_alerts.arn]
+  alarm_actions = [var.ops_alerts_topic_arn]
   tags          = { Name = "${var.name_prefix}-ingest-queue-depth-alarm" }
 }
 
 # ── Agent Silence Detection Lambda ────────────────────────────────────────────
+# Packages the handler that lives at infrastructure/lambda/silence_detector/
+# Path is relative to this module file (modules/monitoring → ../../../lambda/…)
 
 data "archive_file" "silence_detector" {
   type        = "zip"
+  source_dir  = "${path.module}/../../../lambda/silence_detector"
   output_path = "${path.module}/silence_detector.zip"
-
-  source {
-    content  = <<-PYTHON
-import boto3
-import json
-import os
-from datetime import datetime, timezone, timedelta
-
-CUSTOMERS_TABLE = os.environ['CUSTOMERS_TABLE']
-SNS_TOPIC_ARN   = os.environ['SNS_TOPIC_ARN']
-SILENCE_MINUTES = int(os.environ.get('SILENCE_MINUTES', '20'))
-
-dynamodb = boto3.resource('dynamodb')
-sns      = boto3.client('sns')
-
-def handler(event, context):
-    table     = dynamodb.Table(CUSTOMERS_TABLE)
-    cutoff    = datetime.now(timezone.utc) - timedelta(minutes=SILENCE_MINUTES)
-    response  = table.scan(FilterExpression='SK = :sk', ExpressionAttributeValues={':sk': 'PROFILE'})
-    silent    = []
-
-    for customer in response.get('Items', []):
-        if customer.get('status') != 'active':
-            continue
-        last_seen = customer.get('last_agent_seen')
-        if not last_seen:
-            silent.append(customer['customer_id'])
-            continue
-        try:
-            ts = datetime.fromisoformat(last_seen.replace('Z', '+00:00'))
-            if ts < cutoff:
-                silent.append(customer['customer_id'])
-        except (ValueError, TypeError):
-            silent.append(customer['customer_id'])
-
-    if silent:
-        sns.publish(
-            TopicArn=SNS_TOPIC_ARN,
-            Subject=f'[ALERT] {len(silent)} agent(s) silent > {SILENCE_MINUTES} min',
-            Message=json.dumps({'silent_customers': silent, 'checked_at': datetime.now(timezone.utc).isoformat()}),
-        )
-        # Update agent_status to offline
-        for cid in silent:
-            try:
-                table.update_item(
-                    Key={'customer_id': cid, 'SK': 'PROFILE'},
-                    UpdateExpression='SET agent_status = :s',
-                    ExpressionAttributeValues={':s': 'offline'},
-                )
-            except Exception:
-                pass
-
-    return {'silent_count': len(silent), 'silent_customers': silent}
-PYTHON
-    filename = "handler.py"
-  }
+  excludes    = ["test_handler.py", "__pycache__", "*.pyc", "requirements.txt"]
 }
 
 resource "aws_iam_role" "silence_detector" {
@@ -227,17 +176,28 @@ resource "aws_iam_role_policy" "silence_detector" {
       {
         Effect   = "Allow"
         Action   = ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"]
-        Resource = ["arn:aws:logs:*:*:*"]
+        Resource = "arn:aws:logs:*:*:*"
       },
       {
-        Effect   = "Allow"
-        Action   = ["dynamodb:Scan", "dynamodb:UpdateItem"]
-        Resource = ["*"]
+        Sid    = "HeartbeatsRead"
+        Effect = "Allow"
+        Action = ["dynamodb:Scan"]
+        Resource = [
+          "arn:aws:dynamodb:${var.aws_region}:*:table/${var.dynamodb_heartbeats_table}"
+        ]
+      },
+      {
+        Sid    = "AlertsWrite"
+        Effect = "Allow"
+        Action = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
+        Resource = [
+          "arn:aws:dynamodb:${var.aws_region}:*:table/${var.dynamodb_alerts_table}"
+        ]
       },
       {
         Effect   = "Allow"
         Action   = ["sns:Publish"]
-        Resource = [aws_sns_topic.ops_alerts.arn]
+        Resource = [var.ops_alerts_topic_arn]
       }
     ]
   })
@@ -254,9 +214,10 @@ resource "aws_lambda_function" "silence_detector" {
 
   environment {
     variables = {
-      CUSTOMERS_TABLE = var.dynamodb_customers_table
-      SNS_TOPIC_ARN   = aws_sns_topic.ops_alerts.arn
-      SILENCE_MINUTES = "20"
+      ALERTS_TABLE       = var.dynamodb_alerts_table
+      HEARTBEATS_TABLE   = var.dynamodb_heartbeats_table
+      SILENCE_THRESHOLD  = tostring(var.silence_threshold_minutes)
+      NOTIFICATION_TOPIC = var.ops_alerts_topic_arn
     }
   }
 
@@ -329,4 +290,4 @@ resource "aws_cloudwatch_dashboard" "main" {
   })
 }
 
-output "ops_alerts_topic_arn" { value = aws_sns_topic.ops_alerts.arn }
+output "ops_alerts_topic_arn" { value = var.ops_alerts_topic_arn }

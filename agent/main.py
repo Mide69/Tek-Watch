@@ -1,5 +1,5 @@
 """
-Tribe Watch Agent — entry point.
+Tek Watch Agent — entry point.
 
 Execution flow:
   1. Load config from environment variables

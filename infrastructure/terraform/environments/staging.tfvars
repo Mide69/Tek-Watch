@@ -24,5 +24,5 @@ sqs_visibility_timeout_seconds = 300
 sqs_message_retention_seconds  = 345600  # 4 days
 sqs_dlq_max_receive_count      = 3
 
-domain_name         = "staging.tribewatch.io"
+domain_name         = "staging.tekwatch.io"
 acm_certificate_arn = ""   # Set via GitHub secret ACM_CERT_ARN_STAGING

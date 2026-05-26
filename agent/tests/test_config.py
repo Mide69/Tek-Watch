@@ -6,9 +6,9 @@ from unittest.mock import patch
 class TestAgentConfig:
     def test_load_config_success(self):
         env = {
-            "TRIBE_WATCH_CUSTOMER_ID": "TT-0042",
-            "TRIBE_WATCH_INGEST_QUEUE_URL": "https://sqs.eu-west-2.amazonaws.com/123/queue",
-            "TRIBE_WATCH_API_KEY": "secret-key",
+            "TEK_WATCH_CUSTOMER_ID": "TT-0042",
+            "TEK_WATCH_INGEST_QUEUE_URL": "https://sqs.eu-west-2.amazonaws.com/123/queue",
+            "TEK_WATCH_API_KEY": "secret-key",
             "AWS_REGION": "eu-west-2",
             "LOG_LEVEL": "DEBUG",
         }
@@ -23,9 +23,9 @@ class TestAgentConfig:
 
     def test_load_config_missing_required_exits(self):
         env = {
-            "TRIBE_WATCH_CUSTOMER_ID": "",
-            "TRIBE_WATCH_INGEST_QUEUE_URL": "",
-            "TRIBE_WATCH_API_KEY": "",
+            "TEK_WATCH_CUSTOMER_ID": "",
+            "TEK_WATCH_INGEST_QUEUE_URL": "",
+            "TEK_WATCH_API_KEY": "",
         }
         with patch.dict("os.environ", env, clear=False):
             with pytest.raises(SystemExit):
@@ -37,9 +37,9 @@ class TestAgentConfig:
 
     def test_load_config_defaults(self):
         env = {
-            "TRIBE_WATCH_CUSTOMER_ID": "TT-0001",
-            "TRIBE_WATCH_INGEST_QUEUE_URL": "https://sqs.eu-west-2.amazonaws.com/123/q",
-            "TRIBE_WATCH_API_KEY": "key",
+            "TEK_WATCH_CUSTOMER_ID": "TT-0001",
+            "TEK_WATCH_INGEST_QUEUE_URL": "https://sqs.eu-west-2.amazonaws.com/123/q",
+            "TEK_WATCH_API_KEY": "key",
         }
         with patch.dict("os.environ", env, clear=False):
             from config import load_config

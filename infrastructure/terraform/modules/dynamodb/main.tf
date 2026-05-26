@@ -75,9 +75,34 @@ resource "aws_dynamodb_table" "thresholds" {
   tags = { Name = "${var.name_prefix}-thresholds" }
 }
 
-output "customers_table_name" { value = aws_dynamodb_table.customers.name }
-output "alerts_table_name"    { value = aws_dynamodb_table.alerts.name }
-output "thresholds_table_name"{ value = aws_dynamodb_table.thresholds.name }
-output "customers_table_arn"  { value = aws_dynamodb_table.customers.arn }
-output "alerts_table_arn"     { value = aws_dynamodb_table.alerts.arn }
-output "thresholds_table_arn" { value = aws_dynamodb_table.thresholds.arn }
+# ── Heartbeats table (agent silence detector) ─────────────────────────────────
+# Hash key matches the customer_id written by the agent and read by the
+# silence-detector Lambda.  No sort key — one row per customer.
+
+resource "aws_dynamodb_table" "heartbeats" {
+  name         = "${var.name_prefix}-heartbeats"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "customer_id"
+
+  attribute {
+    name = "customer_id"
+    type = "S"
+  }
+
+  # TTL — stale heartbeats auto-expire after 7 days (keeps the table lean)
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  tags = { Name = "${var.name_prefix}-heartbeats" }
+}
+
+output "customers_table_name"  { value = aws_dynamodb_table.customers.name }
+output "alerts_table_name"     { value = aws_dynamodb_table.alerts.name }
+output "thresholds_table_name" { value = aws_dynamodb_table.thresholds.name }
+output "heartbeats_table_name" { value = aws_dynamodb_table.heartbeats.name }
+output "customers_table_arn"   { value = aws_dynamodb_table.customers.arn }
+output "alerts_table_arn"      { value = aws_dynamodb_table.alerts.arn }
+output "thresholds_table_arn"  { value = aws_dynamodb_table.thresholds.arn }
+output "heartbeats_table_arn"  { value = aws_dynamodb_table.heartbeats.arn }
