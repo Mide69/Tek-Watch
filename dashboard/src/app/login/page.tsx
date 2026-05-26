@@ -26,7 +26,7 @@ export default function LoginPage() {
     try {
       const user = await authSignIn(customerId.toUpperCase(), password)
       apiClient.setToken(user.idToken)
-      localStorage.setItem('tribe_watch_customer_id', user.customerId)
+      localStorage.setItem('tek_watch_customer_id', user.customerId)
       router.push('/overview')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Check your credentials.')

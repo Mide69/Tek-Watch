@@ -1,7 +1,7 @@
-# Tribe Watch - Development Environment Setup Script (PowerShell)
+# Tek Watch - Development Environment Setup Script (PowerShell)
 # This script sets up the local development environment on Windows
 
-Write-Host "🚀 Tribe Watch - Development Setup" -ForegroundColor Cyan
+Write-Host "🚀 Tek Watch - Development Setup" -ForegroundColor Cyan
 Write-Host "====================================" -ForegroundColor Cyan
 Write-Host ""
 

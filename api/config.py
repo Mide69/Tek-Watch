@@ -72,23 +72,23 @@ def load_config() -> APIConfig:
             "anthropic_api_key", "sns_ops_alerts_topic_arn", "sqs_ingest_queue_url",
         ]}
         # Sensible local defaults
-        secrets.setdefault("timestream_database_name", "tribe-watch")
+        secrets.setdefault("timestream_database_name", "tek-watch")
         secrets.setdefault("timestream_metrics_table", "metrics")
         secrets.setdefault("timestream_events_table", "events")
-        secrets.setdefault("dynamodb_customers_table", "tribe_watch_customers")
-        secrets.setdefault("dynamodb_alerts_table", "tribe_watch_alerts")
-        secrets.setdefault("dynamodb_thresholds_table", "tribe_watch_thresholds")
+        secrets.setdefault("dynamodb_customers_table", "tek_watch_customers")
+        secrets.setdefault("dynamodb_alerts_table", "tek_watch_alerts")
+        secrets.setdefault("dynamodb_thresholds_table", "tek_watch_thresholds")
 
     return APIConfig(
         aws_region=aws_region,
         environment=environment,
         log_level=log_level,
-        timestream_database_name=secrets.get("timestream_database_name", "tribe-watch"),
+        timestream_database_name=secrets.get("timestream_database_name", "tek-watch"),
         timestream_metrics_table=secrets.get("timestream_metrics_table", "metrics"),
         timestream_events_table=secrets.get("timestream_events_table", "events"),
-        dynamodb_customers_table=secrets.get("dynamodb_customers_table", "tribe_watch_customers"),
-        dynamodb_alerts_table=secrets.get("dynamodb_alerts_table", "tribe_watch_alerts"),
-        dynamodb_thresholds_table=secrets.get("dynamodb_thresholds_table", "tribe_watch_thresholds"),
+        dynamodb_customers_table=secrets.get("dynamodb_customers_table", "tek_watch_customers"),
+        dynamodb_alerts_table=secrets.get("dynamodb_alerts_table", "tek_watch_alerts"),
+        dynamodb_thresholds_table=secrets.get("dynamodb_thresholds_table", "tek_watch_thresholds"),
         cognito_customer_user_pool_id=secrets.get("cognito_customer_user_pool_id", ""),
         cognito_customer_app_client_id=secrets.get("cognito_customer_app_client_id", ""),
         cognito_admin_user_pool_id=secrets.get("cognito_admin_user_pool_id", ""),

@@ -1,4 +1,4 @@
-# Tribe Watch Dashboard
+# Tek Watch Dashboard
 
 Customer-facing web application for viewing AWS infrastructure metrics.
 
@@ -175,8 +175,8 @@ amplify publish
 ### Docker
 
 ```bash
-docker build -t tribe-watch-dashboard .
-docker run -p 3000:3000 tribe-watch-dashboard
+docker build -t tek-watch-dashboard .
+docker run -p 3000:3000 tek-watch-dashboard
 ```
 
 ## Contributing

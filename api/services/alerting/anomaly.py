@@ -13,7 +13,7 @@ from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
 
-ANOMALY_DETECTION_SYSTEM_PROMPT = """You are a cloud infrastructure anomaly detector for Tribe Watch, a managed cloud service platform.
+ANOMALY_DETECTION_SYSTEM_PROMPT = """You are a cloud infrastructure anomaly detector for Tek Watch, a managed cloud service platform.
 You will be given a JSON object containing:
 - "baseline": 7-day hourly averages and standard deviations for key metrics per resource
 - "recent": metric values from the last 1 hour for the same resources

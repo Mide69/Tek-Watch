@@ -16,17 +16,17 @@ def db_service():
         mock_thresholds = MagicMock()
 
         mock_resource.Table.side_effect = lambda name: {
-            "tribe_watch_customers": mock_customers,
-            "tribe_watch_alerts": mock_alerts,
-            "tribe_watch_thresholds": mock_thresholds,
+            "tek_watch_customers": mock_customers,
+            "tek_watch_alerts": mock_alerts,
+            "tek_watch_thresholds": mock_thresholds,
         }.get(name, MagicMock())
 
         with patch("services.dynamodb.load_config") as mock_config:
             mock_config.return_value = MagicMock(
                 aws_region="eu-west-2",
-                dynamodb_customers_table="tribe_watch_customers",
-                dynamodb_alerts_table="tribe_watch_alerts",
-                dynamodb_thresholds_table="tribe_watch_thresholds",
+                dynamodb_customers_table="tek_watch_customers",
+                dynamodb_alerts_table="tek_watch_alerts",
+                dynamodb_thresholds_table="tek_watch_thresholds",
             )
             svc = DynamoDBService()
             svc._customers = mock_customers

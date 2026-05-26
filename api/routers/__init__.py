@@ -1,1 +1,1 @@
-"""Tribe Watch API routers package."""
+"""Tek Watch API routers package."""

@@ -1,6 +1,6 @@
 # Dashboard Testing Guide
 
-This guide explains how to test the Tribe Watch dashboard locally.
+This guide explains how to test the Tek Watch dashboard locally.
 
 ---
 

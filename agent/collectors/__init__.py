@@ -1,4 +1,4 @@
-"""Tribe Watch agent collectors package."""
+"""Tek Watch agent collectors package."""
 from collectors.acm import ACMCollector
 from collectors.cloudfront import CloudFrontCollector
 from collectors.cloudtrail import CloudTrailCollector

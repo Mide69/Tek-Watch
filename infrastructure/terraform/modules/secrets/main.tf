@@ -4,7 +4,7 @@ variable "secret_values" { type = map(string); sensitive = true }
 
 resource "aws_secretsmanager_secret" "main" {
   name                    = "${var.name_prefix}/config"
-  description             = "Tribe Watch platform configuration secrets"
+  description             = "Tek Watch platform configuration secrets"
   recovery_window_in_days = var.environment == "prod" ? 30 : 0
 
   tags = { Name = "${var.name_prefix}-config" }

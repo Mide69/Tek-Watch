@@ -1,39 +1,39 @@
-# Tribe Watch
+# Tek Watch
 
 > AI-assisted cloud infrastructure monitoring platform by Tek Tribe Ltd.
 
-Tribe Watch gives each Tek Tribe managed service customer a real-time, authenticated window into the state of their AWS infrastructure.
+Tek Watch gives each Tek Tribe managed service customer a real-time, authenticated window into the state of their AWS infrastructure.
 
 ## Architecture
 
 ```
 Customer AWS Account
-  └── ECS Fargate (tribe-watch-agent) ──HTTPS──▶ SQS (ingest queue)
+  └── ECS Fargate (tek-watch-agent) ──HTTPS──▶ SQS (ingest queue)
                                                         │
-                                          Tribe Watch Central Account
+                                          Tek Watch Central Account
                                                         │
                                               ECS (ingest-consumer)
                                                         │
                                               Amazon Timestream
                                                         │
-                                              ECS (tribe-watch-api)
+                                              ECS (tek-watch-api)
                                                    │         │
                                             dashboard/   admin-portal/
-                                         app.tribewatch  admin.tribewatch
+                                         app.tekwatch  admin.tekwatch
                                                .io            .io
 ```
 
 ## Repository Structure
 
 ```
-tribe-watch/
+tek-watch/
 ├── agent/                  # Python Docker agent (runs in customer account)
 ├── ingest-consumer/        # FastAPI SQS consumer → Timestream writer
 ├── api/                    # FastAPI central API (serves dashboards)
-├── dashboard/              # Next.js customer dashboard (app.tribewatch.io)
-├── admin-portal/           # Next.js admin portal (admin.tribewatch.io)
+├── dashboard/              # Next.js customer dashboard (app.tekwatch.io)
+├── admin-portal/           # Next.js admin portal (admin.tekwatch.io)
 ├── infrastructure/
-│   ├── terraform/          # Tribe Watch central account resources
+│   ├── terraform/          # Tek Watch central account resources
 │   └── cloudformation/     # Customer agent deployment template
 ├── .github/workflows/      # CI/CD pipelines
 └── docker-compose.yml      # Local development
@@ -51,8 +51,8 @@ tribe-watch/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/tektribe-ltd/tribe-watch.git
-cd tribe-watch
+git clone https://github.com/tektribe-ltd/tek-watch.git
+cd tek-watch
 ```
 
 2. **Set up environment variables**
@@ -158,7 +158,7 @@ uvicorn main:app --reload
 2. **Deploy CloudFormation stack in customer AWS account**
 ```bash
 aws cloudformation create-stack \
-  --stack-name tribe-watch-agent \
+  --stack-name tek-watch-agent \
   --template-body file://customer-agent-template.yaml \
   --parameters \
     ParameterKey=CustomerID,ParameterValue=TT-0042 \
@@ -200,9 +200,9 @@ See `infrastructure/terraform/README.md` for Terraform deployment instructions.
 See `.env.example` for all configuration options.
 
 **Required for Agent:**
-- `TRIBE_WATCH_CUSTOMER_ID`
-- `TRIBE_WATCH_INGEST_QUEUE_URL`
-- `TRIBE_WATCH_API_KEY`
+- `TEK_WATCH_CUSTOMER_ID`
+- `TEK_WATCH_INGEST_QUEUE_URL`
+- `TEK_WATCH_API_KEY`
 
 **Required for API/Consumer:**
 - `AWS_REGION`
@@ -214,9 +214,9 @@ See `.env.example` for all configuration options.
 Production deployments use AWS Secrets Manager:
 ```json
 {
-  "timestream_database_name": "tribe-watch",
+  "timestream_database_name": "tek-watch",
   "timestream_metrics_table": "metrics",
-  "dynamodb_customers_table": "tribe_watch_customers",
+  "dynamodb_customers_table": "tek_watch_customers",
   "cognito_customer_user_pool_id": "...",
   "anthropic_api_key": "...",
   "sns_ops_alerts_topic_arn": "..."
@@ -285,5 +285,5 @@ Proprietary - Tek Tribe Ltd © 2026
 ## Support
 
 For issues or questions:
-- Internal: Slack #tribe-watch
+- Internal: Slack #tek-watch
 - Customers: support@tektribe.io

@@ -16,7 +16,7 @@ variable "aws_region" {
 variable "project" {
   description = "Project name prefix for all resources"
   type        = string
-  default     = "tribe-watch"
+  default     = "tek-watch"
 }
 
 # ── Networking ────────────────────────────────────────────────────────────────
@@ -145,9 +145,9 @@ variable "anthropic_api_key" {
 # ── DNS ───────────────────────────────────────────────────────────────────────
 
 variable "domain_name" {
-  description = "Base domain name (e.g. tribewatch.io)"
+  description = "Base domain name (e.g. tekwatch.io)"
   type        = string
-  default     = "tribewatch.io"
+  default     = "tekwatch.io"
 }
 
 variable "acm_certificate_arn" {

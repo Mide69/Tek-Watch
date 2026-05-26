@@ -1,5 +1,5 @@
 /**
- * Admin Portal API client — communicates with the Tribe Watch API admin endpoints.
+ * Admin Portal API client — communicates with the Tek Watch API admin endpoints.
  */
 import axios, { AxiosInstance, AxiosError } from 'axios'
 

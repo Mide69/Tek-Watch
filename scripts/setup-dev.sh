@@ -1,11 +1,11 @@
 #!/bin/bash
 
-# Tribe Watch - Development Environment Setup Script
+# Tek Watch - Development Environment Setup Script
 # This script sets up the local development environment
 
 set -e
 
-echo "🚀 Tribe Watch - Development Setup"
+echo "🚀 Tek Watch - Development Setup"
 echo "===================================="
 echo ""
 

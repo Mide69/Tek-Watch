@@ -34,7 +34,7 @@ class NotificationService:
         threshold_value: Optional[float] = None,
         description: Optional[str] = None,
     ) -> None:
-        """Publish an alert to the Tribe Watch ops SNS topic.
+        """Publish an alert to the Tek Watch ops SNS topic.
 
         Runs the boto3 call in a thread pool to avoid blocking the event loop.
         """
@@ -42,7 +42,7 @@ class NotificationService:
             logger.debug("SNS ops topic not configured — skipping notification")
             return
 
-        subject = f"[{severity.upper()}] Tribe Watch Alert: {customer_id}"
+        subject = f"[{severity.upper()}] Tek Watch Alert: {customer_id}"
 
         if description:
             message = (

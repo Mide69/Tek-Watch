@@ -14,11 +14,11 @@ terraform {
 
   # Remote state — update bucket/key for your account
   backend "s3" {
-    bucket         = "tribe-watch-terraform-state"
-    key            = "tribe-watch/terraform.tfstate"
+    bucket         = "tek-watch-terraform-state"
+    key            = "tek-watch/terraform.tfstate"
     region         = "eu-west-2"
     encrypt        = true
-    dynamodb_table = "tribe-watch-terraform-locks"
+    dynamodb_table = "tek-watch-terraform-locks"
   }
 }
 
@@ -50,6 +50,15 @@ provider "aws" {
 
 locals {
   name_prefix = "${var.project}-${var.environment}"
+}
+
+# ── SNS — Ops Alerts (created before modules to avoid circular dependency) ────
+# secrets needs the ARN to store it; monitoring needs it for alarms/Lambda.
+# Keeping it here breaks the secrets → monitoring → ecs → secrets cycle.
+
+resource "aws_sns_topic" "ops_alerts" {
+  name = "${local.name_prefix}-ops-alerts"
+  tags = { Name = "${local.name_prefix}-ops-alerts" }
 }
 
 # ── Networking ────────────────────────────────────────────────────────────────
@@ -127,7 +136,7 @@ module "secrets" {
     cognito_customer_app_client_id  = module.cognito.customer_app_client_id
     cognito_admin_user_pool_id      = module.cognito.admin_user_pool_id
     cognito_admin_app_client_id     = module.cognito.admin_app_client_id
-    sns_ops_alerts_topic_arn        = module.monitoring.ops_alerts_topic_arn
+    sns_ops_alerts_topic_arn        = aws_sns_topic.ops_alerts.arn
     sqs_ingest_queue_url            = module.sqs.ingest_queue_url
     anthropic_api_key               = var.anthropic_api_key
   }
@@ -166,6 +175,7 @@ module "ecs" {
     module.dynamodb.customers_table_arn,
     module.dynamodb.alerts_table_arn,
     module.dynamodb.thresholds_table_arn,
+    module.dynamodb.heartbeats_table_arn,
   ]
 
   timestream_database_arn = module.timestream.database_arn
@@ -180,10 +190,13 @@ module "monitoring" {
   environment = var.environment
   aws_region  = var.aws_region
 
-  ecs_cluster_name         = module.ecs.cluster_name
-  api_service_name         = module.ecs.api_service_name
-  consumer_service_name    = module.ecs.consumer_service_name
-  sqs_ingest_queue_name    = module.sqs.ingest_queue_name
-  sqs_dlq_name             = module.sqs.dlq_name
-  dynamodb_customers_table = module.dynamodb.customers_table_name
+  ops_alerts_topic_arn      = aws_sns_topic.ops_alerts.arn
+  ecs_cluster_name          = module.ecs.cluster_name
+  api_service_name          = module.ecs.api_service_name
+  consumer_service_name     = module.ecs.consumer_service_name
+  sqs_ingest_queue_name     = module.sqs.ingest_queue_name
+  sqs_dlq_name              = module.sqs.dlq_name
+  dynamodb_customers_table  = module.dynamodb.customers_table_name
+  dynamodb_alerts_table     = module.dynamodb.alerts_table_name
+  dynamodb_heartbeats_table = module.dynamodb.heartbeats_table_name
 }
