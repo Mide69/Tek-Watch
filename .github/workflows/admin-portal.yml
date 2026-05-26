@@ -12,10 +12,17 @@ on:
     branches: [main]
     paths:
       - 'admin-portal/**'
+  workflow_dispatch:
+
 
 defaults:
   run:
     working-directory: ./admin-portal
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
 
 jobs:
   lint-and-typecheck:
@@ -55,13 +62,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
+      # PR / branch validation build — placeholder Cognito values, not deployed
+      - name: Build (validation)
         env:
-          NEXT_PUBLIC_API_BASE_URL: ${{ secrets.ADMIN_API_BASE_URL || 'https://api.tribewatch.io' }}
+          NEXT_PUBLIC_API_BASE_URL: https://api.tekwatch.io
           NEXT_PUBLIC_COGNITO_REGION: eu-west-2
-          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID }}
-          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID }}
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: eu-west-2_PLACEHOLDER
+          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: placeholder
         run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: admin-portal-build
+          path: admin-portal/out
+          retention-days: 1
 
   deploy-dev:
     needs: build
@@ -74,8 +89,7 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: eu-west-2
 
       - name: Set up Node.js 20
@@ -87,7 +101,7 @@ jobs:
 
       - name: Install and build for dev
         env:
-          NEXT_PUBLIC_API_BASE_URL: https://api-dev.tribewatch.io
+          NEXT_PUBLIC_API_BASE_URL: https://api-dev.tekwatch.io
           NEXT_PUBLIC_COGNITO_REGION: eu-west-2
           NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID_DEV }}
           NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID_DEV }}
@@ -100,6 +114,103 @@ jobs:
           S3_BUCKET: ${{ secrets.ADMIN_S3_BUCKET_DEV }}
           CF_DISTRIBUTION: ${{ secrets.ADMIN_CF_DISTRIBUTION_DEV }}
         run: |
-          aws s3 sync .next/static s3://$S3_BUCKET/_next/static --delete
-          aws s3 sync public s3://$S3_BUCKET --delete
-          aws cloudfront create-invalidation --distribution-id $CF_DISTRIBUTION --paths "/*"
+          aws s3 sync out/ s3://$S3_BUCKET --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html"
+          aws s3 sync out/ s3://$S3_BUCKET \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --exclude "*" --include "*.html"
+          aws cloudfront create-invalidation \
+            --distribution-id $CF_DISTRIBUTION --paths "/*"
+
+  deploy-staging:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: staging
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-2
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin-portal/package-lock.json
+
+      - name: Install and build for staging
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api-staging.tekwatch.io
+          NEXT_PUBLIC_COGNITO_REGION: eu-west-2
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID_STAGING }}
+          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID_STAGING }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to S3 + CloudFront (staging)
+        env:
+          S3_BUCKET: ${{ secrets.ADMIN_S3_BUCKET_STAGING }}
+          CF_DISTRIBUTION: ${{ secrets.ADMIN_CF_DISTRIBUTION_STAGING }}
+        run: |
+          aws s3 sync out/ s3://$S3_BUCKET --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html"
+          aws s3 sync out/ s3://$S3_BUCKET \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --exclude "*" --include "*.html"
+          aws cloudfront create-invalidation \
+            --distribution-id $CF_DISTRIBUTION --paths "/*"
+
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: prod
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-2
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: admin-portal/package-lock.json
+
+      - name: Install and build for prod
+        env:
+          NEXT_PUBLIC_API_BASE_URL: https://api.tekwatch.io
+          NEXT_PUBLIC_COGNITO_REGION: eu-west-2
+          NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID_PROD }}
+          NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID_PROD }}
+        working-directory: ./admin-portal
+        run: |
+          npm ci
+          npm run build
+
+      - name: Deploy to S3 + CloudFront (prod)
+        env:
+          S3_BUCKET: ${{ secrets.ADMIN_S3_BUCKET_PROD }}
+          CF_DISTRIBUTION: ${{ secrets.ADMIN_CF_DISTRIBUTION_PROD }}
+        working-directory: ./admin-portal
+        run: |
+          aws s3 sync out/ s3://$S3_BUCKET --delete \
+            --cache-control "public,max-age=31536000,immutable" \
+            --exclude "*.html"
+          aws s3 sync out/ s3://$S3_BUCKET \
+            --cache-control "public,max-age=0,must-revalidate" \
+            --exclude "*" --include "*.html"
+          aws cloudfront create-invalidation \
+            --distribution-id $CF_DISTRIBUTION --paths "/*"

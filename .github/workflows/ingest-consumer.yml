@@ -12,10 +12,17 @@ on:
     branches: [main]
     paths:
       - 'ingest-consumer/**'
+  workflow_dispatch:
+
 
 env:
   AWS_REGION: eu-west-2
-  ECR_REPOSITORY: tribe-watch-ingest-consumer
+  ECR_REPOSITORY: tek-watch-ingest-consumer
+
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
 
 jobs:
   test:
@@ -33,30 +40,29 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest pytest-cov flake8
 
-      - name: Lint with flake8
+      - name: Lint
         working-directory: ./ingest-consumer
-        run: |
-          pip install flake8
-          flake8 . --max-line-length=100 --exclude=__pycache__ || true
+        run: flake8 . --max-line-length=100 --exclude=__pycache__
 
       - name: Run tests
         working-directory: ./ingest-consumer
-        run: |
-          pytest --cov=. --cov-report=term-missing || echo "Tests not yet implemented"
+        run: pytest --cov=. --cov-report=term-missing
 
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
     if: github.event_name == 'push'
+    outputs:
+      image_uri: ${{ steps.build.outputs.image_uri }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Login to Amazon ECR
@@ -64,6 +70,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push image
+        id: build
         working-directory: ./ingest-consumer
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -73,19 +80,117 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+          echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      - name: Deploy to dev
-        if: github.ref == 'refs/heads/main'
-        run: |
-          aws ecs update-service \
-            --cluster tribe-watch-dev \
-            --service ingest-consumer \
-            --force-new-deployment
+      - name: Scan image for vulnerabilities (Trivy)
+        uses: aquasecurity/trivy-action@0.20.0
+        with:
+          image-ref: ${{ env.ECR_REGISTRY }}/${{ env.ECR_REPOSITORY }}:${{ env.IMAGE_TAG }}
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
 
-      - name: Deploy to staging on tag
+      - name: Tag with version on release
         if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          VERSION: ${{ github.ref_name }}
         run: |
-          aws ecs update-service \
-            --cluster tribe-watch-staging \
-            --service ingest-consumer \
-            --force-new-deployment
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
+
+  deploy-dev:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment: dev
+    env:
+      ECS_CLUSTER: tek-watch-dev
+      ECS_SERVICE: tek-watch-dev-ingest-consumer
+      TASK_FAMILY: tek-watch-dev-ingest-consumer
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-arn: ${{ env.TASK_FAMILY }}
+          container-name: ingest-consumer
+          image: ${{ needs.build-and-push.outputs.image_uri }}
+
+      - name: Deploy to ECS (dev)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  deploy-staging:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: staging
+    env:
+      ECS_CLUSTER: tek-watch-staging
+      ECS_SERVICE: tek-watch-staging-ingest-consumer
+      TASK_FAMILY: tek-watch-staging-ingest-consumer
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-arn: ${{ env.TASK_FAMILY }}
+          container-name: ingest-consumer
+          image: ${{ needs.build-and-push.outputs.image_uri }}
+
+      - name: Deploy to ECS (staging)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+
+  deploy-prod:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    environment: prod
+    env:
+      ECS_CLUSTER: tek-watch-prod
+      ECS_SERVICE: tek-watch-prod-ingest-consumer
+      TASK_FAMILY: tek-watch-prod-ingest-consumer
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS task definition with new image
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition-arn: ${{ env.TASK_FAMILY }}
+          container-name: ingest-consumer
+          image: ${{ needs.build-and-push.outputs.image_uri }}
+
+      - name: Deploy to ECS (prod)
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true

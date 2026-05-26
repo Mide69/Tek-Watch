@@ -26,7 +26,7 @@ def writer():
     with patch("writer.boto3") as mock_boto3:
         mock_ts = MagicMock()
         mock_boto3.client.return_value = mock_ts
-        w = TimestreamWriter("tribe-watch", "metrics", "events", "eu-west-2")
+        w = TimestreamWriter("tek-watch", "metrics", "events", "eu-west-2")
         w._ts = mock_ts
         return w, mock_ts
 
@@ -65,13 +65,14 @@ class TestTimestreamWriter:
 
     def test_rejected_records_handled_gracefully(self, writer):
         w, ts = writer
-        exc = ts.exceptions.RejectedRecordsException = type(
-            "RejectedRecordsException", (Exception,), {}
-        )()
-        exc.response = {"RejectedRecords": [{"RecordIndex": 0}]}
-        ts.write_records.side_effect = exc
+        # Must assign the CLASS to the mock attribute so the except clause resolves correctly
+        RejectedRecordsExc = type("RejectedRecordsException", (Exception,), {})
+        ts.exceptions.RejectedRecordsException = RejectedRecordsExc
+        exc_instance = RejectedRecordsExc()
+        exc_instance.response = {"RejectedRecords": [{"RecordIndex": 0}]}
+        ts.write_records.side_effect = exc_instance
         records = [make_record(42.5)]
-        # Should not raise
+        # Should not raise; rejected count subtracted from written
         result = w.write_batch(records)
         assert result == 0
 

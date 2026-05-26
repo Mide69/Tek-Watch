@@ -40,7 +40,7 @@ def processor():
     with patch("processor.boto3") as mock_boto3:
         mock_table = MagicMock()
         mock_boto3.resource.return_value.Table.return_value = mock_table
-        proc = MessageProcessor("tribe_watch_customers", "eu-west-2")
+        proc = MessageProcessor("tek_watch_customers", "eu-west-2")
         proc._table = mock_table
         return proc, mock_table
 
