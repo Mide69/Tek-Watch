@@ -67,6 +67,505 @@ tek-watch/
 
 ---
 
+## Step-by-Step Deployment Guide
+
+This section walks through deploying TekWatch from a blank AWS account to a live production environment. Follow the phases in order on a first deployment. Subsequent deploys are fully automated via GitHub Actions.
+
+---
+
+### Phase 0 — Pre-Deployment Checklist
+
+Before starting, confirm you have:
+
+- [ ] AWS account with billing enabled and an IAM user/role with AdministratorAccess for bootstrap steps
+- [ ] Registered domain (e.g. `tekwatch.io`) — can be in Route 53 or any registrar with DNS delegation
+- [ ] GitHub repository with Actions enabled
+- [ ] Anthropic API key (for the AI anomaly-detection feature)
+- [ ] All required tools installed (see [Prerequisites](#prerequisites) above)
+
+---
+
+### Phase 1 — AWS OIDC & IAM Role
+
+GitHub Actions uses OIDC to assume an IAM role — no long-lived access keys are stored.
+
+#### Step 1.1 — Create the OIDC Identity Provider
+
+Run once per AWS account:
+
+```bash
+aws iam create-open-id-connect-provider \
+  --url https://token.actions.githubusercontent.com \
+  --client-id-list sts.amazonaws.com \
+  --thumbprint-list 6938fd4d98bab03faadb97b34396831e3780aea1
+```
+
+#### Step 1.2 — Create the GitHub Actions IAM Role
+
+Save the trust policy (replace `<ACCOUNT_ID>` and `<ORG/REPO>`):
+
+```bash
+cat > /tmp/trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Effect": "Allow",
+    "Principal": {
+      "Federated": "arn:aws:iam::<ACCOUNT_ID>:oidc-provider/token.actions.githubusercontent.com"
+    },
+    "Action": "sts:AssumeRoleWithWebIdentity",
+    "Condition": {
+      "StringEquals": {
+        "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
+      },
+      "StringLike": {
+        "token.actions.githubusercontent.com:sub": "repo:<ORG/REPO>:*"
+      }
+    }
+  }]
+}
+EOF
+```
+
+Create the role and attach a permissions policy:
+
+```bash
+aws iam create-role \
+  --role-name TekWatchGitHubActionsRole \
+  --assume-role-policy-document file:///tmp/trust-policy.json
+
+# For initial bootstrap, PowerUserAccess is sufficient.
+# Tighten to a custom policy after infrastructure is stable.
+aws iam attach-role-policy \
+  --role-name TekWatchGitHubActionsRole \
+  --policy-arn arn:aws:iam::aws:policy/PowerUserAccess
+
+# Save this ARN — it becomes the AWS_ROLE_ARN GitHub secret
+aws iam get-role \
+  --role-name TekWatchGitHubActionsRole \
+  --query Role.Arn --output text
+```
+
+---
+
+### Phase 2 — DNS & TLS Certificates
+
+#### Step 2.1 — Confirm Hosted Zone
+
+```bash
+# If your domain is in Route 53:
+aws route53 list-hosted-zones \
+  --query 'HostedZones[?Name==`tekwatch.io.`].Id' \
+  --output text
+
+# If using an external registrar, create the hosted zone first:
+aws route53 create-hosted-zone \
+  --name tekwatch.io \
+  --caller-reference $(date +%s)
+# Then delegate NS records at your registrar to the values returned above.
+```
+
+#### Step 2.2 — Request ACM Certificates
+
+One certificate per environment, all in `eu-west-2`:
+
+```bash
+# Dev
+aws acm request-certificate \
+  --domain-name "*.dev.tekwatch.io" \
+  --subject-alternative-names "api-dev.tekwatch.io" "admin-dev.tekwatch.io" \
+  --validation-method DNS \
+  --region eu-west-2
+
+# Staging
+aws acm request-certificate \
+  --domain-name "*.staging.tekwatch.io" \
+  --subject-alternative-names "api-staging.tekwatch.io" "admin-staging.tekwatch.io" \
+  --validation-method DNS \
+  --region eu-west-2
+
+# Prod
+aws acm request-certificate \
+  --domain-name "*.tekwatch.io" \
+  --subject-alternative-names "tekwatch.io" "api.tekwatch.io" "app.tekwatch.io" "admin.tekwatch.io" \
+  --validation-method DNS \
+  --region eu-west-2
+```
+
+#### Step 2.3 — Validate Certificates
+
+For each cert, retrieve its CNAME validation records and add them to Route 53:
+
+```bash
+CERT_ARN=<arn-from-above>
+
+# Get validation records
+aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --query 'Certificate.DomainValidationOptions[].ResourceRecord'
+
+# Add each CNAME to Route 53, then poll until ISSUED:
+watch -n 30 "aws acm describe-certificate \
+  --certificate-arn $CERT_ARN \
+  --query Certificate.Status --output text"
+```
+
+Save all three ARNs — you'll need them in Phase 5.
+
+---
+
+### Phase 3 — Terraform State Backend
+
+Create once; shared across all environments. This step requires your local AWS credentials (not GitHub Actions):
+
+```bash
+export AWS_REGION=eu-west-2
+
+# 1. State bucket (versioned + encrypted)
+aws s3 mb s3://tek-watch-terraform-state --region $AWS_REGION
+
+aws s3api put-bucket-versioning \
+  --bucket tek-watch-terraform-state \
+  --versioning-configuration Status=Enabled
+
+aws s3api put-bucket-encryption \
+  --bucket tek-watch-terraform-state \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+
+aws s3api put-public-access-block \
+  --bucket tek-watch-terraform-state \
+  --public-access-block-configuration \
+  "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true"
+
+# 2. DynamoDB lock table
+aws dynamodb create-table \
+  --table-name tek-watch-terraform-locks \
+  --attribute-definitions AttributeName=LockID,AttributeType=S \
+  --key-schema AttributeName=LockID,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  --region $AWS_REGION
+```
+
+---
+
+### Phase 4 — Deploy Infrastructure (Dev First)
+
+#### Step 4.1 — Initialise Terraform
+
+```bash
+cd infrastructure/terraform
+
+terraform init \
+  -backend-config="bucket=tek-watch-terraform-state" \
+  -backend-config="key=tek-watch/dev/terraform.tfstate" \
+  -backend-config="region=eu-west-2" \
+  -backend-config="dynamodb_table=tek-watch-terraform-locks"
+```
+
+#### Step 4.2 — Review the Plan
+
+```bash
+terraform plan \
+  -var-file="environments/dev.tfvars" \
+  -var="anthropic_api_key=$ANTHROPIC_API_KEY" \
+  -var="acm_certificate_arn=<ACM_CERT_ARN_DEV>"
+```
+
+Review the output carefully — confirm resources match the module list (VPC, ECS cluster, SQS queue, DynamoDB tables, Timestream database, Cognito pools, Secrets Manager secret, ECR repositories, CloudFront distributions, ALB).
+
+#### Step 4.3 — Apply
+
+```bash
+terraform apply \
+  -var-file="environments/dev.tfvars" \
+  -var="anthropic_api_key=$ANTHROPIC_API_KEY" \
+  -var="acm_certificate_arn=<ACM_CERT_ARN_DEV>"
+```
+
+Expected duration: 10–15 minutes (CloudFront distributions take the longest).
+
+#### Step 4.4 — Capture Outputs
+
+```bash
+# Save all outputs to a file for reference
+terraform output -json | tee /tmp/tf-dev-outputs.json
+
+# Key values:
+terraform output ecr_api_repository_url
+terraform output ecr_agent_repository_url
+terraform output ecr_consumer_repository_url
+terraform output ecs_cluster_name
+terraform output cognito_customer_user_pool_id
+terraform output cognito_customer_app_client_id
+terraform output cognito_admin_user_pool_id
+terraform output cognito_admin_app_client_id
+terraform output sqs_ingest_queue_url
+terraform output dashboard_s3_bucket
+terraform output dashboard_cf_distribution_id
+terraform output admin_s3_bucket
+terraform output admin_cf_distribution_id
+```
+
+---
+
+### Phase 5 — GitHub Repository Configuration
+
+#### Step 5.1 — Create GitHub Environments
+
+Navigate to **GitHub → repo → Settings → Environments → New environment** and create:
+
+| Environment | Protection rules |
+|---|---|
+| `dev` | None — auto-approve all deployments |
+| `staging` | None — auto-approve all deployments |
+| `prod` | Required reviewers: add yourself and/or a team lead |
+
+#### Step 5.2 — Add Repository-Level Secrets
+
+Go to **Settings → Secrets and variables → Actions → New repository secret**:
+
+| Secret | Value |
+|---|---|
+| `ECR_REPOSITORY_API` | `terraform output ecr_api_repository_url` |
+| `ECR_REPOSITORY_AGENT` | `terraform output ecr_agent_repository_url` |
+| `ECR_REPOSITORY_INGEST` | `terraform output ecr_consumer_repository_url` |
+
+#### Step 5.3 — Add Environment Secrets
+
+For each environment, go to **Settings → Environments → [env] → Add secret**.
+
+**dev secrets:**
+
+| Secret | Value |
+|---|---|
+| `AWS_ROLE_ARN` | IAM role ARN from Phase 1 |
+| `ANTHROPIC_API_KEY` | Your Anthropic API key |
+| `ACM_CERT_ARN_DEV` | ACM cert ARN from Phase 2 |
+| `ECS_CLUSTER_DEV` | `terraform output ecs_cluster_name` |
+| `ECS_SERVICE_API_DEV` | `tek-watch-dev-api` |
+| `COGNITO_CUSTOMER_USER_POOL_ID_DEV` | `terraform output cognito_customer_user_pool_id` |
+| `COGNITO_CUSTOMER_APP_CLIENT_ID_DEV` | `terraform output cognito_customer_app_client_id` |
+| `COGNITO_ADMIN_USER_POOL_ID_DEV` | `terraform output cognito_admin_user_pool_id` |
+| `COGNITO_ADMIN_APP_CLIENT_ID_DEV` | `terraform output cognito_admin_app_client_id` |
+| `DASHBOARD_S3_BUCKET_DEV` | `terraform output dashboard_s3_bucket` |
+| `DASHBOARD_CF_DISTRIBUTION_DEV` | `terraform output dashboard_cf_distribution_id` |
+| `ADMIN_S3_BUCKET_DEV` | `terraform output admin_s3_bucket` |
+| `ADMIN_CF_DISTRIBUTION_DEV` | `terraform output admin_cf_distribution_id` |
+
+Repeat for **staging** (suffix `_STAGING`, values from a staging Terraform run with `environments/staging.tfvars`) and **prod** (suffix `_PROD`).
+
+---
+
+### Phase 6 — First Code Deployment (Dev)
+
+Push to `main` to trigger all CI/CD pipelines simultaneously:
+
+```bash
+git push origin main
+```
+
+**Watch the pipelines in GitHub → Actions.** Expected order and duration:
+
+| Pipeline | Trigger | Duration | What it does |
+|---|---|---|---|
+| `Terraform Infrastructure` | terraform/ changed | ~2 min | Validate + plan + apply |
+| `API CI/CD` | api/ changed | ~5 min | Test → build Docker → push ECR → deploy ECS |
+| `Agent CI/CD` | agent/ changed | ~5 min | Test → build Docker → push ECR → push ECS task def |
+| `Ingest Consumer CI/CD` | ingest-consumer/ changed | ~5 min | Test → build Docker → push ECR → deploy ECS |
+| `Dashboard CI/CD` | dashboard/ changed | ~4 min | Lint → type-check → test → build → deploy S3/CloudFront |
+| `Admin Portal CI/CD` | admin-portal/ changed | ~4 min | Lint → type-check → test → build → deploy S3/CloudFront |
+
+If any pipeline fails, click through to the failing step — common first-run failures:
+- **ECR login fails** — confirm `ECR_REPOSITORY_*` secrets are set and the IAM role has ECR permissions
+- **ECS deploy fails** — confirm `ECS_CLUSTER_DEV` / `ECS_SERVICE_API_DEV` match the Terraform outputs
+- **S3 sync fails** — confirm `DASHBOARD_S3_BUCKET_DEV` is correct and the role has `s3:PutObject` on that bucket
+
+---
+
+### Phase 7 — DNS Configuration
+
+After the ALB and CloudFront distributions are provisioned, point your DNS records at them.
+
+#### API (ALB)
+
+```bash
+# Get the ALB DNS name from Terraform output or ECS service
+ALB_DNS=$(terraform output -raw alb_dns_name)
+ALB_ZONE_ID=$(terraform output -raw alb_hosted_zone_id)
+
+aws route53 change-resource-record-sets \
+  --hosted-zone-id <YOUR_ZONE_ID> \
+  --change-batch "{
+    \"Changes\": [{
+      \"Action\": \"UPSERT\",
+      \"ResourceRecordSet\": {
+        \"Name\": \"api-dev.tekwatch.io\",
+        \"Type\": \"A\",
+        \"AliasTarget\": {
+          \"HostedZoneId\": \"$ALB_ZONE_ID\",
+          \"DNSName\": \"$ALB_DNS\",
+          \"EvaluateTargetHealth\": true
+        }
+      }
+    }]
+  }"
+```
+
+#### Dashboard & Admin Portal (CloudFront)
+
+Get the CloudFront domain names:
+
+```bash
+DASH_CF_DOMAIN=$(aws cloudfront get-distribution \
+  --id $(terraform output -raw dashboard_cf_distribution_id) \
+  --query Distribution.DomainName --output text)
+
+ADMIN_CF_DOMAIN=$(aws cloudfront get-distribution \
+  --id $(terraform output -raw admin_cf_distribution_id) \
+  --query Distribution.DomainName --output text)
+```
+
+Add CNAME records in Route 53:
+
+| Record name | Type | Value |
+|---|---|---|
+| `dev.tekwatch.io` | CNAME | `<dashboard CF domain>` |
+| `admin-dev.tekwatch.io` | CNAME | `<admin CF domain>` |
+
+DNS propagation typically takes 1–5 minutes with Route 53.
+
+---
+
+### Phase 8 — Verify Dev Deployment
+
+Run all checks before promoting to staging:
+
+```bash
+# 1. API health endpoint
+curl -sf https://api-dev.tekwatch.io/health && echo "API OK"
+
+# 2. Dashboard returns 200
+curl -sI https://dev.tekwatch.io | head -1
+
+# 3. Admin portal returns 200
+curl -sI https://admin-dev.tekwatch.io | head -1
+
+# 4. ECS services: running count == desired count
+aws ecs describe-services \
+  --cluster tek-watch-dev \
+  --services tek-watch-dev-api tek-watch-dev-ingest-consumer \
+  --query 'services[*].{Service:serviceName,Running:runningCount,Desired:desiredCount}' \
+  --output table
+
+# 5. SQS queue reachable (depth should be 0 on a fresh deploy)
+aws sqs get-queue-attributes \
+  --queue-url $(terraform output -raw sqs_ingest_queue_url) \
+  --attribute-names ApproximateNumberOfMessages \
+  --query Attributes.ApproximateNumberOfMessages --output text
+```
+
+All checks must pass before proceeding.
+
+---
+
+### Phase 9 — Promote to Staging
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+This tag push triggers `deploy-staging` jobs in all 6 workflows automatically. Staging Terraform must have been applied separately:
+
+```bash
+cd infrastructure/terraform
+
+terraform init \
+  -reconfigure \
+  -backend-config="bucket=tek-watch-terraform-state" \
+  -backend-config="key=tek-watch/staging/terraform.tfstate" \
+  -backend-config="region=eu-west-2" \
+  -backend-config="dynamodb_table=tek-watch-terraform-locks"
+
+terraform apply \
+  -var-file="environments/staging.tfvars" \
+  -var="anthropic_api_key=$ANTHROPIC_API_KEY" \
+  -var="acm_certificate_arn=<ACM_CERT_ARN_STAGING>"
+```
+
+Populate staging GitHub environment secrets from the staging Terraform outputs, then repeat Phase 8 verification against `api-staging.tekwatch.io`.
+
+---
+
+### Phase 10 — Promote to Production
+
+Production deployments are **manual-only** and require reviewer approval.
+
+#### Step 10.1 — Apply Prod Infrastructure
+
+In GitHub → **Actions → Terraform Infrastructure → Run workflow**:
+- Branch: `main`
+- Environment: `prod`
+- Action: `apply`
+
+Or manually from your terminal (requires prod AWS credentials):
+
+```bash
+cd infrastructure/terraform
+
+terraform init \
+  -reconfigure \
+  -backend-config="bucket=tek-watch-terraform-state" \
+  -backend-config="key=tek-watch/prod/terraform.tfstate" \
+  -backend-config="region=eu-west-2" \
+  -backend-config="dynamodb_table=tek-watch-terraform-locks"
+
+terraform apply \
+  -var-file="environments/prod.tfvars" \
+  -var="anthropic_api_key=$ANTHROPIC_API_KEY" \
+  -var="acm_certificate_arn=<ACM_CERT_ARN_PROD>"
+```
+
+#### Step 10.2 — Deploy Services to Prod
+
+Trigger each workflow manually in order:
+
+1. **Actions → API CI/CD → Run workflow** (branch: `main`) → approve when prompted
+2. **Actions → Ingest Consumer CI/CD → Run workflow**
+3. **Actions → Agent CI/CD → Run workflow**
+4. **Actions → Dashboard CI/CD → Run workflow**
+5. **Actions → Admin Portal CI/CD → Run workflow**
+
+Each job waits for an approval from the reviewers configured in the `prod` GitHub environment before proceeding.
+
+#### Step 10.3 — Verify Production
+
+```bash
+curl -sf https://api.tekwatch.io/health && echo "Prod API OK"
+curl -sI https://app.tekwatch.io | head -1
+curl -sI https://admin.tekwatch.io | head -1
+
+aws ecs describe-services \
+  --cluster tek-watch-prod \
+  --services tek-watch-prod-api tek-watch-prod-ingest-consumer \
+  --query 'services[*].{Service:serviceName,Running:runningCount,Desired:desiredCount}' \
+  --output table
+```
+
+---
+
+### Phase 11 — Onboard First Customer
+
+See [Customer Agent Deployment](#customer-agent-deployment) below for the full flow. Summary:
+
+1. Log in to `admin.tekwatch.io` and create a customer record
+2. Download the pre-filled CloudFormation template
+3. Deploy it in the customer's AWS account
+4. Verify heartbeat appears in DynamoDB within 5 minutes
+
+---
+
 ## Local Development
 
 ### 1. Initial Setup
@@ -360,26 +859,37 @@ docker push $ECR_BASE/tek-watch-dev-agent:latest
 
 ---
 
-## GitHub Actions Secrets
+## GitHub Actions Secrets Reference
 
-Configure these in **Settings → Secrets and variables → Actions**:
+All workflows use **OIDC** — no long-lived AWS keys are stored. See Phase 5 in the deployment guide above for the full setup procedure.
+
+**Repository-level secrets** (available to all environments):
 
 | Secret | Value |
-|--------|-------|
-| `AWS_ACCESS_KEY_ID` | IAM user access key |
-| `AWS_SECRET_ACCESS_KEY` | IAM user secret key |
-| `ANTHROPIC_API_KEY` | Claude API key |
-| `ACM_CERT_ARN_DEV` | ACM certificate ARN (eu-west-2, dev ALB) |
-| `ACM_CERT_ARN_STAGING` | ACM certificate ARN (staging) |
-| `ACM_CERT_ARN_PROD` | ACM certificate ARN (prod) |
-| `COGNITO_CUSTOMER_USER_POOL_ID` | From `terraform output` |
-| `COGNITO_CUSTOMER_APP_CLIENT_ID` | From `terraform output` |
-| `COGNITO_ADMIN_USER_POOL_ID` | From `terraform output` |
-| `COGNITO_ADMIN_APP_CLIENT_ID` | From `terraform output` |
-| `DASHBOARD_S3_BUCKET_DEV` | S3 bucket for customer dashboard |
-| `DASHBOARD_CF_DISTRIBUTION_DEV` | CloudFront distribution ID for dashboard |
-| `ADMIN_S3_BUCKET_DEV` | S3 bucket for admin portal |
-| `ADMIN_CF_DISTRIBUTION_DEV` | CloudFront distribution ID for admin portal |
+|---|---|
+| `ECR_REPOSITORY_API` | ECR URI for the API image |
+| `ECR_REPOSITORY_AGENT` | ECR URI for the agent image |
+| `ECR_REPOSITORY_INGEST` | ECR URI for the ingest-consumer image |
+
+**Per-environment secrets** (set in Settings → Environments → [env] → Secrets):
+
+| Secret | Environments | Value |
+|---|---|---|
+| `AWS_ROLE_ARN` | dev, staging, prod | OIDC IAM role ARN (from Phase 1) |
+| `ANTHROPIC_API_KEY` | dev, staging, prod | Anthropic Claude API key |
+| `ACM_CERT_ARN_DEV` | dev | ACM cert ARN for dev ALB |
+| `ACM_CERT_ARN_STAGING` | staging | ACM cert ARN for staging ALB |
+| `ACM_CERT_ARN_PROD` | prod | ACM cert ARN for prod ALB |
+| `ECS_CLUSTER_*` | per env | ECS cluster name (`terraform output ecs_cluster_name`) |
+| `ECS_SERVICE_API_*` | per env | ECS service name for the API |
+| `COGNITO_CUSTOMER_USER_POOL_ID_*` | per env | From `terraform output` |
+| `COGNITO_CUSTOMER_APP_CLIENT_ID_*` | per env | From `terraform output` |
+| `COGNITO_ADMIN_USER_POOL_ID_*` | per env | From `terraform output` |
+| `COGNITO_ADMIN_APP_CLIENT_ID_*` | per env | From `terraform output` |
+| `DASHBOARD_S3_BUCKET_*` | per env | S3 bucket for dashboard static files |
+| `DASHBOARD_CF_DISTRIBUTION_*` | per env | CloudFront distribution ID for dashboard |
+| `ADMIN_S3_BUCKET_*` | per env | S3 bucket for admin portal |
+| `ADMIN_CF_DISTRIBUTION_*` | per env | CloudFront distribution ID for admin portal |
 
 ---
 
