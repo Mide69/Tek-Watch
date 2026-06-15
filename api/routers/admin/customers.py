@@ -34,11 +34,15 @@ class UpdateCustomerRequest(BaseModel):
 @router.get("")
 async def list_customers(
     admin: AdminContext = Depends(get_current_admin),
+    limit: int = Query(50, ge=1, le=500, description="Maximum records to return"),
+    offset: int = Query(0, ge=0, description="Number of records to skip"),
 ):
-    """List all customers (admin only)."""
+    """List customers with pagination (admin only)."""
     db = DynamoDBService()
-    customers = db.list_customers()
-    return {"customers": customers}
+    all_customers = db.list_customers()
+    total = len(all_customers)
+    page = all_customers[offset: offset + limit]
+    return {"customers": page, "total": total, "limit": limit, "offset": offset}
 
 
 @router.post("")
