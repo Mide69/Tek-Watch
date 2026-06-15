@@ -11,12 +11,11 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  DashboardProvider, useDashboard,
+  useDashboard,
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
 } from '@/contexts/DashboardContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { NotificationBell } from '@/components/ui/NotificationBell'
-import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -136,7 +135,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
             <p className="text-sm font-mono font-semibold text-foreground">{customerId}</p>
           </div>
         )}
-        <div className="px-3 py-1.5 text-xs text-muted-foreground/60">
+        <div className="px-3 py-1.5 text-xs text-muted-foreground/60" suppressHydrationWarning>
           Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
         <button
@@ -267,11 +266,5 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 // ─── Exported wrapper ─────────────────────────────────────────────────────────
 
 export default function DashboardLayout({ children, customerId }: DashboardLayoutProps) {
-  return (
-    <ErrorBoundary>
-      <DashboardProvider>
-        <Inner customerId={customerId}>{children}</Inner>
-      </DashboardProvider>
-    </ErrorBoundary>
-  )
+  return <Inner customerId={customerId}>{children}</Inner>
 }
