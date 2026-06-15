@@ -2,7 +2,7 @@
 import logging
 from dataclasses import dataclass
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from auth.cognito import verify_admin_token, verify_customer_token
@@ -30,6 +30,7 @@ class AdminContext:
 
 
 def get_current_customer(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
 ) -> CustomerContext:
     """FastAPI dependency — validates customer JWT and returns CustomerContext.
@@ -55,6 +56,9 @@ def get_current_customer(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="customer_id not found in token",
         )
+
+    # Store on request state so UsageMeterMiddleware can read it after the response
+    request.state.customer_id = customer_id
 
     return CustomerContext(
         customer_id=customer_id,
