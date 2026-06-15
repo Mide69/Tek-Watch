@@ -202,6 +202,12 @@ class APIClient {
     return response.data
   }
 
+  // Chat (AI natural language)
+  async chat(message: string, history: { role: string; content: string }[] = []) {
+    const response = await this.client.post('/api/v1/chat/', { message, history })
+    return response.data
+  }
+
   // Metrics (time-series)
   async getResourceMetrics(
     resourceId: string,

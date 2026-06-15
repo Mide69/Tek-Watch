@@ -18,6 +18,7 @@ from config import load_config
 from routers import (
     agent,
     alerts,
+    chat,
     compute,
     cost,
     databases,
@@ -126,6 +127,7 @@ def create_app() -> FastAPI:
     app.include_router(alerts.router, prefix="/api/v1/alerts", tags=["Alerts"])
     app.include_router(agent.router, prefix="/api/v1/agent", tags=["Agent"])
     app.include_router(metrics.router, prefix="/api/v1/metrics", tags=["Metrics"])
+    app.include_router(chat.router, prefix="/api/v1/chat", tags=["Chat"])
     
     # Admin portal routers
     app.include_router(customers.router, prefix="/api/v1/admin/customers", tags=["Admin - Customers"])
