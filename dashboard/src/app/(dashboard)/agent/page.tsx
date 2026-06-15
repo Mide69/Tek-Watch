@@ -17,7 +17,7 @@ export default function AgentPage() {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">
-          <div className="h-8 w-32 bg-white/[0.06] rounded animate-pulse" />
+          <div className="h-8 w-32 bg-muted rounded animate-pulse" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
           </div>
@@ -33,8 +33,8 @@ export default function AgentPage() {
     <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
-          <h1 className="text-2xl font-bold text-white">Agent</h1>
-          <p className="text-slate-400 text-sm mt-0.5">
+          <h1 className="text-2xl font-bold text-foreground">Agent</h1>
+          <p className="text-muted-foreground text-sm mt-0.5">
             Collection agent running in the customer&apos;s AWS account
           </p>
         </div>
@@ -48,21 +48,21 @@ export default function AgentPage() {
                   ? 'bg-emerald-500/20 border border-emerald-500/30'
                   : 'bg-amber-500/20 border border-amber-500/30'
               }`}>
-                <Radio className={`w-7 h-7 ${a.status === 'healthy' ? 'text-emerald-400' : 'text-amber-400'}`} />
+                <Radio className={`w-7 h-7 ${a.status === 'healthy' ? 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' : 'text-amber-500 dark:text-amber-400'}`} />
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl font-bold text-white capitalize">{a.status}</span>
+                  <span className="text-xl font-bold text-foreground capitalize">{a.status}</span>
                   <span className={`w-2 h-2 rounded-full ${a.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
                 </div>
-                <p className="text-sm text-slate-400">
-                  Customer <span className="text-white font-mono">{a.customer_id}</span> · Version {a.version} · Up {a.uptime_hours.toLocaleString()}h
+                <p className="text-sm text-muted-foreground">
+                  Customer <span className="text-foreground font-mono">{a.customer_id}</span> · Version {a.version} · Up {a.uptime_hours.toLocaleString()}h
                 </p>
               </div>
               <div className="text-right text-sm">
-                <p className="text-slate-500 text-xs mb-0.5">Last heartbeat</p>
-                <p className="font-medium text-white">{formatRelativeTime(a.last_heartbeat)}</p>
-                <p className="text-xs text-slate-500 mt-1">{a.collection_interval_s}s interval</p>
+                <p className="text-muted-foreground text-xs mb-0.5">Last heartbeat</p>
+                <p className="font-medium text-foreground">{formatRelativeTime(a.last_heartbeat)}</p>
+                <p className="text-xs text-muted-foreground mt-1">{a.collection_interval_s}s interval</p>
               </div>
             </div>
           </CardContent>
@@ -73,14 +73,14 @@ export default function AgentPage() {
           {[
             { label: 'Metrics Collected',  value: a.metrics_collected_total.toLocaleString(), icon: Activity,    color: 'text-indigo-400' },
             { label: 'Regions Covered',    value: a.regions.length.toString(),                icon: Radio,       color: 'text-blue-400'   },
-            { label: 'Active Collectors',  value: `${okCollectors}/${a.collectors.length}`,   icon: CheckCircle, color: 'text-emerald-400' },
-            { label: 'Collection Interval',value: `${a.collection_interval_s}s`,              icon: Clock,       color: 'text-amber-400'  },
+            { label: 'Active Collectors',  value: `${okCollectors}/${a.collectors.length}`,   icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' },
+            { label: 'Collection Interval',value: `${a.collection_interval_s}s`,              icon: Clock,       color: 'text-amber-500 dark:text-amber-400'  },
           ].map(s => (
             <Card key={s.label}>
               <CardContent className="p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <s.icon className={`w-4 h-4 ${s.color}`} />
-                  <span className="text-xs text-slate-500">{s.label}</span>
+                  <span className="text-xs text-muted-foreground">{s.label}</span>
                 </div>
                 <div className={`text-xl font-bold ${s.color}`}>{s.value}</div>
               </CardContent>
@@ -91,12 +91,12 @@ export default function AgentPage() {
         {/* Regions */}
         <Card>
           <CardContent className="p-5">
-            <h3 className="font-semibold text-white mb-3">Regions Monitored</h3>
+            <h3 className="font-semibold text-foreground mb-3">Regions Monitored</h3>
             <div className="flex flex-wrap gap-2">
               {a.regions.map(r => (
-                <div key={r} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08]">
+                <div key={r} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 border border-white/[0.08]">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span className="text-sm font-mono text-slate-300">{r}</span>
+                  <span className="text-sm font-mono text-foreground">{r}</span>
                 </div>
               ))}
             </div>
@@ -108,8 +108,8 @@ export default function AgentPage() {
           <CardContent className="p-0">
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div>
-                <h3 className="font-semibold text-white">Collectors</h3>
-                <p className="text-xs text-slate-500 mt-0.5">{a.collectors.length} collectors</p>
+                <h3 className="font-semibold text-foreground">Collectors</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">{a.collectors.length} collectors</p>
               </div>
               {warnCollectors > 0
                 ? <Badge variant="warning">{warnCollectors} degraded</Badge>
@@ -118,24 +118,24 @@ export default function AgentPage() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-white/[0.06]">
+                  <tr className="border-b border-border">
                     {['Collector', 'Status', 'Last Run', 'Resources', 'Metrics Sent'].map(h => (
-                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-slate-500 whitespace-nowrap">{h}</th>
+                      <th key={h} className="text-left px-4 py-3 text-xs font-medium text-muted-foreground whitespace-nowrap">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {a.collectors.map((c, idx) => (
-                    <tr key={c.name} className={`border-b border-white/[0.04] hover:bg-white/[0.02] ${idx % 2 ? 'bg-white/[0.01]' : ''}`}>
-                      <td className="px-4 py-3 font-medium text-white">{c.name}</td>
+                    <tr key={c.name} className={`border-b border-border/40 hover:bg-muted/30 ${idx % 2 ? 'bg-muted/10' : ''}`}>
+                      <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
                       <td className="px-4 py-3">
                         {c.status === 'ok'
                           ? <Badge variant="success">ok</Badge>
                           : <Badge variant="error">{c.status}</Badge>}
                       </td>
-                      <td className="px-4 py-3 text-xs text-slate-400">{formatRelativeTime(c.last_run)}</td>
-                      <td className="px-4 py-3 text-slate-300">{c.resources}</td>
-                      <td className="px-4 py-3 text-slate-300">{c.metrics_sent}</td>
+                      <td className="px-4 py-3 text-xs text-muted-foreground">{formatRelativeTime(c.last_run)}</td>
+                      <td className="px-4 py-3 text-foreground">{c.resources}</td>
+                      <td className="px-4 py-3 text-foreground">{c.metrics_sent}</td>
                     </tr>
                   ))}
                 </tbody>
