@@ -66,7 +66,7 @@ function ToastContainer() {
             <p className="text-sm font-medium text-foreground">{t.title}</p>
             {t.message && <p className="text-xs text-muted-foreground mt-0.5">{t.message}</p>}
           </div>
-          <button onClick={() => removeToast(t.id)} className="text-muted-foreground hover:text-foreground">
+          <button onClick={() => removeToast(t.id)} aria-label="Dismiss notification" className="text-muted-foreground hover:text-foreground">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -156,7 +156,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className="fixed inset-y-0 left-0 w-64 bg-sidebar border-r border-sidebar-border shadow-xl">
-            <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
+            <button onClick={() => setSidebarOpen(false)} aria-label="Close navigation" className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
               <X className="h-5 w-5" />
             </button>
             <SidebarContent />
@@ -174,7 +174,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
         {/* Top bar */}
         <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 backdrop-blur-sm px-4 lg:px-6">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground">
+          <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="lg:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
 
@@ -202,6 +202,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           <select
             value={region}
             onChange={e => setRegion(e.target.value as Region)}
+            aria-label="Filter by AWS region"
             className="px-3 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">All Regions</option>
@@ -213,6 +214,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           {/* Refresh */}
           <button
             onClick={refresh}
+            aria-label={`Refresh data — auto-refreshing in ${secondsToRefresh}s`}
             title={`Auto-refresh in ${secondsToRefresh}s`}
             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
