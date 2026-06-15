@@ -8,8 +8,11 @@ import boto3
 from botocore.exceptions import ClientError
 from fastapi import APIRouter, Depends
 
+from fastapi import Query as QueryParam
+
 from auth.dependencies import AdminContext, get_current_admin
 from config import load_config
+from services.audit_log import get_recent_actions
 from services.dynamodb import DynamoDBService
 
 logger = logging.getLogger(__name__)
@@ -173,3 +176,13 @@ async def get_operations_dashboard(
         },
         "recent_errors": recent_errors,
     }
+
+
+@router.get("/audit-log")
+async def get_audit_log(
+    admin: AdminContext = Depends(get_current_admin),
+    limit: int = QueryParam(50, ge=1, le=500, description="Maximum records to return"),
+):
+    """Return recent audit log entries for the calling admin."""
+    entries = get_recent_actions(admin.admin_sub, limit=limit)
+    return {"admin_sub": admin.admin_sub, "entries": entries, "count": len(entries)}

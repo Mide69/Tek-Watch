@@ -19,6 +19,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from config import load_config
 from middleware.security import SecurityHeadersMiddleware
+from middleware.usage_meter import UsageMeterMiddleware
 from rate_limit import (
     SlowAPIMiddleware,
     RateLimitExceeded,
@@ -111,6 +112,9 @@ def create_app() -> FastAPI:
 
     # ── Security headers ──────────────────────────────────────────────────────
     app.add_middleware(SecurityHeadersMiddleware)
+
+    # ── Usage metering (fire-and-forget, never blocks response) ──────────────
+    app.add_middleware(UsageMeterMiddleware)
 
     # ── CORS — origins from config, never hardcoded ───────────────────────────
     allowed_origins = [o.strip() for o in config.allowed_origins.split(",") if o.strip()]

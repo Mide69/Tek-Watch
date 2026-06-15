@@ -98,11 +98,68 @@ resource "aws_dynamodb_table" "heartbeats" {
   tags = { Name = "${var.name_prefix}-heartbeats" }
 }
 
+# ── Usage metering table ──────────────────────────────────────────────────────
+# PK=customer_id, SK=month (YYYY-MM) — atomic ADD counters per endpoint
+
+resource "aws_dynamodb_table" "usage" {
+  name         = "${var.name_prefix}-usage"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "customer_id"
+  range_key    = "month"
+
+  attribute {
+    name = "customer_id"
+    type = "S"
+  }
+  attribute {
+    name = "month"
+    type = "S"
+  }
+
+  # TTL — auto-expire records older than 13 months (keep rolling year + 1)
+  ttl {
+    attribute_name = "expires_at"
+    enabled        = true
+  }
+
+  tags = { Name = "${var.name_prefix}-usage" }
+}
+
+# ── Admin audit log table ─────────────────────────────────────────────────────
+# PK=admin_id, SK={timestamp}#{event_id} — append-only, chronological queries
+
+resource "aws_dynamodb_table" "audit_log" {
+  name         = "${var.name_prefix}-audit-log"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "admin_id"
+  range_key    = "sk"
+
+  attribute {
+    name = "admin_id"
+    type = "S"
+  }
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  # PITR on in all environments — audit logs are compliance data
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = { Name = "${var.name_prefix}-audit-log" }
+}
+
 output "customers_table_name"  { value = aws_dynamodb_table.customers.name }
 output "alerts_table_name"     { value = aws_dynamodb_table.alerts.name }
 output "thresholds_table_name" { value = aws_dynamodb_table.thresholds.name }
 output "heartbeats_table_name" { value = aws_dynamodb_table.heartbeats.name }
+output "usage_table_name"      { value = aws_dynamodb_table.usage.name }
+output "audit_log_table_name"  { value = aws_dynamodb_table.audit_log.name }
 output "customers_table_arn"   { value = aws_dynamodb_table.customers.arn }
 output "alerts_table_arn"      { value = aws_dynamodb_table.alerts.arn }
 output "thresholds_table_arn"  { value = aws_dynamodb_table.thresholds.arn }
 output "heartbeats_table_arn"  { value = aws_dynamodb_table.heartbeats.arn }
+output "usage_table_arn"       { value = aws_dynamodb_table.usage.arn }
+output "audit_log_table_arn"   { value = aws_dynamodb_table.audit_log.arn }
