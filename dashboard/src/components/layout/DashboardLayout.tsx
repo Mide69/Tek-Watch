@@ -14,6 +14,7 @@ import {
   DashboardProvider, useDashboard,
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
 } from '@/contexts/DashboardContext'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -42,29 +43,29 @@ const DEMO_MODE = (
   COGNITO_POOL === 'undefined'
 )
 
-// ─── Toast component ──────────────────────────────────────────────────────────
+// ─── Toast ────────────────────────────────────────────────────────────────────
 
 function ToastContainer() {
   const { toasts, removeToast } = useDashboard()
   if (toasts.length === 0) return null
   const icons = {
-    success: <CheckCircle className="w-4 h-4 text-emerald-400" />,
-    warning: <AlertCircle className="w-4 h-4 text-amber-400" />,
-    error:   <XCircle     className="w-4 h-4 text-red-400"    />,
-    info:    <Info        className="w-4 h-4 text-blue-400"   />,
+    success: <CheckCircle className="w-4 h-4 text-emerald-500" />,
+    warning: <AlertCircle className="w-4 h-4 text-amber-500" />,
+    error:   <XCircle     className="w-4 h-4 text-red-500"    />,
+    info:    <Info        className="w-4 h-4 text-blue-500"   />,
   }
   return (
     <div className="fixed bottom-4 right-4 z-[9999] space-y-2 max-w-sm w-full pointer-events-none">
       {toasts.map(t => (
         <div key={t.id}
-          className="flex items-start gap-3 p-4 rounded-xl border border-white/[0.1] bg-[#0e1525]/95 backdrop-blur-sm shadow-2xl pointer-events-auto animate-fade-in"
+          className="flex items-start gap-3 p-4 rounded-xl border border-border bg-card shadow-lg pointer-events-auto animate-fade-in"
         >
           {icons[t.type]}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white">{t.title}</p>
-            {t.message && <p className="text-xs text-slate-400 mt-0.5">{t.message}</p>}
+            <p className="text-sm font-medium text-foreground">{t.title}</p>
+            {t.message && <p className="text-xs text-muted-foreground mt-0.5">{t.message}</p>}
           </div>
-          <button onClick={() => removeToast(t.id)} className="text-slate-500 hover:text-white">
+          <button onClick={() => removeToast(t.id)} className="text-muted-foreground hover:text-foreground">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -73,12 +74,12 @@ function ToastContainer() {
   )
 }
 
-// ─── Inner layout (has access to DashboardContext) ────────────────────────────
+// ─── Inner layout (has DashboardContext) ──────────────────────────────────────
 
 function Inner({ children, customerId }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const pathname  = usePathname()
-  const router    = useRouter()
+  const pathname = usePathname()
+  const router   = useRouter()
   const {
     timeRange, setTimeRange,
     region, setRegion,
@@ -95,11 +96,11 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="flex items-center gap-3 h-16 px-5 border-b border-white/[0.06]">
-        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+      <div className="flex items-center gap-3 h-16 px-5 border-b border-sidebar-border">
+        <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
           <Radio className="w-4 h-4 text-white" />
         </div>
-        <span className="text-base font-bold text-white tracking-tight">Tek Watch</span>
+        <span className="text-base font-bold text-sidebar-foreground tracking-tight">Tek Watch</span>
       </div>
 
       {/* Nav */}
@@ -114,11 +115,11 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
               className={cn(
                 'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-150',
                 isActive
-                  ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-white/[0.05]'
+                  ? 'bg-primary/10 text-primary border border-primary/20'
+                  : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover'
               )}
             >
-              <item.icon className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-indigo-400' : 'text-slate-500')} />
+              <item.icon className={cn('h-4 w-4 flex-shrink-0', isActive ? 'text-primary' : 'text-sidebar-muted')} />
               {item.name}
             </Link>
           )
@@ -126,20 +127,19 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
       </nav>
 
       {/* Footer */}
-      <div className="px-3 pb-4 border-t border-white/[0.06] pt-4 space-y-3">
+      <div className="px-3 pb-4 border-t border-sidebar-border pt-4 space-y-3">
         {customerId && (
-          <div className="px-3 py-2 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-            <p className="text-xs text-slate-500 mb-0.5">Customer ID</p>
-            <p className="text-sm font-mono font-semibold text-slate-300">{customerId}</p>
+          <div className="px-3 py-2 rounded-lg bg-muted border border-border">
+            <p className="text-xs text-muted-foreground mb-0.5">Customer ID</p>
+            <p className="text-sm font-mono font-semibold text-foreground">{customerId}</p>
           </div>
         )}
-        {/* Last updated */}
-        <div className="px-3 py-1.5 text-xs text-slate-600">
+        <div className="px-3 py-1.5 text-xs text-muted-foreground/60">
           Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
         <button
           onClick={handleSignOut}
-          className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg text-slate-400 hover:text-slate-200 hover:bg-white/[0.05] transition-colors"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
         >
           <LogOut className="h-4 w-4" />
           {DEMO_MODE ? 'Back to Home' : 'Sign out'}
@@ -150,12 +150,12 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile sidebar */}
+      {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
-          <div className="fixed inset-y-0 left-0 w-64 bg-[#0a0f1e] border-r border-white/[0.06]">
-            <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
+          <div className="fixed inset-y-0 left-0 w-64 bg-sidebar border-r border-sidebar-border shadow-xl">
+            <button onClick={() => setSidebarOpen(false)} className="absolute top-4 right-4 text-muted-foreground hover:text-foreground">
               <X className="h-5 w-5" />
             </button>
             <SidebarContent />
@@ -164,22 +164,23 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
       )}
 
       {/* Desktop sidebar */}
-      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-[#0a0f1e] border-r border-white/[0.06]">
+      <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col bg-sidebar border-r border-sidebar-border">
         <SidebarContent />
       </div>
 
-      {/* Main content */}
+      {/* Main content area */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
+
         {/* Top bar */}
-        <div className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-white/[0.06] bg-background/80 backdrop-blur-sm px-4 lg:px-6">
-          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-slate-400 hover:text-white">
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 backdrop-blur-sm px-4 lg:px-6">
+          <button onClick={() => setSidebarOpen(true)} className="lg:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
 
           <div className="flex-1" />
 
           {/* Time range picker */}
-          <div className="hidden sm:flex items-center gap-0.5 bg-white/[0.04] border border-white/[0.06] rounded-lg p-0.5">
+          <div className="hidden sm:flex items-center gap-0.5 bg-muted border border-border rounded-lg p-0.5">
             {TIME_RANGE_OPTIONS.map(r => (
               <button
                 key={r}
@@ -187,8 +188,8 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
                 className={cn(
                   'px-2.5 py-1 text-xs font-medium rounded-md transition-all',
                   timeRange === r
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-primary text-primary-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 )}
               >
                 {r.toUpperCase()}
@@ -200,7 +201,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           <select
             value={region}
             onChange={e => setRegion(e.target.value as Region)}
-            className="px-3 py-1.5 text-xs border border-white/[0.08] rounded-lg bg-white/[0.04] text-slate-300 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+            className="px-3 py-1.5 text-xs border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
           >
             <option value="all">All Regions</option>
             <option value="eu-west-2">eu-west-2</option>
@@ -208,35 +209,38 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
             <option value="us-east-1">us-east-1</option>
           </select>
 
-          {/* Refresh button + live indicator */}
-          <div className="flex items-center gap-2">
-            <button
-              onClick={refresh}
-              title={`Auto-refresh in ${secondsToRefresh}s`}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors"
-            >
-              <RefreshCw className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-indigo-400')} />
-              <span className="hidden md:inline tabular-nums">{secondsToRefresh}s</span>
-            </button>
-            <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-400 font-medium">
-              <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-              </span>
-              LIVE
-            </div>
+          {/* Refresh */}
+          <button
+            onClick={refresh}
+            title={`Auto-refresh in ${secondsToRefresh}s`}
+            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <RefreshCw className={cn('w-3.5 h-3.5', isRefreshing && 'animate-spin text-primary')} />
+            <span className="hidden md:inline tabular-nums">{secondsToRefresh}s</span>
+          </button>
+
+          {/* Live indicator */}
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            LIVE
           </div>
-        </div>
+
+          {/* Theme toggle */}
+          <ThemeToggle />
+        </header>
 
         {/* Mobile time range bar */}
-        <div className="sm:hidden flex items-center gap-1 px-4 py-2 border-b border-white/[0.06] bg-background/60 overflow-x-auto">
+        <div className="sm:hidden flex items-center gap-1 px-4 py-2 border-b border-border bg-background/60 overflow-x-auto">
           {TIME_RANGE_OPTIONS.map(r => (
             <button
               key={r}
               onClick={() => setTimeRange(r as TimeRange)}
               className={cn(
                 'flex-shrink-0 px-3 py-1 text-xs font-medium rounded-md transition-all',
-                timeRange === r ? 'bg-indigo-600 text-white' : 'text-slate-400 bg-white/[0.04]'
+                timeRange === r ? 'bg-primary text-primary-foreground' : 'text-muted-foreground bg-muted'
               )}
             >
               {r.toUpperCase()}
@@ -244,8 +248,8 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           ))}
         </div>
 
-        {/* Page content */}
-        <main className="flex-1 p-4 lg:p-6">
+        {/* Page content — theme-page enables CSS cascade for page internals */}
+        <main className="flex-1 p-4 lg:p-6 theme-page">
           {children}
         </main>
       </div>
@@ -255,7 +259,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
   )
 }
 
-// ─── Exported wrapper (provides context) ─────────────────────────────────────
+// ─── Exported wrapper ─────────────────────────────────────────────────────────
 
 export default function DashboardLayout({ children, customerId }: DashboardLayoutProps) {
   return (
