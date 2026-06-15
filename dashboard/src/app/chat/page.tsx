@@ -15,7 +15,7 @@ interface Message {
 }
 
 const SUGGESTED = [
-  'Forecast this month\'s cloud spend',
+  "Forecast this month's cloud spend",
   'How many EC2 instances do I have running?',
   'Are there any critical security alerts?',
   'Which AWS service costs the most?',
@@ -38,7 +38,7 @@ const TOOL_LABELS: Record<string, string> = {
 
 function ToolBadge({ tool }: { tool: string }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-400">
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/20 text-primary">
       <Sparkles className="w-2.5 h-2.5" />
       {TOOL_LABELS[tool] ?? tool}
     </span>
@@ -49,25 +49,23 @@ function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
   return (
     <div className={cn('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
-      {/* Avatar */}
       <div className={cn(
         'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-        isUser ? 'bg-indigo-600' : 'bg-[#1a2035] border border-white/[0.08]'
+        isUser ? 'bg-primary' : 'bg-muted border border-border'
       )}>
         {isUser
-          ? <User className="w-3.5 h-3.5 text-white" />
-          : <Bot className="w-3.5 h-3.5 text-indigo-400" />}
+          ? <User className="w-3.5 h-3.5 text-primary-foreground" />
+          : <Bot className="w-3.5 h-3.5 text-primary" />}
       </div>
 
-      {/* Bubble */}
-      <div className={cn('max-w-[75%] space-y-1.5', isUser ? 'items-end' : 'items-start', 'flex flex-col')}>
+      <div className={cn('max-w-[75%] space-y-1.5 flex flex-col', isUser ? 'items-end' : 'items-start')}>
         <div className={cn(
           'px-4 py-3 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap',
           isUser
-            ? 'bg-indigo-600 text-white rounded-tr-sm'
+            ? 'bg-primary text-primary-foreground rounded-tr-sm'
             : msg.isError
-              ? 'bg-red-500/10 border border-red-500/20 text-red-300 rounded-tl-sm'
-              : 'bg-[#0e1525] border border-white/[0.06] text-slate-200 rounded-tl-sm'
+              ? 'bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 text-red-700 dark:text-red-300 rounded-tl-sm'
+              : 'bg-card border border-border text-foreground rounded-tl-sm shadow-sm'
         )}>
           {msg.content}
         </div>
@@ -84,15 +82,15 @@ function MessageBubble({ msg }: { msg: Message }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3">
-      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-[#1a2035] border border-white/[0.08]">
-        <Bot className="w-3.5 h-3.5 text-indigo-400" />
+      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-muted border border-border">
+        <Bot className="w-3.5 h-3.5 text-primary" />
       </div>
-      <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-[#0e1525] border border-white/[0.06]">
+      <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border shadow-sm">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
             <span
               key={i}
-              className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-bounce"
+              className="w-1.5 h-1.5 rounded-full bg-muted-foreground animate-bounce"
               style={{ animationDelay: `${i * 150}ms` }}
             />
           ))}
@@ -117,27 +115,21 @@ export default function ChatPage() {
     const trimmed = text.trim()
     if (!trimmed || isLoading) return
 
-    const userMsg: Message = {
-      id: `u-${Date.now()}`,
-      role: 'user',
-      content: trimmed,
-    }
+    const userMsg: Message = { id: `u-${Date.now()}`, role: 'user', content: trimmed }
     setMessages(prev => [...prev, userMsg])
     setInput('')
     setIsLoading(true)
 
-    // Build history from current messages (exclude the one we just added — it's the current message)
     const history = messages.map(m => ({ role: m.role, content: m.content }))
 
     try {
       const data = await apiClient.chat(trimmed, history)
-      const aiMsg: Message = {
+      setMessages(prev => [...prev, {
         id: `a-${Date.now()}`,
         role: 'assistant',
         content: data.response,
         toolCalls: data.tool_calls,
-      }
-      setMessages(prev => [...prev, aiMsg])
+      }])
     } catch (err: unknown) {
       const detail =
         (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -153,16 +145,7 @@ export default function ChatPage() {
   }, [isLoading, messages])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      send(input)
-    }
-  }
-
-  const clearChat = () => {
-    setMessages([])
-    setInput('')
-    textareaRef.current?.focus()
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) }
   }
 
   const isEmpty = messages.length === 0
@@ -174,18 +157,18 @@ export default function ChatPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-4 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center">
-              <MessageSquare className="w-4.5 h-4.5 text-indigo-400" />
+            <div className="w-9 h-9 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-center">
+              <MessageSquare className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-white">Ask AI</h1>
-              <p className="text-xs text-slate-500">Natural language queries over your AWS infrastructure</p>
+              <h1 className="text-lg font-semibold text-foreground">Ask AI</h1>
+              <p className="text-xs text-muted-foreground">Natural language queries over your AWS infrastructure</p>
             </div>
           </div>
           {!isEmpty && (
             <button
-              onClick={clearChat}
-              className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 transition-colors px-2 py-1 rounded-lg hover:bg-white/[0.04]"
+              onClick={() => { setMessages([]); setInput('') }}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-accent border border-transparent hover:border-border"
             >
               <X className="w-3.5 h-3.5" />
               Clear
@@ -193,23 +176,23 @@ export default function ChatPage() {
           )}
         </div>
 
-        {/* Messages area */}
+        {/* Messages */}
         <div className="flex-1 overflow-y-auto space-y-4 pr-1 pb-4">
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
               <div className="space-y-2">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 flex items-center justify-center mx-auto">
-                  <Sparkles className="w-7 h-7 text-indigo-400" />
+                <div className="w-14 h-14 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center mx-auto">
+                  <Sparkles className="w-7 h-7 text-primary" />
                 </div>
-                <p className="text-slate-300 font-medium">Ask anything about your infrastructure</p>
-                <p className="text-slate-500 text-sm">I can query your real AWS data in real time.</p>
+                <p className="text-foreground font-medium">Ask anything about your infrastructure</p>
+                <p className="text-muted-foreground text-sm">Queries your live AWS data in real time.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {SUGGESTED.map((q) => (
                   <button
                     key={q}
                     onClick={() => send(q)}
-                    className="text-left px-4 py-3 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.05] hover:border-indigo-500/30 text-sm text-slate-400 hover:text-slate-200 transition-all"
+                    className="text-left px-4 py-3 rounded-xl border border-border bg-card hover:bg-accent hover:border-primary/30 text-sm text-muted-foreground hover:text-foreground transition-all shadow-sm"
                   >
                     {q}
                   </button>
@@ -226,7 +209,7 @@ export default function ChatPage() {
         </div>
 
         {/* Input */}
-        <div className="flex-shrink-0 pt-3 border-t border-white/[0.06]">
+        <div className="flex-shrink-0 pt-3 border-t border-border">
           <div className="flex gap-3 items-end">
             <textarea
               ref={textareaRef}
@@ -236,7 +219,7 @@ export default function ChatPage() {
               placeholder="Ask about your infrastructure…"
               rows={1}
               disabled={isLoading}
-              className="flex-1 resize-none bg-[#0e1525] border border-white/[0.08] rounded-xl px-4 py-3 text-sm text-slate-200 placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500/50 disabled:opacity-50 transition-colors max-h-32 overflow-y-auto"
+              className="flex-1 resize-none bg-background border border-input rounded-xl px-4 py-3 text-sm text-foreground placeholder-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:border-ring disabled:opacity-50 transition-colors max-h-32 overflow-y-auto shadow-sm"
               style={{ lineHeight: '1.5' }}
               onInput={e => {
                 const el = e.currentTarget
@@ -247,15 +230,15 @@ export default function ChatPage() {
             <button
               onClick={() => send(input)}
               disabled={!input.trim() || isLoading}
-              className="w-10 h-10 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0"
+              className="w-10 h-10 rounded-xl bg-primary hover:bg-primary/90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors flex-shrink-0 shadow-sm"
             >
               {isLoading
-                ? <Loader2 className="w-4 h-4 text-white animate-spin" />
-                : <Send className="w-4 h-4 text-white" />}
+                ? <Loader2 className="w-4 h-4 text-primary-foreground animate-spin" />
+                : <Send className="w-4 h-4 text-primary-foreground" />}
             </button>
           </div>
-          <p className="text-[10px] text-slate-600 mt-2 text-center">
-            Press Enter to send · Shift+Enter for newline · Powered by Claude
+          <p className="text-[10px] text-muted-foreground/60 mt-2 text-center">
+            Enter to send · Shift+Enter for newline · Powered by Claude
           </p>
         </div>
       </div>

@@ -83,7 +83,7 @@ export function getMockOverview(timeRange: TimeRange = '24h') {
     estimated_monthly_cost: +(4247.80 * multiplier).toFixed(2),
     cost_trend: genDailyCosts(timeRange, 142, 28, 77),
     agent_status: { status: 'healthy' as const, last_seen: minsAgo(2) },
-    top_alarms: MOCK_ALERTS.filter(a => a.status === 'active').slice(0, 3),
+    top_alarms: [] as unknown[],  // populated by useAlerts hook to avoid circular init
   }
 }
 
