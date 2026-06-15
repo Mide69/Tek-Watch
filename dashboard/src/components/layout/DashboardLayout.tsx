@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   Activity, AlertTriangle, Database, DollarSign, Globe,
-  HardDrive, LayoutDashboard, LogOut, Mail, Menu,
+  HardDrive, LayoutDashboard, LogOut, Mail, Menu, MessageSquare,
   RefreshCw, Server, Shield, X, Radio, CheckCircle,
   AlertCircle, Info, XCircle,
 } from 'lucide-react'
@@ -31,6 +31,7 @@ const navigation = [
   { name: 'Cost',       href: '/cost',       icon: DollarSign },
   { name: 'Alerts',     href: '/alerts',     icon: AlertTriangle },
   { name: 'Agent',      href: '/agent',      icon: Activity },
+  { name: 'Ask AI',     href: '/chat',       icon: MessageSquare },
 ]
 
 const COGNITO_POOL = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? ''
