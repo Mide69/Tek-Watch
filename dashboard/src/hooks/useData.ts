@@ -191,13 +191,33 @@ export function useCost() {
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
 
-export function useAlerts() {
+export interface AlertsPage {
+  alerts: unknown[]
+  total: number
+  limit: number
+  offset: number
+}
+
+export function useAlerts(limit = 100, offset = 0) {
   const { refreshKey } = useDashboard()
-  const key = `alerts|${refreshKey}`
-  return useSWR(key, () => apiFetch('/api/v1/alerts', MOCK_ALERTS), {
-    revalidateOnFocus: false,
-    fallbackData: MOCK_ALERTS,
-  })
+  const key = `alerts|${refreshKey}|${limit}|${offset}`
+  const fallback: AlertsPage = { alerts: MOCK_ALERTS, total: MOCK_ALERTS.length, limit, offset }
+  return useSWR(
+    key,
+    async () => {
+      const res = await apiFetch<AlertsPage | unknown[]>(
+        `/api/v1/alerts?limit=${limit}&offset=${offset}`,
+        fallback,
+      )
+      if (Array.isArray(res)) return { alerts: res, total: res.length, limit, offset }
+      return res as AlertsPage
+    },
+    {
+      revalidateOnFocus: false,
+      fallbackData: fallback,
+      refreshInterval: 30_000,
+    },
+  )
 }
 
 // ─── Agent ───────────────────────────────────────────────────────────────────

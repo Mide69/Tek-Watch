@@ -35,8 +35,13 @@ class APIConfig:
     anthropic_api_key: str
     # SNS / SES
     sns_ops_alerts_topic_arn: str
+    ses_from_email: str
+    # Slack
+    slack_webhook_url: str
     # SQS
     sqs_ingest_queue_url: str
+    # CORS — comma-separated allowed origins
+    allowed_origins: str
 
 
 @lru_cache(maxsize=1)
@@ -69,7 +74,8 @@ def load_config() -> APIConfig:
             "dynamodb_alerts_table", "dynamodb_thresholds_table",
             "cognito_customer_user_pool_id", "cognito_customer_app_client_id",
             "cognito_admin_user_pool_id", "cognito_admin_app_client_id",
-            "anthropic_api_key", "sns_ops_alerts_topic_arn", "sqs_ingest_queue_url",
+            "anthropic_api_key", "sns_ops_alerts_topic_arn", "ses_from_email",
+            "slack_webhook_url", "sqs_ingest_queue_url", "allowed_origins",
         ]}
         # Sensible local defaults
         secrets.setdefault("timestream_database_name", "tek-watch")
@@ -95,5 +101,13 @@ def load_config() -> APIConfig:
         cognito_admin_app_client_id=secrets.get("cognito_admin_app_client_id", ""),
         anthropic_api_key=secrets.get("anthropic_api_key", ""),
         sns_ops_alerts_topic_arn=secrets.get("sns_ops_alerts_topic_arn", ""),
+        ses_from_email=secrets.get("ses_from_email", ""),
+        slack_webhook_url=secrets.get("slack_webhook_url", ""),
         sqs_ingest_queue_url=secrets.get("sqs_ingest_queue_url", ""),
+        allowed_origins=secrets.get(
+            "allowed_origins",
+            "http://localhost:3000,http://localhost:3001,"
+            "https://app.tekwatch.io,https://admin.tekwatch.io,"
+            "https://dev.tekwatch.io,https://staging.tekwatch.io",
+        ),
     )

@@ -15,6 +15,8 @@ import {
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
 } from '@/contexts/DashboardContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { NotificationBell } from '@/components/ui/NotificationBell'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -228,6 +230,9 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
             LIVE
           </div>
 
+          {/* Notification bell */}
+          <NotificationBell />
+
           {/* Theme toggle */}
           <ThemeToggle />
         </header>
@@ -263,8 +268,10 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
 export default function DashboardLayout({ children, customerId }: DashboardLayoutProps) {
   return (
-    <DashboardProvider>
-      <Inner customerId={customerId}>{children}</Inner>
-    </DashboardProvider>
+    <ErrorBoundary>
+      <DashboardProvider>
+        <Inner customerId={customerId}>{children}</Inner>
+      </DashboardProvider>
+    </ErrorBoundary>
   )
 }
