@@ -56,7 +56,7 @@ export async function adminSignIn(
   const result = await signIn({ username: email, password })
   const step = result.nextStep?.signInStep
 
-  if (step === 'CONFIRM_SIGN_IN_WITH_TOTP_CODE' || step === 'CONFIRM_SIGN_IN_WITH_SOFTWARE_TOKEN_MFA_CODE') {
+  if (step === 'CONFIRM_SIGN_IN_WITH_TOTP_CODE') {
     return { mfaRequired: true, signInOutput: result }
   }
 

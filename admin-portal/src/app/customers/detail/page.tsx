@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { Suspense, useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import AdminLayout from '@/components/AdminLayout'
 import adminApi from '@/lib/api'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
@@ -23,9 +23,22 @@ interface Customer {
   created_at: string
 }
 
+// Static export (output: 'export') cannot use a [id] dynamic route segment —
+// every path must be known at build time, and customer IDs aren't. We pass
+// the ID as a query string instead (?id=TT-0001), which works fine with
+// static hosting. useSearchParams() requires a Suspense boundary in the App
+// Router, hence the wrapper below.
 export default function CustomerDetailPage() {
-  const { id } = useParams<{ id: string }>()
-  const router = useRouter()
+  return (
+    <Suspense fallback={null}>
+      <CustomerDetailContent />
+    </Suspense>
+  )
+}
+
+function CustomerDetailContent() {
+  const searchParams = useSearchParams()
+  const id = searchParams.get('id') ?? ''
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -38,11 +51,8 @@ export default function CustomerDetailPage() {
     status: '',
   })
 
-  useEffect(() => {
-    fetchCustomer()
-  }, [id])
-
-  const fetchCustomer = async () => {
+  const fetchCustomer = useCallback(async () => {
+    if (!id) { setLoading(false); return }
     setLoading(true)
     try {
       const data = await adminApi.getCustomer(id)
@@ -60,7 +70,11 @@ export default function CustomerDetailPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [id])
+
+  useEffect(() => {
+    fetchCustomer()
+  }, [fetchCustomer])
 
   const handleSave = async () => {
     setSaving(true)
@@ -173,7 +187,7 @@ export default function CustomerDetailPage() {
         {newApiKey && (
           <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
             <p className="font-semibold text-amber-900 mb-1">
-              New API key — save it now, it won't be shown again
+              New API key — save it now, it won&apos;t be shown again
             </p>
             <code className="block bg-white border border-amber-200 rounded px-3 py-2 text-sm font-mono break-all">
               {newApiKey}
