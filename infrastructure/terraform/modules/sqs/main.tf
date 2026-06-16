@@ -39,8 +39,13 @@ resource "aws_sqs_queue_policy" "ingest" {
       Sid       = "AllowSendFromAnyAccount"
       Effect    = "Allow"
       Principal = { AWS = "*" }
-      Action    = ["sqs:SendMessage", "sqs:SendMessageBatch"]
-      Resource  = aws_sqs_queue.ingest.arn
+      # SQS resource (queue) policies validate against an older action list
+      # than IAM identity policies — "sqs:SendMessageBatch" isn't recognized
+      # here ("Please refer to the appropriate WSDL...") even though it's a
+      # valid IAM action. SendMessageBatch calls are authorized by the same
+      # underlying SendMessage permission, so this alone is sufficient.
+      Action   = ["sqs:SendMessage"]
+      Resource = aws_sqs_queue.ingest.arn
       Condition = {
         StringEquals = {
           "aws:PrincipalOrgID" = "*"

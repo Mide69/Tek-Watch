@@ -97,15 +97,6 @@ module "dynamodb" {
   environment = var.environment
 }
 
-# ── Timestream ────────────────────────────────────────────────────────────────
-
-module "timestream" {
-  source                  = "./modules/timestream"
-  name_prefix             = local.name_prefix
-  memory_retention_hours  = var.timestream_memory_retention_hours
-  magnetic_retention_days = var.timestream_magnetic_retention_days
-}
-
 # ── SQS ───────────────────────────────────────────────────────────────────────
 
 module "sqs" {
@@ -134,14 +125,13 @@ module "secrets" {
   environment = var.environment
 
   secret_values = {
-    timestream_database_name       = module.timestream.database_name
-    timestream_metrics_table       = module.timestream.metrics_table_name
-    timestream_events_table        = module.timestream.events_table_name
     dynamodb_customers_table       = module.dynamodb.customers_table_name
     dynamodb_alerts_table          = module.dynamodb.alerts_table_name
     dynamodb_thresholds_table      = module.dynamodb.thresholds_table_name
     dynamodb_usage_table           = module.dynamodb.usage_table_name
     dynamodb_audit_log_table       = module.dynamodb.audit_log_table_name
+    dynamodb_metrics_table         = module.dynamodb.metrics_table_name
+    dynamodb_events_table          = module.dynamodb.events_table_name
     cognito_customer_user_pool_id  = module.cognito.customer_user_pool_id
     cognito_customer_app_client_id = module.cognito.customer_app_client_id
     cognito_admin_user_pool_id     = module.cognito.admin_user_pool_id
@@ -193,10 +183,14 @@ module "ecs" {
     module.dynamodb.heartbeats_table_arn,
     module.dynamodb.usage_table_arn,
     module.dynamodb.audit_log_table_arn,
+    module.dynamodb.metrics_table_arn,
+    # Querying a GSI is authorized against the index's own ARN, not just the
+    # base table's — without this, get_7day_summary/get_last_hour/cost
+    # queries (which all go through gsi_customer_time) would silently fail
+    # with AccessDenied at runtime despite terraform apply succeeding.
+    "${module.dynamodb.metrics_table_arn}/index/*",
+    module.dynamodb.events_table_arn,
   ]
-
-  timestream_database_arn = module.timestream.database_arn
-  timestream_table_arns   = module.timestream.table_arns
 }
 
 # ── Monitoring ────────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@ async def get_agent_health(
     # Use stored status if it's "offline" (set by silence detector), otherwise derive
     status = stored_status if stored_status == "offline" else derived_status
 
-    # Query heartbeat records from Timestream for the last 24h
+    # Query heartbeat records (metrics store) for the last 24h
     heartbeats = ts.get_time_series(
         customer_id=customer.customer_id,
         resource_id=customer.customer_id,

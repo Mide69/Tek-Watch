@@ -1,10 +1,23 @@
 """
-Timestream writer — writes validated metric records to Amazon Timestream.
+Metrics writer — writes validated metric/event records to DynamoDB.
 
-Uses batch writes (max 100 records per call) for efficiency.
+Replaces Amazon Timestream, which closed to new AWS customers on
+2025-06-20 (existing Timestream customers are unaffected, but a brand new
+AWS account can never create a Timestream database, in any region).
+
+Two tables, mirroring Timestream's old metrics/events split:
+  - metrics: numeric measurements (cpu_utilization_percent, mtd_blended_cost,
+    etc.) — pk = "{customer_id}#{resource_id}#{metric_name}", sk = ISO8601
+    time. Supports point lookups and time-range scans for one metric, plus a
+    gsi_customer_time GSI (pk=customer_id, sk=time) for "everything for this
+    customer in the last N hours" queries used by anomaly detection and cost
+    summaries.
+  - events: string-valued records (instance_state, etc.) — pk =
+    "{customer_id}#{service}", sk = "{time}#{resource_id}#{metric_name}".
 """
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Dict, List
 
 import boto3
@@ -14,33 +27,31 @@ from processor import ValidatedRecord
 
 logger = logging.getLogger(__name__)
 
-_TIMESTREAM_BATCH_SIZE = 100
+# Matches the old Timestream tables' magnetic-store retention (7 days).
+_RETENTION_DAYS = 7
 
 
-class TimestreamWriter:
-    """Writes ValidatedRecord objects to Amazon Timestream.
+class MetricsWriter:
+    """Writes ValidatedRecord objects to the metrics/events DynamoDB tables.
 
     Args:
-        database_name: Timestream database name.
-        metrics_table: Table name for numeric metric records.
-        events_table: Table name for event/inventory records.
-        aws_region: AWS region for Timestream client.
+        metrics_table_name: DynamoDB table name for numeric metric records.
+        events_table_name: DynamoDB table name for event/inventory records.
+        aws_region: AWS region for the DynamoDB client.
     """
 
     def __init__(
         self,
-        database_name: str,
-        metrics_table: str,
-        events_table: str,
+        metrics_table_name: str,
+        events_table_name: str,
         aws_region: str,
     ) -> None:
-        self._database = database_name
-        self._metrics_table = metrics_table
-        self._events_table = events_table
-        self._ts = boto3.client("timestream-write", region_name=aws_region)
+        dynamodb = boto3.resource("dynamodb", region_name=aws_region)
+        self._metrics_table = dynamodb.Table(metrics_table_name)
+        self._events_table = dynamodb.Table(events_table_name)
 
     def write_batch(self, records: List[ValidatedRecord]) -> int:
-        """Write a batch of validated records to Timestream.
+        """Write a batch of validated records to DynamoDB.
 
         Args:
             records: List of ValidatedRecord objects.
@@ -56,89 +67,87 @@ class TimestreamWriter:
         event_records = [r for r in records if not isinstance(r.metric_value, (int, float))]
 
         written = 0
-        written += self._write_to_table(metric_records, self._metrics_table, "DOUBLE")
-        written += self._write_to_table(event_records, self._events_table, "VARCHAR")
+        written += self._write_metrics(metric_records)
+        written += self._write_events(event_records)
         return written
 
-    def _write_to_table(
-        self, records: List[ValidatedRecord], table_name: str, measure_type: str
-    ) -> int:
-        """Write records to a specific Timestream table in batches."""
+    def _write_metrics(self, records: List[ValidatedRecord]) -> int:
         if not records:
             return 0
-
-        written = 0
-        for i in range(0, len(records), _TIMESTREAM_BATCH_SIZE):
-            batch = records[i:i + _TIMESTREAM_BATCH_SIZE]
-            ts_records = [
-                self._to_timestream_record(r, measure_type) for r in batch
-            ]
-
-            try:
-                self._ts.write_records(
-                    DatabaseName=self._database,
-                    TableName=table_name,
-                    Records=ts_records,
-                    CommonAttributes={},
-                )
-                written += len(batch)
-                logger.debug(
-                    "Wrote %d records to %s/%s", len(batch), self._database, table_name
-                )
-            except self._ts.exceptions.RejectedRecordsException as exc:
-                rejected = exc.response.get("RejectedRecords", [])
-                logger.warning(
-                    "Timestream rejected %d records: %s", len(rejected), rejected
-                )
-                written += len(batch) - len(rejected)
-            except ClientError as exc:
-                logger.error(
-                    "Timestream write failed for table %s: %s", table_name, exc
-                )
-
-        return written
-
-    def _to_timestream_record(
-        self, record: ValidatedRecord, measure_type: str
-    ) -> Dict[str, Any]:
-        """Convert a ValidatedRecord to a Timestream write_records entry."""
-        # Parse timestamp to milliseconds epoch
         try:
-            dt = datetime.fromisoformat(
-                record.collection_timestamp.replace("Z", "+00:00")
-            )
-        except ValueError:
-            dt = datetime.now(timezone.utc)
+            with self._metrics_table.batch_writer() as batch:
+                for record in records:
+                    batch.put_item(Item=self._to_metric_item(record))
+            logger.debug("Wrote %d records to metrics table", len(records))
+            return len(records)
+        except ClientError as exc:
+            logger.error("DynamoDB metrics write failed: %s", exc)
+            return 0
 
-        time_ms = str(int(dt.timestamp() * 1000))
+    def _write_events(self, records: List[ValidatedRecord]) -> int:
+        if not records:
+            return 0
+        try:
+            with self._events_table.batch_writer() as batch:
+                for record in records:
+                    batch.put_item(Item=self._to_event_item(record))
+            logger.debug("Wrote %d records to events table", len(records))
+            return len(records)
+        except ClientError as exc:
+            logger.error("DynamoDB events write failed: %s", exc)
+            return 0
 
-        # Build dimensions
-        dimensions = [
-            {"Name": "customer_id", "Value": record.customer_id},
-            {"Name": "region",      "Value": record.region},
-            {"Name": "service",     "Value": record.service},
-            {"Name": "resource_type", "Value": record.resource_type or "unknown"},
-            {"Name": "resource_id", "Value": record.resource_id[:256]},
-            {"Name": "metric_name", "Value": record.metric_name},
-        ]
+    def _to_metric_item(self, record: ValidatedRecord) -> Dict[str, Any]:
+        dt = self._parse_timestamp(record.collection_timestamp)
+        time_iso = dt.isoformat()
+        resource_id = record.resource_id[:256]
 
-        # Add extra dimensions (max 128 chars per value)
-        for k, v in (record.dimensions or {}).items():
-            if len(dimensions) >= 128:
-                break
-            dimensions.append({"Name": str(k)[:60], "Value": str(v)[:256]})
+        item: Dict[str, Any] = {
+            "pk": f"{record.customer_id}#{resource_id}#{record.metric_name}",
+            "time": time_iso,
+            "customer_id": record.customer_id,
+            "service": record.service,
+            "resource_id": resource_id,
+            "resource_name": record.resource_name or "",
+            "resource_type": record.resource_type or "unknown",
+            "metric_name": record.metric_name[:256],
+            "value": Decimal(str(record.metric_value)),
+            "region": record.region,
+            "unit": record.unit,
+            "expires_at": self._expires_at(dt),
+        }
+        if record.dimensions:
+            # Mirrors Timestream's 128-dimension / 60-char-name / 256-char-value caps
+            item["dimensions"] = {
+                str(k)[:60]: str(v)[:256] for k, v in list(record.dimensions.items())[:128]
+            }
+        return item
 
-        # Measure value
-        if measure_type == "DOUBLE":
-            measure_value = str(float(record.metric_value))
-        else:
-            measure_value = str(record.metric_value)[:2048]
+    def _to_event_item(self, record: ValidatedRecord) -> Dict[str, Any]:
+        dt = self._parse_timestamp(record.collection_timestamp)
+        time_iso = dt.isoformat()
+        resource_id = record.resource_id[:256]
 
         return {
-            "Dimensions": dimensions,
-            "MeasureName": record.metric_name[:256],
-            "MeasureValue": measure_value,
-            "MeasureValueType": measure_type,
-            "Time": time_ms,
-            "TimeUnit": "MILLISECONDS",
+            "pk": f"{record.customer_id}#{record.service}",
+            "sk": f"{time_iso}#{resource_id}#{record.metric_name}",
+            "time": time_iso,
+            "customer_id": record.customer_id,
+            "service": record.service,
+            "resource_id": resource_id,
+            "resource_name": record.resource_name or "",
+            "metric_name": record.metric_name[:256],
+            "value": str(record.metric_value)[:2048],
+            "expires_at": self._expires_at(dt),
         }
+
+    @staticmethod
+    def _parse_timestamp(collection_timestamp: str) -> datetime:
+        try:
+            return datetime.fromisoformat(collection_timestamp.replace("Z", "+00:00"))
+        except ValueError:
+            return datetime.now(timezone.utc)
+
+    @staticmethod
+    def _expires_at(dt: datetime) -> int:
+        return int((dt + timedelta(days=_RETENTION_DAYS)).timestamp())

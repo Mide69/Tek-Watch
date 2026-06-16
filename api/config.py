@@ -18,16 +18,15 @@ class APIConfig:
     aws_region: str
     environment: str
     log_level: str
-    # Timestream
-    timestream_database_name: str
-    timestream_metrics_table: str
-    timestream_events_table: str
     # DynamoDB
     dynamodb_customers_table: str
     dynamodb_alerts_table: str
     dynamodb_thresholds_table: str
     dynamodb_usage_table: str
     dynamodb_audit_log_table: str
+    # Metrics/events (replaces Timestream — closed to new AWS accounts 2025-06-20)
+    dynamodb_metrics_table: str
+    dynamodb_events_table: str
     # Cognito
     cognito_customer_user_pool_id: str
     cognito_customer_app_client_id: str
@@ -71,37 +70,35 @@ def load_config() -> APIConfig:
     else:
         # Local dev — read from environment
         secrets = {k: os.environ.get(k.upper(), "") for k in [
-            "timestream_database_name", "timestream_metrics_table",
-            "timestream_events_table", "dynamodb_customers_table",
+            "dynamodb_customers_table",
             "dynamodb_alerts_table", "dynamodb_thresholds_table",
             "dynamodb_usage_table", "dynamodb_audit_log_table",
+            "dynamodb_metrics_table", "dynamodb_events_table",
             "cognito_customer_user_pool_id", "cognito_customer_app_client_id",
             "cognito_admin_user_pool_id", "cognito_admin_app_client_id",
             "anthropic_api_key", "sns_ops_alerts_topic_arn", "ses_from_email",
             "slack_webhook_url", "sqs_ingest_queue_url", "allowed_origins",
         ]}
         # Sensible local defaults
-        secrets.setdefault("timestream_database_name", "tek-watch")
-        secrets.setdefault("timestream_metrics_table", "metrics")
-        secrets.setdefault("timestream_events_table", "events")
         secrets.setdefault("dynamodb_customers_table", "tek_watch_customers")
         secrets.setdefault("dynamodb_alerts_table", "tek_watch_alerts")
         secrets.setdefault("dynamodb_thresholds_table", "tek_watch_thresholds")
         secrets.setdefault("dynamodb_usage_table", "tek_watch_usage")
         secrets.setdefault("dynamodb_audit_log_table", "tek_watch_audit_log")
+        secrets.setdefault("dynamodb_metrics_table", "tek_watch_metrics")
+        secrets.setdefault("dynamodb_events_table", "tek_watch_events")
 
     return APIConfig(
         aws_region=aws_region,
         environment=environment,
         log_level=log_level,
-        timestream_database_name=secrets.get("timestream_database_name", "tek-watch"),
-        timestream_metrics_table=secrets.get("timestream_metrics_table", "metrics"),
-        timestream_events_table=secrets.get("timestream_events_table", "events"),
         dynamodb_customers_table=secrets.get("dynamodb_customers_table", "tek_watch_customers"),
         dynamodb_alerts_table=secrets.get("dynamodb_alerts_table", "tek_watch_alerts"),
         dynamodb_thresholds_table=secrets.get("dynamodb_thresholds_table", "tek_watch_thresholds"),
         dynamodb_usage_table=secrets.get("dynamodb_usage_table", "tek_watch_usage"),
         dynamodb_audit_log_table=secrets.get("dynamodb_audit_log_table", "tek_watch_audit_log"),
+        dynamodb_metrics_table=secrets.get("dynamodb_metrics_table", "tek_watch_metrics"),
+        dynamodb_events_table=secrets.get("dynamodb_events_table", "tek_watch_events"),
         cognito_customer_user_pool_id=secrets.get("cognito_customer_user_pool_id", ""),
         cognito_customer_app_client_id=secrets.get("cognito_customer_app_client_id", ""),
         cognito_admin_user_pool_id=secrets.get("cognito_admin_user_pool_id", ""),

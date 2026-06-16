@@ -39,6 +39,7 @@ playwright/.cache/
 *.tfstate.*
 *.tfplan
 .terraform.lock.hcl
+**/silence_detector.zip
 
 # Docker
 .dockerignore

@@ -101,20 +101,6 @@ variable "agent_schedule_expression" {
   default     = "rate(5 minutes)"
 }
 
-# ── Timestream ────────────────────────────────────────────────────────────────
-
-variable "timestream_memory_retention_hours" {
-  description = "Hours to retain data in Timestream memory store"
-  type        = number
-  default     = 168 # 7 days
-}
-
-variable "timestream_magnetic_retention_days" {
-  description = "Days to retain data in Timestream magnetic store"
-  type        = number
-  default     = 90
-}
-
 # ── SQS ───────────────────────────────────────────────────────────────────────
 
 variable "sqs_visibility_timeout_seconds" {
