@@ -12,26 +12,10 @@ import {
 import { formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard } from '@/contexts/DashboardContext'
-import { useAlerts } from '@/hooks/useData'
+import { useAlerts, type Alert, type AlertStatus } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 20
-
-type AlertStatus = 'active' | 'acknowledged'
-type Alert = {
-  alert_id: string
-  severity: string
-  status: AlertStatus
-  type: string
-  service: string
-  resource: string
-  description: string
-  triggered_at: string
-  current_value?: number
-  threshold_value?: number | null
-  recommendation?: string
-  acknowledged_at?: string
-}
 
 export default function AlertsPage() {
   const { customerId }      = useAuth()

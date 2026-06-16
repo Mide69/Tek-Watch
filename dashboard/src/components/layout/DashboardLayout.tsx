@@ -10,6 +10,7 @@ import {
   AlertCircle, Info, XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { isDemoMode } from '@/lib/demoMode'
 import {
   useDashboard,
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
@@ -36,13 +37,7 @@ const navigation = [
   { name: 'Ask AI',     href: '/chat',       icon: MessageSquare },
 ]
 
-const COGNITO_POOL = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? ''
-const DEMO_MODE = (
-  process.env.NEXT_PUBLIC_DEMO_MODE === 'true' ||
-  COGNITO_POOL.length === 0 ||
-  COGNITO_POOL.includes('placeholder') ||
-  COGNITO_POOL === 'undefined'
-)
+const DEMO_MODE = isDemoMode()
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 

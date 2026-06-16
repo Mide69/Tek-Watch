@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { isDemoMode } from '@/lib/demoMode'
 
 /**
  * useAuth — returns the current authenticated user.
@@ -10,12 +11,7 @@ import { useState, useEffect } from 'react'
  * /login when unauthenticated.
  */
 
-const COGNITO_POOL = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? ''
-const IS_REAL_COGNITO = (
-  COGNITO_POOL.length > 0 &&
-  !COGNITO_POOL.includes('placeholder') &&
-  COGNITO_POOL !== 'undefined'
-)
+const IS_REAL_COGNITO = !isDemoMode()
 
 export function useAuth() {
   const [customerId, setCustomerId] = useState<string | null>('TT-DEMO')
