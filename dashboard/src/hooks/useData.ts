@@ -191,8 +191,25 @@ export function useCost() {
 
 // ─── Alerts ──────────────────────────────────────────────────────────────────
 
+export type AlertStatus = 'active' | 'acknowledged'
+
+export interface Alert {
+  alert_id: string
+  severity: string
+  status: AlertStatus
+  type: string
+  service: string
+  resource: string
+  description: string
+  triggered_at: string
+  current_value?: number
+  threshold_value?: number | null
+  recommendation?: string
+  acknowledged_at?: string
+}
+
 export interface AlertsPage {
-  alerts: unknown[]
+  alerts: Alert[]
   total: number
   limit: number
   offset: number
@@ -205,7 +222,7 @@ export function useAlerts(limit = 100, offset = 0) {
   return useSWR(
     key,
     async () => {
-      const res = await apiFetch<AlertsPage | unknown[]>(
+      const res = await apiFetch<AlertsPage | Alert[]>(
         `/api/v1/alerts?limit=${limit}&offset=${offset}`,
         fallback,
       )

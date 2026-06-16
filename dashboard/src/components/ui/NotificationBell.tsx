@@ -8,7 +8,7 @@ import { useAlerts } from '@/hooks/useData'
 export function NotificationBell() {
   const { data } = useAlerts()
   const alerts = data?.alerts ?? []
-  const activeCount = alerts.filter((a: { status: string }) => a.status === 'active').length
+  const activeCount = alerts.filter(a => a.status === 'active').length
 
   return (
     <Link
