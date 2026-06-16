@@ -53,7 +53,9 @@ def load_config() -> ConsumerConfig:
             "timestream_database_name": os.environ.get("TIMESTREAM_DATABASE_NAME", "tek-watch"),
             "timestream_metrics_table": os.environ.get("TIMESTREAM_METRICS_TABLE", "metrics"),
             "timestream_events_table": os.environ.get("TIMESTREAM_EVENTS_TABLE", "events"),
-            "dynamodb_customers_table": os.environ.get("DYNAMODB_CUSTOMERS_TABLE", "tek_watch_customers"),
+            "dynamodb_customers_table": os.environ.get(
+                "DYNAMODB_CUSTOMERS_TABLE", "tek_watch_customers"
+            ),
         }
 
     return ConsumerConfig(

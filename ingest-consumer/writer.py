@@ -69,7 +69,7 @@ class TimestreamWriter:
 
         written = 0
         for i in range(0, len(records), _TIMESTREAM_BATCH_SIZE):
-            batch = records[i : i + _TIMESTREAM_BATCH_SIZE]
+            batch = records[i:i + _TIMESTREAM_BATCH_SIZE]
             ts_records = [
                 self._to_timestream_record(r, measure_type) for r in batch
             ]
