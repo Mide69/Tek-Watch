@@ -171,18 +171,30 @@ resource "aws_lb_target_group" "api" {
   tags = { Name = "${var.name_prefix}-api-tg" }
 }
 
-resource "aws_lb_listener" "http_redirect" {
+# Without an ACM cert, the HTTPS listener below doesn't exist (count=0) — if
+# this listener only ever redirected to :443, the target group would never
+# be attached to the load balancer via ANY listener, and ECS would refuse to
+# create the service ("target group does not have an associated load
+# balancer"). So: forward over plain HTTP until a cert exists, then switch
+# to redirect-to-HTTPS once var.acm_certificate_arn is set.
+resource "aws_lb_listener" "http" {
   load_balancer_arn = aws_lb.api.arn
   port              = 80
   protocol          = "HTTP"
 
   default_action {
-    type = "redirect"
-    redirect {
-      port        = "443"
-      protocol    = "HTTPS"
-      status_code = "HTTP_301"
+    type = var.acm_certificate_arn != "" ? "redirect" : "forward"
+
+    dynamic "redirect" {
+      for_each = var.acm_certificate_arn != "" ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
     }
+
+    target_group_arn = var.acm_certificate_arn == "" ? aws_lb_target_group.api.arn : null
   }
 }
 
