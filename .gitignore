@@ -27,6 +27,12 @@ out/
 *.tsbuildinfo
 npm-debug.log*
 
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
 # Terraform
 **/.terraform/
 *.tfstate
