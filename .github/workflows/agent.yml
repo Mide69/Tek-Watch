@@ -94,6 +94,15 @@ jobs:
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:${{ github.sha }} $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$VERSION
 
+  # The agent is a scheduled Fargate task (EventBridge -> ecs:RunTask), not a
+  # long-running ECS service — agent/main.py runs its collectors once and
+  # exits by design. The task definition's container image is the mutable
+  # ":latest" tag (see infrastructure/terraform/modules/ecs/main.tf), so the
+  # *next scheduled run* automatically picks up whatever build-and-push just
+  # pushed — there is nothing to "deploy" on the ECS side. These jobs just
+  # trigger one immediate run for fast feedback instead of waiting for the
+  # next tick, reusing the network config Terraform already attached to the
+  # EventBridge target (no extra secrets needed for subnets/security groups).
   deploy-dev:
     needs: build-and-push
     runs-on: ubuntu-latest
@@ -101,8 +110,8 @@ jobs:
     environment: dev
     env:
       ECS_CLUSTER: tek-watch-dev
-      ECS_SERVICE: tek-watch-dev-agent
       TASK_FAMILY: tek-watch-dev-agent
+      SCHEDULE_RULE: tek-watch-dev-agent-schedule
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -110,21 +119,17 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update ECS task definition with new image
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition-arn: ${{ env.TASK_FAMILY }}
-          container-name: agent
-          image: ${{ needs.build-and-push.outputs.image_uri }}
-
-      - name: Deploy to ECS (dev)
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Trigger immediate agent run (verification)
+        run: |
+          NET_CONFIG=$(aws events list-targets-by-rule \
+            --rule "$SCHEDULE_RULE" \
+            --query 'Targets[0].EcsParameters.NetworkConfiguration' \
+            --output json)
+          aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_FAMILY" \
+            --launch-type FARGATE \
+            --network-configuration "$NET_CONFIG"
 
   deploy-staging:
     needs: build-and-push
@@ -133,8 +138,8 @@ jobs:
     environment: staging
     env:
       ECS_CLUSTER: tek-watch-staging
-      ECS_SERVICE: tek-watch-staging-agent
       TASK_FAMILY: tek-watch-staging-agent
+      SCHEDULE_RULE: tek-watch-staging-agent-schedule
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -142,21 +147,17 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update ECS task definition with new image
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition-arn: ${{ env.TASK_FAMILY }}
-          container-name: agent
-          image: ${{ needs.build-and-push.outputs.image_uri }}
-
-      - name: Deploy to ECS (staging)
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Trigger immediate agent run (verification)
+        run: |
+          NET_CONFIG=$(aws events list-targets-by-rule \
+            --rule "$SCHEDULE_RULE" \
+            --query 'Targets[0].EcsParameters.NetworkConfiguration' \
+            --output json)
+          aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_FAMILY" \
+            --launch-type FARGATE \
+            --network-configuration "$NET_CONFIG"
 
   deploy-prod:
     needs: build-and-push
@@ -165,8 +166,8 @@ jobs:
     environment: prod
     env:
       ECS_CLUSTER: tek-watch-prod
-      ECS_SERVICE: tek-watch-prod-agent
       TASK_FAMILY: tek-watch-prod-agent
+      SCHEDULE_RULE: tek-watch-prod-agent-schedule
     steps:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -174,18 +175,14 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Update ECS task definition with new image
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition-arn: ${{ env.TASK_FAMILY }}
-          container-name: agent
-          image: ${{ needs.build-and-push.outputs.image_uri }}
-
-      - name: Deploy to ECS (prod)
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      - name: Trigger immediate agent run (verification)
+        run: |
+          NET_CONFIG=$(aws events list-targets-by-rule \
+            --rule "$SCHEDULE_RULE" \
+            --query 'Targets[0].EcsParameters.NetworkConfiguration' \
+            --output json)
+          aws ecs run-task \
+            --cluster "$ECS_CLUSTER" \
+            --task-definition "$TASK_FAMILY" \
+            --launch-type FARGATE \
+            --network-configuration "$NET_CONFIG"

@@ -83,6 +83,24 @@ variable "consumer_desired_count" {
   default     = 2
 }
 
+variable "agent_cpu" {
+  description = "CPU units for the self-hosted agent ECS task (matches the customer CFN template default)"
+  type        = number
+  default     = 512
+}
+
+variable "agent_memory" {
+  description = "Memory (MB) for the self-hosted agent ECS task"
+  type        = number
+  default     = 1024
+}
+
+variable "agent_schedule_expression" {
+  description = "EventBridge schedule for the self-hosted agent's scheduled ECS task"
+  type        = string
+  default     = "rate(5 minutes)"
+}
+
 # ── Timestream ────────────────────────────────────────────────────────────────
 
 variable "timestream_memory_retention_hours" {
