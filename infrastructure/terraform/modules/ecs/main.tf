@@ -1,24 +1,24 @@
-variable "name_prefix"            { type = string }
-variable "environment"            { type = string }
-variable "aws_region"             { type = string }
-variable "vpc_id"                 { type = string }
-variable "private_subnet_ids"     { type = list(string) }
-variable "alb_security_group_id"  { type = string }
-variable "alb_target_group_arn"   { type = string }
-variable "api_image_uri"          { type = string }
-variable "consumer_image_uri"     { type = string }
-variable "api_cpu"                { type = number }
-variable "api_memory"             { type = number }
-variable "api_desired_count"      { type = number }
-variable "consumer_cpu"           { type = number }
-variable "consumer_memory"        { type = number }
+variable "name_prefix" { type = string }
+variable "environment" { type = string }
+variable "aws_region" { type = string }
+variable "vpc_id" { type = string }
+variable "private_subnet_ids" { type = list(string) }
+variable "alb_security_group_id" { type = string }
+variable "alb_target_group_arn" { type = string }
+variable "api_image_uri" { type = string }
+variable "consumer_image_uri" { type = string }
+variable "api_cpu" { type = number }
+variable "api_memory" { type = number }
+variable "api_desired_count" { type = number }
+variable "consumer_cpu" { type = number }
+variable "consumer_memory" { type = number }
 variable "consumer_desired_count" { type = number }
-variable "secrets_manager_arn"    { type = string }
-variable "sqs_ingest_queue_arn"   { type = string }
-variable "sqs_dlq_arn"            { type = string }
-variable "dynamodb_table_arns"    { type = list(string) }
-variable "timestream_database_arn"{ type = string }
-variable "timestream_table_arns"  { type = list(string) }
+variable "secrets_manager_arn" { type = string }
+variable "sqs_ingest_queue_arn" { type = string }
+variable "sqs_dlq_arn" { type = string }
+variable "dynamodb_table_arns" { type = list(string) }
+variable "timestream_database_arn" { type = string }
+variable "timestream_table_arns" { type = list(string) }
 
 # ── ECS Cluster ───────────────────────────────────────────────────────────────
 
@@ -259,9 +259,9 @@ resource "aws_ecs_task_definition" "api" {
     }]
 
     environment = [
-      { name = "AWS_REGION",   value = var.aws_region },
-      { name = "ENVIRONMENT",  value = var.environment },
-      { name = "LOG_LEVEL",    value = "INFO" },
+      { name = "AWS_REGION", value = var.aws_region },
+      { name = "ENVIRONMENT", value = var.environment },
+      { name = "LOG_LEVEL", value = "INFO" },
       { name = "SECRETS_MANAGER_SECRET_ARN", value = var.secrets_manager_arn }
     ]
 
@@ -289,13 +289,13 @@ resource "aws_ecs_task_definition" "api" {
 # ── API Service ───────────────────────────────────────────────────────────────
 
 resource "aws_ecs_service" "api" {
-  name                               = "api"
-  cluster                            = aws_ecs_cluster.main.id
-  task_definition                    = aws_ecs_task_definition.api.arn
-  desired_count                      = var.api_desired_count
-  launch_type                        = "FARGATE"
-  health_check_grace_period_seconds  = 60
-  force_new_deployment               = true
+  name                              = "api"
+  cluster                           = aws_ecs_cluster.main.id
+  task_definition                   = aws_ecs_task_definition.api.arn
+  desired_count                     = var.api_desired_count
+  launch_type                       = "FARGATE"
+  health_check_grace_period_seconds = 60
+  force_new_deployment              = true
 
   network_configuration {
     subnets          = var.private_subnet_ids
@@ -334,9 +334,9 @@ resource "aws_ecs_task_definition" "consumer" {
     essential = true
 
     environment = [
-      { name = "AWS_REGION",   value = var.aws_region },
-      { name = "ENVIRONMENT",  value = var.environment },
-      { name = "LOG_LEVEL",    value = "INFO" },
+      { name = "AWS_REGION", value = var.aws_region },
+      { name = "ENVIRONMENT", value = var.environment },
+      { name = "LOG_LEVEL", value = "INFO" },
       { name = "SECRETS_MANAGER_SECRET_ARN", value = var.secrets_manager_arn }
     ]
 
@@ -356,11 +356,11 @@ resource "aws_ecs_task_definition" "consumer" {
 # ── Ingest Consumer Service ───────────────────────────────────────────────────
 
 resource "aws_ecs_service" "consumer" {
-  name             = "ingest-consumer"
-  cluster          = aws_ecs_cluster.main.id
-  task_definition  = aws_ecs_task_definition.consumer.arn
-  desired_count    = var.consumer_desired_count
-  launch_type      = "FARGATE"
+  name                 = "ingest-consumer"
+  cluster              = aws_ecs_cluster.main.id
+  task_definition      = aws_ecs_task_definition.consumer.arn
+  desired_count        = var.consumer_desired_count
+  launch_type          = "FARGATE"
   force_new_deployment = true
 
   network_configuration {
@@ -404,6 +404,6 @@ resource "aws_appautoscaling_policy" "api_cpu" {
   }
 }
 
-output "cluster_name"        { value = aws_ecs_cluster.main.name }
-output "api_service_name"    { value = aws_ecs_service.api.name }
+output "cluster_name" { value = aws_ecs_cluster.main.name }
+output "api_service_name" { value = aws_ecs_service.api.name }
 output "consumer_service_name" { value = aws_ecs_service.consumer.name }

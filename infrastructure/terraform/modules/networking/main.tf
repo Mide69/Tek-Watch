@@ -1,9 +1,13 @@
-variable "name_prefix"          { type = string }
-variable "vpc_cidr"             { type = string }
-variable "availability_zones"   { type = list(string) }
+variable "name_prefix" { type = string }
+variable "vpc_cidr" { type = string }
+variable "availability_zones" { type = list(string) }
 variable "private_subnet_cidrs" { type = list(string) }
-variable "public_subnet_cidrs"  { type = list(string) }
-variable "acm_certificate_arn"  { type = string; default = "" }
+variable "public_subnet_cidrs" { type = list(string) }
+
+variable "acm_certificate_arn" {
+  type    = string
+  default = ""
+}
 
 # ── VPC ───────────────────────────────────────────────────────────────────────
 
@@ -11,7 +15,7 @@ resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
   enable_dns_support   = true
-  tags = { Name = "${var.name_prefix}-vpc" }
+  tags                 = { Name = "${var.name_prefix}-vpc" }
 }
 
 resource "aws_internet_gateway" "main" {
@@ -27,7 +31,7 @@ resource "aws_subnet" "public" {
   cidr_block              = var.public_subnet_cidrs[count.index]
   availability_zone       = var.availability_zones[count.index]
   map_public_ip_on_launch = true
-  tags = { Name = "${var.name_prefix}-public-${count.index + 1}" }
+  tags                    = { Name = "${var.name_prefix}-public-${count.index + 1}" }
 }
 
 resource "aws_subnet" "private" {
@@ -35,7 +39,7 @@ resource "aws_subnet" "private" {
   vpc_id            = aws_vpc.main.id
   cidr_block        = var.private_subnet_cidrs[count.index]
   availability_zone = var.availability_zones[count.index]
-  tags = { Name = "${var.name_prefix}-private-${count.index + 1}" }
+  tags              = { Name = "${var.name_prefix}-private-${count.index + 1}" }
 }
 
 # ── NAT Gateways ──────────────────────────────────────────────────────────────
@@ -198,10 +202,10 @@ resource "aws_lb_listener" "https" {
 
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
-output "vpc_id"                { value = aws_vpc.main.id }
-output "public_subnet_ids"     { value = aws_subnet.public[*].id }
-output "private_subnet_ids"    { value = aws_subnet.private[*].id }
+output "vpc_id" { value = aws_vpc.main.id }
+output "public_subnet_ids" { value = aws_subnet.public[*].id }
+output "private_subnet_ids" { value = aws_subnet.private[*].id }
 output "alb_security_group_id" { value = aws_security_group.alb.id }
-output "ecs_sg_id"             { value = aws_security_group.ecs_tasks.id }
-output "alb_dns_name"          { value = aws_lb.api.dns_name }
-output "api_target_group_arn"  { value = aws_lb_target_group.api.arn }
+output "ecs_sg_id" { value = aws_security_group.ecs_tasks.id }
+output "alb_dns_name" { value = aws_lb.api.dns_name }
+output "api_target_group_arn" { value = aws_lb_target_group.api.arn }

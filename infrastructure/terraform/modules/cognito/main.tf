@@ -1,14 +1,25 @@
-variable "name_prefix"                { type = string }
-variable "environment"                { type = string }
-variable "admin_google_client_id"     { type = string; default = "" }
-variable "admin_google_client_secret" { type = string; default = ""; sensitive = true }
+variable "name_prefix" { type = string }
+variable "environment" { type = string }
+
+variable "admin_google_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "admin_google_client_secret" {
+  type      = string
+  default   = ""
+  sensitive = true
+}
 
 # ── Customer User Pool ────────────────────────────────────────────────────────
 
 resource "aws_cognito_user_pool" "customers" {
   name = "${var.name_prefix}-customers"
 
-  username_attributes      = ["preferred_username"]
+  # No username_attributes set — customers sign in with the raw Cognito
+  # Username (the Customer ID, e.g. "TT-0001"), assigned at creation time,
+  # not email/phone. See dashboard/src/lib/auth.ts (loginWith: { username: true }).
   auto_verified_attributes = ["email"]
 
   username_configuration {
@@ -47,7 +58,7 @@ resource "aws_cognito_user_pool" "customers" {
     invite_message_template {
       email_subject = "Your Tek Watch account"
       email_message = "Your Customer ID is {username} and temporary password is {####}"
-      sms_message   = "Your Tek Watch temp password: {####}"
+      sms_message   = "Tek Watch: your Customer ID is {username}, temp password {####}"
     }
   }
 
@@ -69,9 +80,9 @@ resource "aws_cognito_user_pool_client" "customers" {
     "ALLOW_USER_SRP_AUTH",
   ]
 
-  access_token_validity  = 8    # hours
+  access_token_validity  = 8 # hours
   id_token_validity      = 8
-  refresh_token_validity = 30   # days
+  refresh_token_validity = 30 # days
 
   token_validity_units {
     access_token  = "hours"
@@ -136,7 +147,7 @@ resource "aws_cognito_user_pool_client" "admins" {
   }
 }
 
-output "customer_user_pool_id"   { value = aws_cognito_user_pool.customers.id }
-output "customer_app_client_id"  { value = aws_cognito_user_pool_client.customers.id }
-output "admin_user_pool_id"      { value = aws_cognito_user_pool.admins.id }
-output "admin_app_client_id"     { value = aws_cognito_user_pool_client.admins.id }
+output "customer_user_pool_id" { value = aws_cognito_user_pool.customers.id }
+output "customer_app_client_id" { value = aws_cognito_user_pool_client.customers.id }
+output "admin_user_pool_id" { value = aws_cognito_user_pool.admins.id }
+output "admin_app_client_id" { value = aws_cognito_user_pool_client.admins.id }

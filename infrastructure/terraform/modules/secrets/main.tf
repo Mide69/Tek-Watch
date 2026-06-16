@@ -1,6 +1,10 @@
-variable "name_prefix"   { type = string }
-variable "environment"   { type = string }
-variable "secret_values" { type = map(string); sensitive = true }
+variable "name_prefix" { type = string }
+variable "environment" { type = string }
+
+variable "secret_values" {
+  type      = map(string)
+  sensitive = true
+}
 
 resource "aws_secretsmanager_secret" "main" {
   name                    = "${var.name_prefix}/config"
@@ -19,5 +23,5 @@ resource "aws_secretsmanager_secret_version" "main" {
   }
 }
 
-output "secret_arn"  { value = aws_secretsmanager_secret.main.arn }
+output "secret_arn" { value = aws_secretsmanager_secret.main.arn }
 output "secret_name" { value = aws_secretsmanager_secret.main.name }

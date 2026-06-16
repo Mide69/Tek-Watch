@@ -1,14 +1,14 @@
-variable "name_prefix"               { type = string }
-variable "environment"               { type = string }
-variable "aws_region"                { type = string }
-variable "ops_alerts_topic_arn"      { type = string }
-variable "ecs_cluster_name"          { type = string }
-variable "api_service_name"          { type = string }
-variable "consumer_service_name"     { type = string }
-variable "sqs_ingest_queue_name"     { type = string }
-variable "sqs_dlq_name"              { type = string }
-variable "dynamodb_customers_table"  { type = string }
-variable "dynamodb_alerts_table"     { type = string }
+variable "name_prefix" { type = string }
+variable "environment" { type = string }
+variable "aws_region" { type = string }
+variable "ops_alerts_topic_arn" { type = string }
+variable "ecs_cluster_name" { type = string }
+variable "api_service_name" { type = string }
+variable "consumer_service_name" { type = string }
+variable "sqs_ingest_queue_name" { type = string }
+variable "sqs_dlq_name" { type = string }
+variable "dynamodb_customers_table" { type = string }
+variable "dynamodb_alerts_table" { type = string }
 variable "dynamodb_heartbeats_table" { type = string }
 
 variable "silence_threshold_minutes" {
@@ -278,7 +278,7 @@ resource "aws_cloudwatch_dashboard" "main" {
       {
         type = "alarm"
         properties = {
-          title  = "Active Alarms"
+          title = "Active Alarms"
           alarms = [
             "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.name_prefix}-dlq-depth",
             "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.name_prefix}-api-task-count",
