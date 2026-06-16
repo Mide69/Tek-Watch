@@ -50,6 +50,14 @@ provider "aws" {
 
 locals {
   name_prefix = "${var.project}-${var.environment}"
+
+  # Conventional per-environment subdomains. Prod dashboard already matches
+  # dashboard.yml's hardcoded NEXT_PUBLIC_API_BASE_URL/login redirect target
+  # (app.tekwatch.io); the rest follow the same pattern. Override by changing
+  # var.domain_name per environment in environments/*.tfvars if these don't
+  # match your actual DNS plan.
+  dashboard_domain = var.environment == "prod" ? "app.${var.domain_name}" : "${var.environment}.${var.domain_name}"
+  admin_domain     = var.environment == "prod" ? "admin.${var.domain_name}" : "admin-${var.environment}.${var.domain_name}"
 }
 
 # ── SNS — Ops Alerts (created before modules to avoid circular dependency) ────
@@ -159,6 +167,7 @@ module "ecs" {
 
   api_image_uri      = "${module.ecr.api_repository_url}:latest"
   consumer_image_uri = "${module.ecr.consumer_repository_url}:latest"
+  agent_image_uri    = module.ecr.agent_repository_url
 
   api_cpu           = var.api_cpu
   api_memory        = var.api_memory
@@ -167,6 +176,10 @@ module "ecs" {
   consumer_cpu           = var.consumer_cpu
   consumer_memory        = var.consumer_memory
   consumer_desired_count = var.consumer_desired_count
+
+  agent_cpu                 = var.agent_cpu
+  agent_memory              = var.agent_memory
+  agent_schedule_expression = var.agent_schedule_expression
 
   secrets_manager_arn = module.secrets.secret_arn
 
@@ -203,4 +216,27 @@ module "monitoring" {
   dynamodb_customers_table  = module.dynamodb.customers_table_name
   dynamodb_alerts_table     = module.dynamodb.alerts_table_name
   dynamodb_heartbeats_table = module.dynamodb.heartbeats_table_name
+}
+
+# ── Static site hosting (dashboard + admin portal) ────────────────────────────
+# certificate_arn defaults to "" (see variables.tf) — both distributions stand
+# up on their default *.cloudfront.net domain with no custom alias until a
+# real us-east-1 ACM cert is requested, DNS-validated, and the var is set.
+
+module "dashboard_hosting" {
+  source          = "./modules/static_site"
+  name_prefix     = local.name_prefix
+  site_name       = "dashboard"
+  environment     = var.environment
+  domain_name     = local.dashboard_domain
+  certificate_arn = var.cloudfront_certificate_arn
+}
+
+module "admin_hosting" {
+  source          = "./modules/static_site"
+  name_prefix     = local.name_prefix
+  site_name       = "admin"
+  environment     = var.environment
+  domain_name     = local.admin_domain
+  certificate_arn = var.cloudfront_certificate_arn
 }

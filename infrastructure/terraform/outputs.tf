@@ -77,3 +77,40 @@ output "ecs_cluster_name" {
   description = "ECS cluster name"
   value       = module.ecs.cluster_name
 }
+
+output "agent_task_family" {
+  description = "Self-hosted agent ECS task definition family — TASK_FAMILY in agent.yml"
+  value       = module.ecs.agent_task_family
+}
+
+# ── Static site hosting — feeds the GitHub secrets documented in GUIDE.md ────
+
+output "dashboard_s3_bucket" {
+  description = "S3 bucket for dashboard static files — set as DASHBOARD_S3_BUCKET_* secret"
+  value       = module.dashboard_hosting.bucket_name
+}
+
+output "dashboard_cf_distribution_id" {
+  description = "CloudFront distribution ID for dashboard — set as DASHBOARD_CF_DISTRIBUTION_* secret"
+  value       = module.dashboard_hosting.cloudfront_distribution_id
+}
+
+output "dashboard_cf_domain_name" {
+  description = "CloudFront default domain for dashboard (use until a custom domain/cert is set)"
+  value       = module.dashboard_hosting.cloudfront_domain_name
+}
+
+output "admin_s3_bucket" {
+  description = "S3 bucket for admin portal static files — set as ADMIN_S3_BUCKET_* secret"
+  value       = module.admin_hosting.bucket_name
+}
+
+output "admin_cf_distribution_id" {
+  description = "CloudFront distribution ID for admin portal — set as ADMIN_CF_DISTRIBUTION_* secret"
+  value       = module.admin_hosting.cloudfront_distribution_id
+}
+
+output "admin_cf_domain_name" {
+  description = "CloudFront default domain for admin portal (use until a custom domain/cert is set)"
+  value       = module.admin_hosting.cloudfront_domain_name
+}
