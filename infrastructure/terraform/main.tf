@@ -92,17 +92,17 @@ module "dynamodb" {
 # ── Timestream ────────────────────────────────────────────────────────────────
 
 module "timestream" {
-  source                             = "./modules/timestream"
-  name_prefix                        = local.name_prefix
-  memory_retention_hours             = var.timestream_memory_retention_hours
-  magnetic_retention_days            = var.timestream_magnetic_retention_days
+  source                  = "./modules/timestream"
+  name_prefix             = local.name_prefix
+  memory_retention_hours  = var.timestream_memory_retention_hours
+  magnetic_retention_days = var.timestream_magnetic_retention_days
 }
 
 # ── SQS ───────────────────────────────────────────────────────────────────────
 
 module "sqs" {
-  source                    = "./modules/sqs"
-  name_prefix               = local.name_prefix
+  source                     = "./modules/sqs"
+  name_prefix                = local.name_prefix
   visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
   message_retention_seconds  = var.sqs_message_retention_seconds
   dlq_max_receive_count      = var.sqs_dlq_max_receive_count
@@ -126,19 +126,21 @@ module "secrets" {
   environment = var.environment
 
   secret_values = {
-    timestream_database_name        = module.timestream.database_name
-    timestream_metrics_table        = module.timestream.metrics_table_name
-    timestream_events_table         = module.timestream.events_table_name
-    dynamodb_customers_table        = module.dynamodb.customers_table_name
-    dynamodb_alerts_table           = module.dynamodb.alerts_table_name
-    dynamodb_thresholds_table       = module.dynamodb.thresholds_table_name
-    cognito_customer_user_pool_id   = module.cognito.customer_user_pool_id
-    cognito_customer_app_client_id  = module.cognito.customer_app_client_id
-    cognito_admin_user_pool_id      = module.cognito.admin_user_pool_id
-    cognito_admin_app_client_id     = module.cognito.admin_app_client_id
-    sns_ops_alerts_topic_arn        = aws_sns_topic.ops_alerts.arn
-    sqs_ingest_queue_url            = module.sqs.ingest_queue_url
-    anthropic_api_key               = var.anthropic_api_key
+    timestream_database_name       = module.timestream.database_name
+    timestream_metrics_table       = module.timestream.metrics_table_name
+    timestream_events_table        = module.timestream.events_table_name
+    dynamodb_customers_table       = module.dynamodb.customers_table_name
+    dynamodb_alerts_table          = module.dynamodb.alerts_table_name
+    dynamodb_thresholds_table      = module.dynamodb.thresholds_table_name
+    dynamodb_usage_table           = module.dynamodb.usage_table_name
+    dynamodb_audit_log_table       = module.dynamodb.audit_log_table_name
+    cognito_customer_user_pool_id  = module.cognito.customer_user_pool_id
+    cognito_customer_app_client_id = module.cognito.customer_app_client_id
+    cognito_admin_user_pool_id     = module.cognito.admin_user_pool_id
+    cognito_admin_app_client_id    = module.cognito.admin_app_client_id
+    sns_ops_alerts_topic_arn       = aws_sns_topic.ops_alerts.arn
+    sqs_ingest_queue_url           = module.sqs.ingest_queue_url
+    anthropic_api_key              = var.anthropic_api_key
   }
 }
 
@@ -150,17 +152,17 @@ module "ecs" {
   environment = var.environment
   aws_region  = var.aws_region
 
-  vpc_id             = module.networking.vpc_id
-  private_subnet_ids = module.networking.private_subnet_ids
+  vpc_id                = module.networking.vpc_id
+  private_subnet_ids    = module.networking.private_subnet_ids
   alb_security_group_id = module.networking.alb_security_group_id
   alb_target_group_arn  = module.networking.api_target_group_arn
 
   api_image_uri      = "${module.ecr.api_repository_url}:latest"
   consumer_image_uri = "${module.ecr.consumer_repository_url}:latest"
 
-  api_cpu            = var.api_cpu
-  api_memory         = var.api_memory
-  api_desired_count  = var.api_desired_count
+  api_cpu           = var.api_cpu
+  api_memory        = var.api_memory
+  api_desired_count = var.api_desired_count
 
   consumer_cpu           = var.consumer_cpu
   consumer_memory        = var.consumer_memory
@@ -176,6 +178,8 @@ module "ecs" {
     module.dynamodb.alerts_table_arn,
     module.dynamodb.thresholds_table_arn,
     module.dynamodb.heartbeats_table_arn,
+    module.dynamodb.usage_table_arn,
+    module.dynamodb.audit_log_table_arn,
   ]
 
   timestream_database_arn = module.timestream.database_arn

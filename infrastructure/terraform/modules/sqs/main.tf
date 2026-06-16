@@ -1,13 +1,13 @@
-variable "name_prefix"                { type = string }
+variable "name_prefix" { type = string }
 variable "visibility_timeout_seconds" { type = number }
-variable "message_retention_seconds"  { type = number }
-variable "dlq_max_receive_count"      { type = number }
+variable "message_retention_seconds" { type = number }
+variable "dlq_max_receive_count" { type = number }
 
 # ── Dead Letter Queue ─────────────────────────────────────────────────────────
 
 resource "aws_sqs_queue" "dlq" {
   name                       = "${var.name_prefix}-ingest-dlq"
-  message_retention_seconds  = 1209600  # 14 days for DLQ
+  message_retention_seconds  = 1209600 # 14 days for DLQ
   visibility_timeout_seconds = var.visibility_timeout_seconds
 
   tags = { Name = "${var.name_prefix}-ingest-dlq" }
@@ -50,8 +50,8 @@ resource "aws_sqs_queue_policy" "ingest" {
   })
 }
 
-output "ingest_queue_url"  { value = aws_sqs_queue.ingest.url }
-output "ingest_queue_arn"  { value = aws_sqs_queue.ingest.arn }
+output "ingest_queue_url" { value = aws_sqs_queue.ingest.url }
+output "ingest_queue_arn" { value = aws_sqs_queue.ingest.arn }
 output "ingest_queue_name" { value = aws_sqs_queue.ingest.name }
-output "dlq_arn"           { value = aws_sqs_queue.dlq.arn }
-output "dlq_name"          { value = aws_sqs_queue.dlq.name }
+output "dlq_arn" { value = aws_sqs_queue.dlq.arn }
+output "dlq_name" { value = aws_sqs_queue.dlq.name }

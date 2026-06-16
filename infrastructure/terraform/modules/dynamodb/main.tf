@@ -151,15 +151,15 @@ resource "aws_dynamodb_table" "audit_log" {
   tags = { Name = "${var.name_prefix}-audit-log" }
 }
 
-output "customers_table_name"  { value = aws_dynamodb_table.customers.name }
-output "alerts_table_name"     { value = aws_dynamodb_table.alerts.name }
+output "customers_table_name" { value = aws_dynamodb_table.customers.name }
+output "alerts_table_name" { value = aws_dynamodb_table.alerts.name }
 output "thresholds_table_name" { value = aws_dynamodb_table.thresholds.name }
 output "heartbeats_table_name" { value = aws_dynamodb_table.heartbeats.name }
-output "usage_table_name"      { value = aws_dynamodb_table.usage.name }
-output "audit_log_table_name"  { value = aws_dynamodb_table.audit_log.name }
-output "customers_table_arn"   { value = aws_dynamodb_table.customers.arn }
-output "alerts_table_arn"      { value = aws_dynamodb_table.alerts.arn }
-output "thresholds_table_arn"  { value = aws_dynamodb_table.thresholds.arn }
-output "heartbeats_table_arn"  { value = aws_dynamodb_table.heartbeats.arn }
-output "usage_table_arn"       { value = aws_dynamodb_table.usage.arn }
-output "audit_log_table_arn"   { value = aws_dynamodb_table.audit_log.arn }
+output "usage_table_name" { value = aws_dynamodb_table.usage.name }
+output "audit_log_table_name" { value = aws_dynamodb_table.audit_log.name }
+output "customers_table_arn" { value = aws_dynamodb_table.customers.arn }
+output "alerts_table_arn" { value = aws_dynamodb_table.alerts.arn }
+output "thresholds_table_arn" { value = aws_dynamodb_table.thresholds.arn }
+output "heartbeats_table_arn" { value = aws_dynamodb_table.heartbeats.arn }
+output "usage_table_arn" { value = aws_dynamodb_table.usage.arn }
+output "audit_log_table_arn" { value = aws_dynamodb_table.audit_log.arn }

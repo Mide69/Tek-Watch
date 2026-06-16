@@ -88,7 +88,7 @@ variable "consumer_desired_count" {
 variable "timestream_memory_retention_hours" {
   description = "Hours to retain data in Timestream memory store"
   type        = number
-  default     = 168  # 7 days
+  default     = 168 # 7 days
 }
 
 variable "timestream_magnetic_retention_days" {
@@ -108,7 +108,7 @@ variable "sqs_visibility_timeout_seconds" {
 variable "sqs_message_retention_seconds" {
   description = "SQS message retention period"
   type        = number
-  default     = 345600  # 4 days
+  default     = 345600 # 4 days
 }
 
 variable "sqs_dlq_max_receive_count" {

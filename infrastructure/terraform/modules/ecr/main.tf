@@ -34,6 +34,6 @@ resource "aws_ecr_lifecycle_policy" "repos" {
   })
 }
 
-output "agent_repository_url"    { value = aws_ecr_repository.repos["agent"].repository_url }
-output "api_repository_url"      { value = aws_ecr_repository.repos["api"].repository_url }
+output "agent_repository_url" { value = aws_ecr_repository.repos["agent"].repository_url }
+output "api_repository_url" { value = aws_ecr_repository.repos["api"].repository_url }
 output "consumer_repository_url" { value = aws_ecr_repository.repos["ingest-consumer"].repository_url }

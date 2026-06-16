@@ -1,5 +1,5 @@
-variable "name_prefix"             { type = string }
-variable "memory_retention_hours"  { type = number }
+variable "name_prefix" { type = string }
+variable "memory_retention_hours" { type = number }
 variable "magnetic_retention_days" { type = number }
 
 resource "aws_timestreamwrite_database" "main" {
@@ -39,10 +39,10 @@ resource "aws_timestreamwrite_table" "events" {
   tags = { Name = "${var.name_prefix}-events" }
 }
 
-output "database_name"      { value = aws_timestreamwrite_database.main.database_name }
+output "database_name" { value = aws_timestreamwrite_database.main.database_name }
 output "metrics_table_name" { value = aws_timestreamwrite_table.metrics.table_name }
-output "events_table_name"  { value = aws_timestreamwrite_table.events.table_name }
-output "database_arn"       { value = aws_timestreamwrite_database.main.arn }
+output "events_table_name" { value = aws_timestreamwrite_table.events.table_name }
+output "database_arn" { value = aws_timestreamwrite_database.main.arn }
 output "table_arns" {
   value = [
     aws_timestreamwrite_table.metrics.arn,
