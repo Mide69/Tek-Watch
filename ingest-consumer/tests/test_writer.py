@@ -1,6 +1,6 @@
 """Unit tests for the Timestream writer."""
 import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from processor import ValidatedRecord
 from writer import TimestreamWriter
 
