@@ -1,5 +1,5 @@
 """
-Message processor — validates SQS messages before writing to Timestream.
+Message processor — validates SQS messages before writing to DynamoDB.
 
 Validation steps:
   1. Parse JSON body
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ValidatedRecord:
-    """A validated and parsed metric record ready for Timestream."""
+    """A validated and parsed metric record ready for DynamoDB."""
 
     customer_id: str
     collection_timestamp: str

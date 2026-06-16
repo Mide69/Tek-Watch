@@ -95,7 +95,7 @@ resource "aws_route_table_association" "private" {
 
 resource "aws_security_group" "alb" {
   name        = "${var.name_prefix}-alb-sg"
-  description = "ALB — allow HTTPS inbound"
+  description = "ALB - allow HTTPS inbound"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -123,7 +123,7 @@ resource "aws_security_group" "alb" {
 
 resource "aws_security_group" "ecs_tasks" {
   name        = "${var.name_prefix}-ecs-tasks-sg"
-  description = "ECS tasks — allow traffic from ALB"
+  description = "ECS tasks - allow traffic from ALB"
   vpc_id      = aws_vpc.main.id
 
   ingress {

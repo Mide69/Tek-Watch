@@ -17,8 +17,6 @@ variable "secrets_manager_arn" { type = string }
 variable "sqs_ingest_queue_arn" { type = string }
 variable "sqs_dlq_arn" { type = string }
 variable "dynamodb_table_arns" { type = list(string) }
-variable "timestream_database_arn" { type = string }
-variable "timestream_table_arns" { type = list(string) }
 
 # ── Agent (self-hosted — dogfoods Tek Watch's own AWS account) ────────────────
 variable "agent_image_uri" { type = string }
@@ -138,19 +136,6 @@ resource "aws_iam_role_policy" "api_task" {
         Resource = var.dynamodb_table_arns
       },
       {
-        Effect = "Allow"
-        Action = [
-          "timestream:Select", "timestream:DescribeTable",
-          "timestream:ListMeasures", "timestream:DescribeDatabase"
-        ]
-        Resource = concat([var.timestream_database_arn], var.timestream_table_arns)
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["timestream:DescribeEndpoints"]
-        Resource = ["*"]
-      },
-      {
         Effect   = "Allow"
         Action   = ["sns:Publish"]
         Resource = ["*"]
@@ -203,22 +188,14 @@ resource "aws_iam_role_policy" "consumer_task" {
       {
         Effect = "Allow"
         Action = [
-          "dynamodb:GetItem", "dynamodb:Query"
+          # GetItem/Query for the customer-lookup cache in processor.py;
+          # PutItem/BatchWriteItem to write metric/event records (replaces
+          # the old timestream:WriteRecords grant — Timestream for
+          # LiveAnalytics closed to new customers 2025-06-20).
+          "dynamodb:GetItem", "dynamodb:Query",
+          "dynamodb:PutItem", "dynamodb:BatchWriteItem"
         ]
         Resource = var.dynamodb_table_arns
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "timestream:WriteRecords", "timestream:DescribeTable",
-          "timestream:DescribeDatabase"
-        ]
-        Resource = concat([var.timestream_database_arn], var.timestream_table_arns)
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["timestream:DescribeEndpoints"]
-        Resource = ["*"]
       }
     ]
   })
@@ -227,8 +204,11 @@ resource "aws_iam_role_policy" "consumer_task" {
 # ── Security Group — ECS Tasks ────────────────────────────────────────────────
 
 resource "aws_security_group" "ecs_tasks" {
-  name        = "${var.name_prefix}-ecs-tasks"
-  description = "ECS tasks — inbound from ALB only"
+  name = "${var.name_prefix}-ecs-tasks"
+  # AWS EC2 SecurityGroup descriptions reject non-ASCII characters (an
+  # em-dash here caused a real InvalidParameterValue apply failure) — plain
+  # hyphens only in this field.
+  description = "ECS tasks - inbound from ALB only"
   vpc_id      = var.vpc_id
 
   ingress {
@@ -486,7 +466,7 @@ resource "aws_iam_role_policy" "agent_task" {
 
 resource "aws_security_group" "agent_task" {
   name        = "${var.name_prefix}-agent-task"
-  description = "Self-hosted agent task — outbound only, no inbound needed"
+  description = "Self-hosted agent task - outbound only, no inbound needed"
   vpc_id      = var.vpc_id
 
   egress {

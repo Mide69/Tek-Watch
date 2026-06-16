@@ -15,10 +15,6 @@ consumer_cpu           = 256
 consumer_memory        = 512
 consumer_desired_count = 2
 
-# Timestream — 7-day memory, 30-day magnetic
-timestream_memory_retention_hours  = 168
-timestream_magnetic_retention_days = 30
-
 # SQS
 sqs_visibility_timeout_seconds = 300
 sqs_message_retention_seconds  = 345600 # 4 days

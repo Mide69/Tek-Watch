@@ -16,10 +16,6 @@ consumer_cpu           = 256
 consumer_memory        = 512
 consumer_desired_count = 1
 
-# Timestream — shorter retention in dev
-timestream_memory_retention_hours  = 24
-timestream_magnetic_retention_days = 7
-
 # SQS
 sqs_visibility_timeout_seconds = 300
 sqs_message_retention_seconds  = 86400 # 1 day in dev

@@ -1,7 +1,7 @@
 """
 Tek Watch Ingest Consumer — long-running SQS poll loop.
 
-Polls the ingest SQS queue, validates messages, writes to Timestream,
+Polls the ingest SQS queue, validates messages, writes to DynamoDB,
 and deletes successfully processed messages.
 """
 import logging
@@ -15,7 +15,7 @@ from botocore.exceptions import ClientError
 
 from config import load_config
 from processor import MessageProcessor
-from writer import TimestreamWriter
+from writer import MetricsWriter
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def configure_logging(level: str) -> None:
 def process_messages(
     messages: List[Dict],
     processor: MessageProcessor,
-    writer: TimestreamWriter,
+    writer: MetricsWriter,
     sqs: Any,
     queue_url: str,
 ) -> tuple[int, int]:
@@ -85,7 +85,7 @@ def process_messages(
             to_delete.append({"Id": msg_id, "ReceiptHandle": receipt})
             processed += 1
         else:
-            logger.warning("Timestream write failed for message %s", msg_id)
+            logger.warning("DynamoDB write failed for message %s", msg_id)
             failed += 1
 
     # Batch delete successfully processed messages
@@ -121,10 +121,9 @@ def run() -> None:
         dynamodb_table_name=config.dynamodb_customers_table,
         aws_region=config.aws_region,
     )
-    writer = TimestreamWriter(
-        database_name=config.timestream_database_name,
-        metrics_table=config.timestream_metrics_table,
-        events_table=config.timestream_events_table,
+    writer = MetricsWriter(
+        metrics_table_name=config.dynamodb_metrics_table,
+        events_table_name=config.dynamodb_events_table,
         aws_region=config.aws_region,
     )
 

@@ -33,14 +33,19 @@ output "sqs_ingest_queue_arn" {
   value       = module.sqs.ingest_queue_arn
 }
 
-output "timestream_database_name" {
-  description = "Timestream database name"
-  value       = module.timestream.database_name
-}
-
 output "dynamodb_customers_table" {
   description = "DynamoDB customers table name"
   value       = module.dynamodb.customers_table_name
+}
+
+output "dynamodb_metrics_table" {
+  description = "DynamoDB metrics table name (replaces Timestream, closed to new accounts since 2025-06-20)"
+  value       = module.dynamodb.metrics_table_name
+}
+
+output "dynamodb_events_table" {
+  description = "DynamoDB events table name (replaces Timestream)"
+  value       = module.dynamodb.events_table_name
 }
 
 output "dynamodb_heartbeats_table" {
