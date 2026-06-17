@@ -87,6 +87,7 @@ module "networking" {
 module "ecr" {
   source      = "./modules/ecr"
   name_prefix = local.name_prefix
+  environment = var.environment
 }
 
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
