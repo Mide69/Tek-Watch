@@ -1,4 +1,5 @@
 variable "name_prefix" { type = string }
+variable "environment" { type = string }
 
 locals {
   repos = ["agent", "api", "ingest-consumer"]
@@ -8,6 +9,11 @@ resource "aws_ecr_repository" "repos" {
   for_each             = toset(local.repos)
   name                 = "${var.name_prefix}-${each.key}"
   image_tag_mutability = "MUTABLE"
+
+  # Non-prod repos delete with their images on `terraform destroy` — without
+  # this, a teardown fails on "repository not empty" and leaves the repos (and
+  # their image storage) behind. Prod requires emptying by hand first.
+  force_delete = var.environment != "prod"
 
   image_scanning_configuration {
     scan_on_push = true
