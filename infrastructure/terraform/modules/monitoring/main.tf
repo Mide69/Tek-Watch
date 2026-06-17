@@ -246,6 +246,11 @@ resource "aws_lambda_permission" "silence_detector" {
 
 # ── CloudWatch Dashboard ──────────────────────────────────────────────────────
 
+# Account ID for fully-qualified alarm ARNs in the dashboard — CloudWatch
+# validates the alarm-widget ARN against a strict pattern that requires a real
+# 12-digit account, so a "*" wildcard is rejected at apply time.
+data "aws_caller_identity" "current" {}
+
 resource "aws_cloudwatch_dashboard" "main" {
   dashboard_name = var.name_prefix
 
@@ -255,6 +260,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           title  = "SQS Ingest Queue Depth"
+          region = var.aws_region
           period = 60
           stat   = "Maximum"
           metrics = [
@@ -267,6 +273,7 @@ resource "aws_cloudwatch_dashboard" "main" {
         type = "metric"
         properties = {
           title  = "ECS Running Tasks"
+          region = var.aws_region
           period = 60
           stat   = "Minimum"
           metrics = [
@@ -280,9 +287,9 @@ resource "aws_cloudwatch_dashboard" "main" {
         properties = {
           title = "Active Alarms"
           alarms = [
-            "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.name_prefix}-dlq-depth",
-            "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.name_prefix}-api-task-count",
-            "arn:aws:cloudwatch:${var.aws_region}:*:alarm:${var.name_prefix}-consumer-task-count",
+            "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${var.name_prefix}-dlq-depth",
+            "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${var.name_prefix}-api-task-count",
+            "arn:aws:cloudwatch:${var.aws_region}:${data.aws_caller_identity.current.account_id}:alarm:${var.name_prefix}-consumer-task-count",
           ]
         }
       }
