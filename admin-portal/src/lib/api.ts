@@ -2,8 +2,16 @@
  * Admin Portal API client — communicates with the Tek Watch API admin endpoints.
  */
 import axios, { AxiosInstance, AxiosError } from 'axios'
+import { isDemoMode } from './demoMode'
+import { demoData } from './demoData'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+
+// In demo mode there's no backend — every call resolves from demoData instead
+// of hitting axios. Small delay so loading spinners behave like the real thing.
+const DEMO = isDemoMode()
+const demo = <T>(value: T): Promise<T> =>
+  new Promise(resolve => setTimeout(() => resolve(value), 150))
 
 class AdminAPIClient {
   private client: AxiosInstance
@@ -53,11 +61,13 @@ class AdminAPIClient {
   // ── Customers ──────────────────────────────────────────────────────────────
 
   async listCustomers() {
+    if (DEMO) return demo(demoData.listCustomers())
     const r = await this.client.get('/api/v1/admin/customers')
     return r.data
   }
 
   async getCustomer(customerId: string) {
+    if (DEMO) return demo(demoData.getCustomer(customerId))
     const r = await this.client.get(`/api/v1/admin/customers/${customerId}`)
     return r.data
   }
@@ -68,21 +78,25 @@ class AdminAPIClient {
     subscription_tier: string
     aws_account_ids: string[]
   }) {
+    if (DEMO) return demo(demoData.createCustomer(data))
     const r = await this.client.post('/api/v1/admin/customers', data)
     return r.data
   }
 
   async updateCustomer(customerId: string, data: Record<string, unknown>) {
+    if (DEMO) return demo({ customer_id: customerId, ...data })
     const r = await this.client.put(`/api/v1/admin/customers/${customerId}`, data)
     return r.data
   }
 
   async rotateApiKey(customerId: string) {
+    if (DEMO) return demo(demoData.rotateApiKey())
     const r = await this.client.post(`/api/v1/admin/customers/${customerId}/rotate-key`)
     return r.data
   }
 
   async downloadCfnTemplate(customerId: string): Promise<Blob> {
+    if (DEMO) return demo(new Blob([demoData.cfnTemplate(customerId)], { type: 'text/yaml' }))
     const r = await this.client.get(
       `/api/v1/admin/customers/${customerId}/cfn-template`,
       { responseType: 'blob' }
@@ -93,11 +107,13 @@ class AdminAPIClient {
   // ── Thresholds ─────────────────────────────────────────────────────────────
 
   async getDefaultThresholds() {
+    if (DEMO) return demo(demoData.getDefaultThresholds())
     const r = await this.client.get('/api/v1/admin/thresholds')
     return r.data
   }
 
   async getCustomerThresholds(customerId: string) {
+    if (DEMO) return demo(demoData.getCustomerThresholds())
     const r = await this.client.get(`/api/v1/admin/thresholds/${customerId}`)
     return r.data
   }
@@ -108,6 +124,7 @@ class AdminAPIClient {
     metricName: string,
     config: Record<string, unknown>
   ) {
+    if (DEMO) return demo(demoData.upsertThreshold())
     const r = await this.client.put(`/api/v1/admin/thresholds/${customerId}`, {
       service,
       metric_name: metricName,
@@ -119,6 +136,7 @@ class AdminAPIClient {
   // ── Operations ─────────────────────────────────────────────────────────────
 
   async getOperationsHealth() {
+    if (DEMO) return demo(demoData.getOperationsHealth())
     const r = await this.client.get('/api/v1/admin/operations')
     return r.data
   }
