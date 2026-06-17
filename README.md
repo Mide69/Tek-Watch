@@ -14,7 +14,7 @@ Customer AWS Account
                                                         │
                                               ECS (ingest-consumer)
                                                         │
-                                              Amazon Timestream
+                                        DynamoDB (metrics + events, TTL)
                                                         │
                                               ECS (tek-watch-api)
                                                    │         │
@@ -28,7 +28,7 @@ Customer AWS Account
 ```
 tek-watch/
 ├── agent/                  # Python Docker agent (runs in customer account)
-├── ingest-consumer/        # FastAPI SQS consumer → Timestream writer
+├── ingest-consumer/        # FastAPI SQS consumer → DynamoDB writer
 ├── api/                    # FastAPI central API (serves dashboards)
 ├── dashboard/              # Next.js customer dashboard (app.tekwatch.io)
 ├── admin-portal/           # Next.js admin portal (admin.tekwatch.io)
@@ -109,7 +109,7 @@ uvicorn main:app --reload
 | API | Python 3.12, FastAPI, Anthropic SDK |
 | Dashboard | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
 | Admin Portal | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
-| Metrics Store | Amazon Timestream |
+| Metrics Store | Amazon DynamoDB (metrics + events tables, TTL) |
 | App Data | Amazon DynamoDB |
 | Queue | Amazon SQS |
 | Auth | AWS Cognito |
@@ -122,12 +122,12 @@ uvicorn main:app --reload
 - [x] Agent framework with multi-region discovery
 - [x] Collectors: EC2, Lambda, RDS, SQS, GuardDuty, ACM, IAM, Cost Explorer, CloudWatch Alarms
 - [x] SQS publisher with batching
-- [x] Ingest consumer with validation and Timestream writer
+- [x] Ingest consumer with validation and DynamoDB writer
 - [x] API framework with Cognito JWT authentication
 - [x] All API routers (overview, compute, databases, networking, storage, messaging, security, cost, alerts, agent, metrics)
 - [x] Admin routers (customers, thresholds, operations)
 - [x] DynamoDB service layer
-- [x] Timestream query service
+- [x] DynamoDB-backed metrics query service
 - [x] Threshold alerting engine
 - [x] AI anomaly detection with Claude
 - [x] Notification service (SNS)
