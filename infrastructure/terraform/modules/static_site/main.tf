@@ -65,6 +65,31 @@ resource "aws_cloudfront_origin_access_control" "site" {
   signing_protocol                  = "sigv4"
 }
 
+# CloudFront's default_root_object only rewrites the ROOT path to index.html —
+# it does nothing for subpaths. With a Next.js static export (trailingSlash:
+# true) every route is pre-rendered as /<route>/index.html, so a request for
+# "/overview/" reaches S3 as the key "overview/" (no such object) and 404s.
+# This viewer-request function appends index.html to directory-style URIs so
+# the private-bucket-via-OAC origin resolves them correctly.
+resource "aws_cloudfront_function" "rewrite_index" {
+  name    = "${var.name_prefix}-${var.site_name}-rewrite-index"
+  runtime = "cloudfront-js-2.0"
+  comment = "Append index.html to directory requests for Next.js static export"
+  publish = true
+  code    = <<-EOT
+    function handler(event) {
+      var request = event.request;
+      var uri = request.uri;
+      if (uri.endsWith('/')) {
+        request.uri += 'index.html';
+      } else if (!uri.includes('.')) {
+        request.uri += '/index.html';
+      }
+      return request;
+    }
+  EOT
+}
+
 resource "aws_cloudfront_distribution" "site" {
   enabled             = true
   default_root_object = "index.html"
@@ -90,6 +115,11 @@ resource "aws_cloudfront_distribution" "site" {
       cookies {
         forward = "none"
       }
+    }
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.rewrite_index.arn
     }
 
     min_ttl     = 0
