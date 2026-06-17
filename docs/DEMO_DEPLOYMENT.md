@@ -28,12 +28,16 @@ extra configuration needed.
 Vercel → Project → **Domains** → add `app.tekwatch.io` (or any domain you own),
 then point a CNAME at Vercel as instructed. Free, automatic HTTPS.
 
-## Admin portal (optional second demo)
+## Admin portal (second demo project)
 
-The admin portal (`admin-portal/`) is also a demo-mode static export. To demo it
-too, create a second Vercel project from the same repo with **Root Directory** =
-`admin-portal`. It needs its own `admin-portal/.env.production` with
-`NEXT_PUBLIC_DEMO_MODE=true` if you want it forced the same way.
+The admin portal (`admin-portal/`) is also a demo-mode static export, with its
+own `admin-portal/.env.production` already forcing demo mode. To demo it,
+create a **second** Vercel project from the same repo with **Root Directory** =
+`admin-portal`. No env vars needed.
+
+On the admin login page, click **"Enter demo (no credentials needed)"** — or
+sign in with any email/password. It loads sample customers, thresholds, and
+platform-operations data with no backend (see `admin-portal/src/lib/demoData.ts`).
 
 ## Relationship to the AWS deployment
 
