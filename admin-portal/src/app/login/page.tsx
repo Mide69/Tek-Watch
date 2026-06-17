@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Shield } from 'lucide-react'
 import { configureAmplify, adminSignIn, adminConfirmMfa, getAdminToken } from '@/lib/auth'
+import { isDemoMode } from '@/lib/demoMode'
 import adminApi from '@/lib/api'
 
 configureAmplify()
+const DEMO = isDemoMode()
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -25,6 +27,21 @@ export default function AdminLoginPage() {
       router.replace('/customers')
     }
   }, [router])
+
+  const enterDemo = async () => {
+    setError('')
+    setLoading(true)
+    try {
+      await adminSignIn('demo@tektribe.io', 'demo')
+      const token = getAdminToken()
+      if (token) adminApi.setToken(token)
+      router.push('/customers')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not enter demo')
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -159,6 +176,26 @@ export default function AdminLoginPage() {
                   : 'Continue'}
             </button>
           </form>
+
+          {DEMO && (
+            <div className="mt-5">
+              <div className="relative my-4">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
+                <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">demo</span></div>
+              </div>
+              <button
+                type="button"
+                onClick={enterDemo}
+                disabled={loading}
+                className="w-full py-2.5 px-4 border border-blue-600 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition-colors"
+              >
+                Enter demo (no credentials needed)
+              </button>
+              <p className="mt-2 text-center text-xs text-gray-400">
+                Sample data only — no AWS backend. Or sign in above with any email/password.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 text-center text-xs text-gray-400 space-y-1">
             <p>Admin access only. All actions are logged.</p>

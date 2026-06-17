@@ -10,11 +10,13 @@ import {
   fetchAuthSession,
   type SignInOutput,
 } from 'aws-amplify/auth'
+import { isDemoMode } from './demoMode'
 
 let _configured = false
 
 export function configureAmplify() {
   if (_configured) return
+  if (isDemoMode()) return  // demo/dev — no real Cognito to configure
   const region   = process.env.NEXT_PUBLIC_COGNITO_REGION    || 'eu-west-2'
   const poolId   = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID  || ''
   const clientId = process.env.NEXT_PUBLIC_COGNITO_APP_CLIENT_ID || ''
@@ -44,10 +46,10 @@ export async function adminSignIn(
   email: string,
   password: string
 ): Promise<{ mfaRequired: boolean; signInOutput?: SignInOutput }> {
-  const poolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || ''
-
-  // Dev mode — no Cognito configured
-  if (!poolId) {
+  // Demo/dev mode — no Cognito. Any credentials grant a mock session so the
+  // demo is explorable; the placeholder pool id also routes here (not just an
+  // empty one), matching isDemoMode()'s logic.
+  if (isDemoMode()) {
     if (!email || !password) throw new Error('Email and password are required')
     localStorage.setItem('tw_admin_token', `mock.${btoa(email)}.sig`)
     return { mfaRequired: false }
@@ -82,8 +84,7 @@ export async function adminConfirmMfa(code: string): Promise<void> {
 }
 
 export async function adminSignOut(): Promise<void> {
-  const poolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || ''
-  if (poolId) await signOut()
+  if (!isDemoMode()) await signOut()
   localStorage.removeItem('tw_admin_token')
 }
 
