@@ -7,7 +7,7 @@ Tek Watch is a multi-tenant AWS cloud monitoring SaaS platform. It consists of:
 | Component | Technology | Purpose |
 |-----------|-----------|---------|
 | **Agent** | Python 3.12, Docker/ECS | Runs in each customer's AWS account; collects metrics from 20+ services and publishes to SQS |
-| **Ingest Consumer** | Python 3.12, Docker/ECS | Reads from SQS, writes to Timestream and DynamoDB |
+| **Ingest Consumer** | Python 3.12, Docker/ECS | Reads from SQS, writes metrics/events to DynamoDB |
 | **API** | FastAPI, Docker/ECS | REST API with Cognito JWT auth; serves dashboard and admin portal |
 | **Dashboard** | Next.js 14, Vercel/S3 | Customer-facing monitoring UI |
 | **Admin Portal** | Next.js 14, Vercel/S3 | Internal portal for managing customers and billing |
@@ -51,7 +51,7 @@ tek-watch/
 │   ├── tests/              # 50 unit tests
 │   └── main.py
 ├── api/                    # FastAPI REST API
-├── ingest-consumer/        # SQS → Timestream writer
+├── ingest-consumer/        # SQS → DynamoDB writer
 ├── dashboard/              # Customer Next.js UI (port 3000)
 ├── admin-portal/           # Admin Next.js UI (port 3001)
 ├── infrastructure/
@@ -272,7 +272,7 @@ terraform plan \
   -var="acm_certificate_arn=<ACM_CERT_ARN_DEV>"
 ```
 
-Review the output carefully — confirm resources match the module list (VPC, ECS cluster, SQS queue, DynamoDB tables, Timestream database, Cognito pools, Secrets Manager secret, ECR repositories, CloudFront distributions, ALB).
+Review the output carefully — confirm resources match the module list (VPC, ECS cluster, SQS queue, DynamoDB tables incl. metrics/events, Cognito pools, Secrets Manager secret, ECR repositories, CloudFront distributions, ALB).
 
 #### Step 4.3 — Apply
 
@@ -824,8 +824,7 @@ terraform output ecr_agent_repository_url
 | `networking` | VPC, subnets, security groups, NAT gateway |
 | `ecs` | ECS cluster, task definitions, services, ALB |
 | `sqs` | Ingest queue + DLQ |
-| `dynamodb` | Customers, alerts, thresholds tables |
-| `timestream` | Metrics and events time-series database |
+| `dynamodb` | Customers, alerts, thresholds, usage, audit-log, and metrics/events tables |
 | `cognito` | Customer and admin user pools |
 | `secrets` | Secrets Manager secret for service credentials |
 | `ecr` | Container image repositories (API, consumer, agent) |
@@ -1167,7 +1166,7 @@ app.include_router(myrouter.router, prefix="/api/v1/myrouter", tags=["MyRouter"]
 | API returns 401 Unauthorized | Expired or invalid JWT | Verify Cognito pool IDs; re-authenticate |
 | Dashboard shows no data | API unreachable | Check `NEXT_PUBLIC_API_BASE_URL`; confirm API health endpoint returns 200 |
 | Ingest consumer not processing | SQS consumer not running | Check ECS task status; inspect CloudWatch logs |
-| Timestream write fails | Missing permissions or table doesn't exist | Check IAM policy; run `terraform apply` to ensure table exists |
+| Metrics/events write fails | Missing permissions or table doesn't exist | Check the consumer task's DynamoDB IAM policy; run `terraform apply` to ensure the metrics/events tables exist |
 | Silence alert not resolving | Agent restarted but alert is stale | Silence detector runs every 15 min; wait or invoke Lambda manually |
 | `ConditionalCheckFailedException` in silence detector | Alert didn't exist when resolve was attempted | Benign — logged at DEBUG, handler continues normally |
 

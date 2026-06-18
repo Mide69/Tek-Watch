@@ -23,7 +23,7 @@ Tek Watch is a **multi-tenant SaaS** AWS infrastructure monitoring platform. Eac
 │  SQS Ingest Queue                                           │
 │       │                                                     │
 │       ▼                                                     │
-│  Lambda Ingest Worker ──────► Timestream (metrics/events)   │
+│  ECS Ingest Consumer ───────► DynamoDB (metrics/events, TTL)│
 │                               DynamoDB (customers/alerts)   │
 │                                                             │
 │  FastAPI (ECS Fargate)                                      │
@@ -51,8 +51,8 @@ Tek Watch is a **multi-tenant SaaS** AWS infrastructure monitoring platform. Eac
 1. Agent runs on a schedule (default: every 5 min) inside the customer's AWS account
 2. Agent collects metrics from 25 AWS services via boto3 ReadOnly calls
 3. Metrics are batched and sent to the Tek Watch SQS ingest queue in the central account
-4. Lambda ingest worker consumes the SQS messages, fans out to:
-   - **Timestream** — time-series metrics (CPU, memory, latency, cost trend)
+4. ECS ingest consumer (Fargate) consumes the SQS messages, fans out to:
+   - **DynamoDB metrics + events tables (TTL)** — time-series metrics (CPU, memory, latency, cost trend) and string-valued events
    - **DynamoDB** — resource inventory, alert state, customer metadata
 
 ### Alert Evaluation
@@ -60,7 +60,7 @@ The API runs two background workers:
 
 | Worker | Interval | Purpose |
 |--------|----------|---------|
-| `threshold_evaluation_loop` | 60 s | Reads customer thresholds from DynamoDB, queries Timestream for latest values, fires alerts when breached |
+| `threshold_evaluation_loop` | 60 s | Reads customer thresholds from DynamoDB, queries the metrics table for latest values, fires alerts when breached |
 | `anomaly_detection_loop` | 5 min | Sends metrics to Claude for AI-powered anomaly detection, creates AI-flagged alerts |
 
 When an alert fires:
@@ -86,7 +86,7 @@ Cognito Customer User Pool
 FastAPI → get_current_customer() → CustomerContext(customer_id)
   │
   └── All DynamoDB queries scoped to customer_id (partition key)
-      All Timestream queries filter on customer_id dimension
+      All metrics/events queries are scoped by customer_id
 ```
 
 - **Customer JWT** → `CustomerContext` — used on all `/api/v1/...` endpoints
@@ -158,7 +158,7 @@ infrastructure/
 ├── modules/
 │   ├── networking/    VPC, subnets, NAT, security groups
 │   ├── compute/       ECS cluster, Fargate task definitions
-│   ├── data/          Timestream, DynamoDB, S3
+│   ├── data/          DynamoDB (incl. metrics/events), S3
 │   ├── auth/          Cognito user pools
 │   ├── messaging/     SQS, SNS
 │   └── cdn/           CloudFront, ACM
@@ -189,7 +189,7 @@ See [GUIDE.md](GUIDE.md) for step-by-step deployment instructions.
 | # | Decision | Rationale |
 |---|----------|-----------|
 | 1 | FastAPI over Django REST | Async-first; lighter weight; native Pydantic v2 |
-| 2 | Timestream for metrics | Native time-series compression; built-in TTL; AWS-native |
+| 2 | DynamoDB for metrics/events (was Timestream) | Amazon Timestream for LiveAnalytics closed to new AWS customers on 2025-06-20, so it cannot be provisioned on a new account. Replaced with two purpose-shaped DynamoDB tables (metrics keyed `customer_id#resource_id#metric_name` + a `customer_id`-time GSI; events keyed `customer_id#service`), both with per-item TTL. Same serverless, single-digit-ms, AWS-native profile; aggregation done in the query service. |
 | 3 | DynamoDB for state | Serverless; single-digit ms at any scale; per-item TTL |
 | 4 | Claude for AI features | Best-in-class reasoning; native tool-use for multi-step queries |
 | 5 | Next.js App Router | RSC for static data; client components only where needed |

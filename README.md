@@ -214,9 +214,9 @@ See `.env.example` for all configuration options.
 Production deployments use AWS Secrets Manager:
 ```json
 {
-  "timestream_database_name": "tek-watch",
-  "timestream_metrics_table": "metrics",
   "dynamodb_customers_table": "tek_watch_customers",
+  "dynamodb_metrics_table": "tek_watch_metrics",
+  "dynamodb_events_table": "tek_watch_events",
   "cognito_customer_user_pool_id": "...",
   "anthropic_api_key": "...",
   "sns_ops_alerts_topic_arn": "..."
