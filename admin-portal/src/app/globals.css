@@ -2,8 +2,14 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ──────────────────────────────────────────────────────────────────────────
+   Tek Watch Admin — "Aurora" design system
+   Vivid purple→blue gradient canvas, glassmorphism, glowing gradient accents.
+   ────────────────────────────────────────────────────────────────────────── */
+
 @layer base {
   :root {
+    /* Legacy shadcn tokens (kept so tailwind.config color mappings resolve) */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -21,11 +27,171 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --radius: 0.875rem;
+
+    /* Aurora palette */
+    --violet: 262 83% 64%;
+    --indigo: 243 75% 62%;
+    --blue: 217 91% 60%;
+    --cyan: 189 94% 55%;
+    --fuchsia: 292 84% 66%;
+
+    /* Surfaces */
+    --bg-0: 240 30% 6%;
+    --ink: 240 20% 98%;
+    --ink-muted: 240 12% 72%;
+    --ink-faint: 240 10% 55%;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    color: hsl(var(--ink));
+    background: hsl(var(--bg-0));
+    min-height: 100vh;
+  }
+
+  /* Aurora backdrop — fixed, layered radial blobs that drift slowly. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: -20%;
+    z-index: -2;
+    background:
+      radial-gradient(38rem 38rem at 12% 18%, hsl(var(--violet) / 0.40), transparent 60%),
+      radial-gradient(34rem 34rem at 88% 12%, hsl(var(--blue) / 0.38), transparent 60%),
+      radial-gradient(40rem 40rem at 78% 88%, hsl(var(--fuchsia) / 0.32), transparent 62%),
+      radial-gradient(36rem 36rem at 20% 92%, hsl(var(--cyan) / 0.28), transparent 60%);
+    filter: blur(20px) saturate(1.15);
+    animation: aurora-drift 26s ease-in-out infinite alternate;
+  }
+
+  /* Vignette layer for depth. */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    background: radial-gradient(120% 120% at 50% 0%, transparent 40%, hsl(var(--bg-0) / 0.75) 100%);
+    pointer-events: none;
   }
 }
 
-@layer base {
-  * { @apply border-border; }
-  body { @apply bg-background text-foreground; }
+@layer components {
+  .glass {
+    background: hsl(0 0% 100% / 0.06);
+    backdrop-filter: blur(18px) saturate(1.4);
+    -webkit-backdrop-filter: blur(18px) saturate(1.4);
+    border: 1px solid hsl(0 0% 100% / 0.10);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.08) inset,
+      0 20px 50px -20px hsl(240 60% 3% / 0.6);
+  }
+
+  .glass-card { @apply glass rounded-2xl; }
+
+  .lift {
+    transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s, border-color 0.25s;
+  }
+  .lift:hover {
+    transform: translateY(-3px);
+    border-color: hsl(0 0% 100% / 0.20);
+    box-shadow:
+      0 1px 0 0 hsl(0 0% 100% / 0.12) inset,
+      0 28px 60px -24px hsl(262 80% 30% / 0.7);
+  }
+
+  .gradient-text {
+    background-image: linear-gradient(100deg, hsl(var(--cyan)), hsl(var(--blue)) 40%, hsl(var(--violet)) 75%, hsl(var(--fuchsia)));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .aurora-grad {
+    background-image: linear-gradient(100deg, hsl(var(--cyan)), hsl(var(--blue)) 45%, hsl(var(--violet)) 80%, hsl(var(--fuchsia)));
+  }
+
+  .btn-primary {
+    @apply relative inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all;
+    background-image: linear-gradient(100deg, hsl(var(--blue)), hsl(var(--violet)) 60%, hsl(var(--fuchsia)));
+    box-shadow: 0 8px 24px -8px hsl(262 84% 55% / 0.7);
+  }
+  .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 12px 30px -8px hsl(262 84% 55% / 0.85); }
+  .btn-primary:active { transform: translateY(1px); }
+  .btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all;
+    color: hsl(var(--ink-muted));
+    background: hsl(0 0% 100% / 0.04);
+    border: 1px solid hsl(0 0% 100% / 0.12);
+  }
+  .btn-ghost:hover { color: hsl(var(--ink)); background: hsl(0 0% 100% / 0.09); border-color: hsl(0 0% 100% / 0.22); }
+
+  .kpi { @apply glass-card lift relative overflow-hidden p-5; }
+  .kpi::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 3px;
+    background-image: linear-gradient(90deg, hsl(var(--cyan)), hsl(var(--violet)));
+    opacity: 0.9;
+  }
+
+  .pill {
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium;
+    border: 1px solid hsl(0 0% 100% / 0.12);
+  }
+
+  .input-glass {
+    @apply w-full rounded-xl px-3.5 py-2.5 text-sm transition-all;
+    color: hsl(var(--ink));
+    background: hsl(0 0% 100% / 0.05);
+    border: 1px solid hsl(0 0% 100% / 0.12);
+  }
+  .input-glass::placeholder { color: hsl(var(--ink-faint)); }
+  .input-glass:focus {
+    outline: none;
+    border-color: hsl(var(--violet) / 0.7);
+    box-shadow: 0 0 0 3px hsl(var(--violet) / 0.25);
+    background: hsl(0 0% 100% / 0.08);
+  }
+  select.input-glass option { background: hsl(var(--bg-0)); color: hsl(var(--ink)); }
+}
+
+@layer utilities {
+  .text-ink { color: hsl(var(--ink)); }
+  .text-muted-ink { color: hsl(var(--ink-muted)); }
+  .text-faint-ink { color: hsl(var(--ink-faint)); }
+  .animate-fade-up { animation: fade-up 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+}
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 100% / 0.12);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover { background: hsl(0 0% 100% / 0.22); background-clip: content-box; }
+
+@keyframes aurora-drift {
+  0%   { transform: translate3d(0, 0, 0) scale(1); }
+  50%  { transform: translate3d(2%, -2%, 0) scale(1.06); }
+  100% { transform: translate3d(-2%, 2%, 0) scale(1.02); }
+}
+
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+  .animate-fade-up { animation: none; }
 }

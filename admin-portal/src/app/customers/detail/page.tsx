@@ -23,11 +23,8 @@ interface Customer {
   created_at: string
 }
 
-// Static export (output: 'export') cannot use a [id] dynamic route segment —
-// every path must be known at build time, and customer IDs aren't. We pass
-// the ID as a query string instead (?id=TT-0001), which works fine with
-// static hosting. useSearchParams() requires a Suspense boundary in the App
-// Router, hence the wrapper below.
+// Static export can't use a [id] dynamic segment — IDs are passed as ?id=…
+// (useSearchParams needs a Suspense boundary in the App Router).
 export default function CustomerDetailPage() {
   return (
     <Suspense fallback={null}>
@@ -43,13 +40,7 @@ function CustomerDetailContent() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [newApiKey, setNewApiKey] = useState<string | null>(null)
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    subscription_tier: '',
-    aws_account_ids: '',
-    status: '',
-  })
+  const [form, setForm] = useState({ name: '', email: '', subscription_tier: '', aws_account_ids: '', status: '' })
 
   const fetchCustomer = useCallback(async () => {
     if (!id) { setLoading(false); return }
@@ -59,8 +50,7 @@ function CustomerDetailContent() {
       const c = data.customer
       setCustomer(c)
       setForm({
-        name: c.name || '',
-        email: c.email || '',
+        name: c.name || '', email: c.email || '',
         subscription_tier: c.subscription_tier || 'foundation',
         aws_account_ids: (c.aws_account_ids || []).join(', '),
         status: c.status || 'active',
@@ -72,22 +62,18 @@ function CustomerDetailContent() {
     }
   }, [id])
 
-  useEffect(() => {
-    fetchCustomer()
-  }, [fetchCustomer])
+  useEffect(() => { fetchCustomer() }, [fetchCustomer])
 
   const handleSave = async () => {
     setSaving(true)
     try {
       await adminApi.updateCustomer(id, {
-        name: form.name,
-        email: form.email,
-        subscription_tier: form.subscription_tier,
+        name: form.name, email: form.email, subscription_tier: form.subscription_tier,
         aws_account_ids: form.aws_account_ids.split(',').map(s => s.trim()).filter(Boolean),
         status: form.status,
       })
       await fetchCustomer()
-    } catch (e) {
+    } catch {
       alert('Failed to save changes')
     } finally {
       setSaving(false)
@@ -99,7 +85,7 @@ function CustomerDetailContent() {
     try {
       const data = await adminApi.rotateApiKey(id)
       setNewApiKey(data.new_api_key)
-    } catch (e) {
+    } catch {
       alert('Failed to rotate key')
     }
   }
@@ -113,7 +99,7 @@ function CustomerDetailContent() {
       a.download = `tek-watch-agent-${id}.yaml`
       a.click()
       URL.revokeObjectURL(url)
-    } catch (e) {
+    } catch {
       alert('Failed to download template')
     }
   }
@@ -121,8 +107,8 @@ function CustomerDetailContent() {
   if (loading) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-violet-400" />
         </div>
       </AdminLayout>
     )
@@ -131,123 +117,76 @@ function CustomerDetailContent() {
   if (!customer) {
     return (
       <AdminLayout>
-        <div className="text-center py-16">
-          <p className="text-gray-500">Customer not found</p>
-          <Link href="/customers" className="text-blue-600 hover:underline text-sm mt-2 inline-block">
-            ← Back to customers
-          </Link>
+        <div className="py-16 text-center">
+          <p className="text-muted-ink">Customer not found</p>
+          <Link href="/customers" className="mt-2 inline-block text-sm text-violet-300 hover:underline">← Back to customers</Link>
         </div>
       </AdminLayout>
     )
   }
 
-  const agentStatusColor = {
-    healthy: 'text-green-600',
-    warning: 'text-yellow-600',
-    offline: 'text-red-600',
-    unknown: 'text-gray-400',
-  }[customer.agent_status] || 'text-gray-400'
+  const agentColor = {
+    healthy: 'text-emerald-300', warning: 'text-amber-300',
+    offline: 'text-rose-300', unknown: 'text-faint-ink',
+  }[customer.agent_status] || 'text-faint-ink'
 
   return (
     <AdminLayout>
-      <div className="space-y-6 max-w-3xl">
-        {/* Back + header */}
+      <div className="max-w-3xl space-y-6">
         <div>
-          <Link
-            href="/customers"
-            className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 mb-4"
-          >
+          <Link href="/customers" className="mb-4 flex items-center gap-1 text-sm text-muted-ink transition-colors hover:text-ink">
             <ArrowLeft className="h-4 w-4" /> Back to customers
           </Link>
-          <div className="flex items-start justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{customer.name}</h1>
-              <p className="text-sm font-mono text-gray-500 mt-0.5">{customer.customer_id}</p>
+              <h1 className="text-3xl font-bold tracking-tight text-ink">{customer.name}</h1>
+              <p className="mt-0.5 font-mono text-sm text-faint-ink">{customer.customer_id}</p>
             </div>
             <div className="flex gap-2">
-              <button
-                onClick={handleDownloadCfn}
-                className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
-              >
-                <Download className="h-4 w-4" />
-                CloudFormation
-              </button>
-              <button
-                onClick={handleRotateKey}
-                className="flex items-center gap-2 px-3 py-2 text-sm border border-amber-300 text-amber-700 rounded-lg hover:bg-amber-50"
-              >
-                <Key className="h-4 w-4" />
-                Rotate Key
+              <button onClick={handleDownloadCfn} className="btn-ghost"><Download className="h-4 w-4" /> CloudFormation</button>
+              <button onClick={handleRotateKey} className="btn-ghost !border-amber-300/30 !text-amber-200 hover:!bg-amber-400/10">
+                <Key className="h-4 w-4" /> Rotate key
               </button>
             </div>
           </div>
         </div>
 
-        {/* New API key banner */}
         {newApiKey && (
-          <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-            <p className="font-semibold text-amber-900 mb-1">
-              New API key — save it now, it won&apos;t be shown again
-            </p>
-            <code className="block bg-white border border-amber-200 rounded px-3 py-2 text-sm font-mono break-all">
-              {newApiKey}
-            </code>
-            <button onClick={() => setNewApiKey(null)} className="mt-2 text-xs text-amber-700 hover:underline">
-              Dismiss
-            </button>
+          <div className="glass-card border-amber-300/30 bg-amber-400/10 p-4">
+            <p className="mb-1 font-semibold text-amber-200">New API key — save it now, it won&apos;t be shown again</p>
+            <code className="block break-all rounded-lg border border-amber-300/20 bg-black/30 px-3 py-2 font-mono text-sm text-amber-100">{newApiKey}</code>
+            <button onClick={() => setNewApiKey(null)} className="mt-2 text-xs text-amber-300 hover:underline">Dismiss</button>
           </div>
         )}
 
-        {/* Agent status card */}
-        <div className="bg-white rounded-lg border p-5">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Agent Status</h2>
-          <div className="flex items-center gap-4">
-            <div className={`flex items-center gap-2 font-medium capitalize ${agentStatusColor}`}>
+        <div className="glass-card p-5">
+          <h2 className="mb-3 text-sm font-semibold text-muted-ink">Agent status</h2>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <div className={`flex items-center gap-2 font-medium capitalize ${agentColor}`}>
               {customer.agent_status === 'healthy' && <CheckCircle className="h-5 w-5" />}
               {customer.agent_status === 'warning' && <AlertTriangle className="h-5 w-5" />}
-              {(customer.agent_status === 'offline' || customer.agent_status === 'unknown') && (
-                <XCircle className="h-5 w-5" />
-              )}
+              {(customer.agent_status === 'offline' || customer.agent_status === 'unknown') && <XCircle className="h-5 w-5" />}
               {customer.agent_status || 'unknown'}
             </div>
-            <div className="text-sm text-gray-500">
-              Last seen: <span className="font-medium">{formatRelativeTime(customer.last_agent_seen)}</span>
-            </div>
-            <div className="text-sm text-gray-500">
-              Created: <span className="font-medium">{formatDate(customer.created_at)}</span>
-            </div>
+            <div className="text-sm text-muted-ink">Last seen: <span className="font-medium text-ink">{formatRelativeTime(customer.last_agent_seen)}</span></div>
+            <div className="text-sm text-muted-ink">Created: <span className="font-medium text-ink">{formatDate(customer.created_at)}</span></div>
           </div>
         </div>
 
-        {/* Edit form */}
-        <div className="bg-white rounded-lg border p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-700">Account Details</h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="glass-card space-y-4 p-5">
+          <h2 className="text-sm font-semibold text-muted-ink">Account details</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
-              <input
-                value={form.name}
-                onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="mb-1 block text-sm font-medium text-muted-ink">Company name</label>
+              <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-glass" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Contact Email</label>
-              <input
-                type="email"
-                value={form.email}
-                onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <label className="mb-1 block text-sm font-medium text-muted-ink">Contact email</label>
+              <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-glass" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subscription Tier</label>
-              <select
-                value={form.subscription_tier}
-                onChange={e => setForm(f => ({ ...f, subscription_tier: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <label className="mb-1 block text-sm font-medium text-muted-ink">Subscription tier</label>
+              <select value={form.subscription_tier} onChange={e => setForm(f => ({ ...f, subscription_tier: e.target.value }))} className="input-glass">
                 <option value="foundation">Foundation</option>
                 <option value="growth">Growth</option>
                 <option value="scale">Scale</option>
@@ -255,38 +194,24 @@ function CustomerDetailContent() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Account Status</label>
-              <select
-                value={form.status}
-                onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
+              <label className="mb-1 block text-sm font-medium text-muted-ink">Account status</label>
+              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="input-glass">
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
               </select>
             </div>
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              AWS Account IDs <span className="text-gray-400 font-normal">(comma-separated)</span>
+            <label className="mb-1 block text-sm font-medium text-muted-ink">
+              AWS account IDs <span className="font-normal text-faint-ink">(comma-separated)</span>
             </label>
-            <input
-              value={form.aws_account_ids}
-              onChange={e => setForm(f => ({ ...f, aws_account_ids: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="123456789012, 987654321098"
-            />
+            <input value={form.aws_account_ids} onChange={e => setForm(f => ({ ...f, aws_account_ids: e.target.value }))}
+              className="input-glass" placeholder="123456789012, 987654321098" />
           </div>
-
           <div className="flex justify-end">
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-            >
+            <button onClick={handleSave} disabled={saving} className="btn-primary">
               {saving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-              {saving ? 'Saving…' : 'Save Changes'}
+              {saving ? 'Saving…' : 'Save changes'}
             </button>
           </div>
         </div>

@@ -10,74 +10,36 @@ import {
 } from 'lucide-react'
 
 interface OperationsHealth {
-  ingest_queue: {
-    depth: number
-    dlq_depth: number
-    oldest_message_age_seconds: number | null
-  }
-  api_service: {
-    status: string
-    uptime_seconds: number
-  }
-  ingest_consumer: {
-    status: string
-    messages_processed_1h: number
-    messages_failed_1h: number
-  }
-  customers: {
-    total: number
-    active: number
-    agents_healthy: number
-    agents_offline: number
-  }
-  recent_errors: Array<{
-    timestamp: string
-    service: string
-    message: string
-  }>
+  ingest_queue: { depth: number; dlq_depth: number; oldest_message_age_seconds: number | null }
+  api_service: { status: string; uptime_seconds: number }
+  ingest_consumer: { status: string; messages_processed_1h: number; messages_failed_1h: number }
+  customers: { total: number; active: number; agents_healthy: number; agents_offline: number }
+  recent_errors: Array<{ timestamp: string; service: string; message: string }>
 }
 
 function StatusBadge({ status }: { status: string }) {
   if (status === 'healthy' || status === 'running') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
-        <CheckCircle className="h-3 w-3" /> {status}
-      </span>
-    )
+    return <span className="pill bg-emerald-400/15 text-emerald-300 border-emerald-300/25"><CheckCircle className="h-3 w-3" /> {status}</span>
   }
   if (status === 'degraded') {
-    return (
-      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
-        <AlertTriangle className="h-3 w-3" /> {status}
-      </span>
-    )
+    return <span className="pill bg-amber-400/15 text-amber-300 border-amber-300/25"><AlertTriangle className="h-3 w-3" /> {status}</span>
   }
-  return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
-      <XCircle className="h-3 w-3" /> {status}
-    </span>
-  )
+  return <span className="pill bg-rose-400/15 text-rose-300 border-rose-300/25"><XCircle className="h-3 w-3" /> {status}</span>
 }
 
-function MetricCard({
-  title, value, subtitle, icon, alert = false,
-}: {
-  title: string
-  value: string | number
-  subtitle?: string
-  icon: React.ReactNode
-  alert?: boolean
+function MetricCard({ title, value, subtitle, icon, accent, alert = false }: {
+  title: string; value: string | number; subtitle?: string; icon: React.ReactNode; accent: string; alert?: boolean
 }) {
   return (
-    <div className={`bg-white rounded-lg border p-5 ${alert ? 'border-red-300 bg-red-50' : ''}`}>
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-sm font-medium text-gray-600">{title}</span>
-        <div className={`p-2 rounded-lg ${alert ? 'bg-red-100 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-          {icon}
+    <div className={`kpi ${alert ? '!border-rose-400/30' : ''}`}>
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wider text-faint-ink">{title}</p>
+          <p className={`mt-2 text-2xl font-bold tracking-tight ${alert ? 'text-rose-300' : 'text-ink'}`}>{value}</p>
+          {subtitle && <p className="mt-1 text-xs text-muted-ink">{subtitle}</p>}
         </div>
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${alert ? 'bg-rose-400/15 text-rose-300' : accent}`}>{icon}</div>
       </div>
-      <div className={`text-2xl font-bold ${alert ? 'text-red-700' : 'text-gray-900'}`}>{value}</div>
-      {subtitle && <p className="text-xs text-gray-500 mt-1">{subtitle}</p>}
     </div>
   )
 }
@@ -100,7 +62,6 @@ export default function OperationsPage() {
       setHealth(data)
       setLastRefresh(new Date())
     } catch {
-      // Show mock data if API unavailable
       setHealth({
         ingest_queue: { depth: 0, dlq_depth: 0, oldest_message_age_seconds: null },
         api_service: { status: 'healthy', uptime_seconds: 3600 },
@@ -120,149 +81,100 @@ export default function OperationsPage() {
     return `${h}h ${m}m`
   }
 
+  const fmt = (n: number) => n.toLocaleString('en-GB')
+
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+      <div className="space-y-7">
+        <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Platform Operations</h1>
-            <p className="text-sm text-gray-500 mt-1">
+            <h1 className="text-3xl font-bold tracking-tight text-ink">Platform operations</h1>
+            <p className="mt-1 text-sm text-muted-ink">
               Last refreshed {formatRelativeTime(lastRefresh)} · auto-refreshes every 30s
             </p>
           </div>
-          <button
-            onClick={fetchHealth}
-            disabled={loading}
-            className="flex items-center gap-2 px-3 py-2 text-sm border rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          >
-            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+          <button onClick={fetchHealth} disabled={loading} className="btn-ghost">
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
           </button>
         </div>
 
         {loading && !health ? (
-          <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="flex h-48 items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/15 border-t-violet-400" />
           </div>
         ) : health ? (
           <>
-            {/* Service Status Row */}
-            <div className="bg-white rounded-lg border p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-4">Service Status</h2>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Server className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">API Service</span>
+            {/* Service status */}
+            <div className="glass-card p-5">
+              <h2 className="mb-4 text-sm font-semibold text-muted-ink">Service status</h2>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                {[
+                  { icon: <Server className="h-4 w-4 text-cyan-300" />, label: 'API Service', status: health.api_service.status },
+                  { icon: <Activity className="h-4 w-4 text-violet-300" />, label: 'Ingest Consumer', status: health.ingest_consumer.status },
+                  { icon: <MessageSquare className="h-4 w-4 text-blue-300" />, label: 'Ingest Queue', status: health.ingest_queue.dlq_depth > 0 ? 'degraded' : 'healthy' },
+                ].map((s) => (
+                  <div key={s.label} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3.5">
+                    <div className="flex items-center gap-2.5">
+                      {s.icon}
+                      <span className="text-sm font-medium text-ink">{s.label}</span>
+                    </div>
+                    <StatusBadge status={s.status} />
                   </div>
-                  <StatusBadge status={health.api_service.status} />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Activity className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">Ingest Consumer</span>
-                  </div>
-                  <StatusBadge status={health.ingest_consumer.status} />
-                </div>
-                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="h-4 w-4 text-gray-500" />
-                    <span className="text-sm font-medium">Ingest Queue</span>
-                  </div>
-                  <StatusBadge status={health.ingest_queue.dlq_depth > 0 ? 'degraded' : 'healthy'} />
-                </div>
+                ))}
               </div>
             </div>
 
-            {/* Metrics Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricCard
-                title="Queue Depth"
-                value={health.ingest_queue.depth}
-                subtitle="Messages waiting"
-                icon={<MessageSquare className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="DLQ Depth"
-                value={health.ingest_queue.dlq_depth}
-                subtitle="Failed messages"
-                icon={<AlertTriangle className="h-4 w-4" />}
-                alert={health.ingest_queue.dlq_depth > 0}
-              />
-              <MetricCard
-                title="Processed (1h)"
-                value={health.ingest_consumer.messages_processed_1h}
-                subtitle="Messages ingested"
-                icon={<CheckCircle className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Failed (1h)"
-                value={health.ingest_consumer.messages_failed_1h}
-                subtitle="Validation failures"
-                icon={<XCircle className="h-4 w-4" />}
-                alert={health.ingest_consumer.messages_failed_1h > 0}
-              />
+            {/* Pipeline metrics */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <MetricCard title="Queue depth" value={fmt(health.ingest_queue.depth)} subtitle="Messages waiting"
+                icon={<MessageSquare className="h-5 w-5 text-blue-300" />} accent="bg-blue-400/15" />
+              <MetricCard title="DLQ depth" value={fmt(health.ingest_queue.dlq_depth)} subtitle="Failed messages"
+                icon={<AlertTriangle className="h-5 w-5" />} accent="bg-amber-400/15 text-amber-300" alert={health.ingest_queue.dlq_depth > 0} />
+              <MetricCard title="Processed (1h)" value={fmt(health.ingest_consumer.messages_processed_1h)} subtitle="Messages ingested"
+                icon={<CheckCircle className="h-5 w-5 text-emerald-300" />} accent="bg-emerald-400/15" />
+              <MetricCard title="Failed (1h)" value={fmt(health.ingest_consumer.messages_failed_1h)} subtitle="Validation failures"
+                icon={<XCircle className="h-5 w-5" />} accent="bg-rose-400/15 text-rose-300" alert={health.ingest_consumer.messages_failed_1h > 0} />
             </div>
 
-            {/* Customer Overview */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <MetricCard
-                title="Total Customers"
-                value={health.customers.total}
-                icon={<Database className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Active Customers"
-                value={health.customers.active}
-                icon={<CheckCircle className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Agents Healthy"
-                value={health.customers.agents_healthy}
-                subtitle="Reporting in last 20 min"
-                icon={<Activity className="h-4 w-4" />}
-              />
-              <MetricCard
-                title="Agents Offline"
-                value={health.customers.agents_offline}
-                subtitle="No heartbeat > 20 min"
-                icon={<XCircle className="h-4 w-4" />}
-                alert={health.customers.agents_offline > 0}
-              />
+            {/* Customer overview */}
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <MetricCard title="Total customers" value={fmt(health.customers.total)}
+                icon={<Database className="h-5 w-5 text-cyan-300" />} accent="bg-cyan-400/15" />
+              <MetricCard title="Active customers" value={fmt(health.customers.active)}
+                icon={<CheckCircle className="h-5 w-5 text-emerald-300" />} accent="bg-emerald-400/15" />
+              <MetricCard title="Agents healthy" value={fmt(health.customers.agents_healthy)} subtitle="< 20 min"
+                icon={<Activity className="h-5 w-5 text-violet-300" />} accent="bg-violet-400/15" />
+              <MetricCard title="Agents offline" value={fmt(health.customers.agents_offline)} subtitle="> 20 min"
+                icon={<XCircle className="h-5 w-5" />} accent="bg-rose-400/15 text-rose-300" alert={health.customers.agents_offline > 0} />
             </div>
 
-            {/* API Uptime */}
-            <div className="bg-white rounded-lg border p-5">
-              <h2 className="text-sm font-semibold text-gray-700 mb-2">API Uptime</h2>
-              <p className="text-2xl font-bold text-gray-900">
-                {formatUptime(health.api_service.uptime_seconds)}
-              </p>
+            {/* Uptime */}
+            <div className="glass-card p-5">
+              <h2 className="mb-1 text-sm font-semibold text-muted-ink">API uptime</h2>
+              <p className="text-3xl font-bold tracking-tight gradient-text">{formatUptime(health.api_service.uptime_seconds)}</p>
             </div>
 
-            {/* Recent Errors */}
-            <div className="bg-white rounded-lg border overflow-hidden">
-              <div className="px-5 py-4 border-b">
-                <h2 className="text-sm font-semibold text-gray-700">Recent Errors</h2>
+            {/* Recent errors */}
+            <div className="glass-card overflow-hidden">
+              <div className="border-b border-white/10 px-5 py-4">
+                <h2 className="text-sm font-semibold text-muted-ink">Recent errors</h2>
               </div>
               {health.recent_errors.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-gray-400">
-                  <CheckCircle className="h-8 w-8 mb-2 text-green-400" />
+                <div className="flex flex-col items-center justify-center py-12 text-faint-ink">
+                  <CheckCircle className="mb-2 h-8 w-8 text-emerald-400" />
                   <p className="text-sm">No recent errors</p>
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className="divide-y divide-white/[0.06]">
                   {health.recent_errors.map((err, i) => (
-                    <div key={i} className="px-5 py-3 flex items-start gap-3">
-                      <XCircle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-0.5">
-                          <span className="text-xs font-mono bg-gray-100 px-1.5 py-0.5 rounded text-gray-600">
-                            {err.service}
-                          </span>
-                          <span className="text-xs text-gray-400">{formatRelativeTime(err.timestamp)}</span>
+                    <div key={i} className="flex items-start gap-3 px-5 py-3.5">
+                      <XCircle className="mt-0.5 h-4 w-4 flex-shrink-0 text-rose-400" />
+                      <div className="min-w-0 flex-1">
+                        <div className="mb-0.5 flex items-center gap-2">
+                          <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-xs text-muted-ink">{err.service}</span>
+                          <span className="text-xs text-faint-ink">{formatRelativeTime(err.timestamp)}</span>
                         </div>
-                        <p className="text-sm text-gray-700 truncate">{err.message}</p>
+                        <p className="truncate text-sm text-ink">{err.message}</p>
                       </div>
                     </div>
                   ))}
