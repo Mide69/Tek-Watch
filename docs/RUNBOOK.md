@@ -42,7 +42,7 @@ aws ecs describe-services \
    ```bash
    aws logs tail /ecs/tek-watch-ingest-consumer --follow
    ```
-3. Check Timestream write capacity — look for `RejectedRecords` in consumer logs.
+3. Check DynamoDB write throttling on the metrics/events tables — look for write errors in consumer logs.
 4. If consumer is crashing: check the ECR image tag matches the deployed task definition.
 5. Scale up the consumer service if processing is too slow:
    ```bash
@@ -56,9 +56,8 @@ aws ecs describe-services \
    ```bash
    aws logs tail /ecs/tek-watch-api --follow
    ```
-2. Check DynamoDB throttling metrics in CloudWatch.
-3. Check Timestream query latency.
-4. Roll back if a recent deploy caused the spike:
+2. Check DynamoDB throttling metrics in CloudWatch (incl. the metrics/events tables and the `gsi_customer_time` index).
+3. Roll back if a recent deploy caused the spike:
    ```bash
    # Redeploy previous task definition revision
    aws ecs update-service --cluster tek-watch-<env> \
