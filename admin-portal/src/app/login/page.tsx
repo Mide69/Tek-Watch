@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield } from 'lucide-react'
+import { Shield, ArrowRight } from 'lucide-react'
 import { configureAmplify, adminSignIn, adminConfirmMfa, getAdminToken } from '@/lib/auth'
 import { isDemoMode } from '@/lib/demoMode'
 import adminApi from '@/lib/api'
@@ -12,14 +12,13 @@ const DEMO = isDemoMode()
 
 export default function AdminLoginPage() {
   const router = useRouter()
-  const [email, setEmail]       = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [mfaCode, setMfaCode]   = useState('')
-  const [showMfa, setShowMfa]   = useState(false)
-  const [error, setError]       = useState('')
-  const [loading, setLoading]   = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
+  const [showMfa, setShowMfa] = useState(false)
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  // Redirect if already authenticated
   useEffect(() => {
     const token = getAdminToken()
     if (token) {
@@ -50,18 +49,15 @@ export default function AdminLoginPage() {
 
     try {
       if (!showMfa) {
-        // Step 1: email + password
         const { mfaRequired } = await adminSignIn(email, password)
         if (mfaRequired) {
           setShowMfa(true)
         } else {
-          // No MFA (dev mode or MFA not configured)
           const token = getAdminToken()
           if (token) adminApi.setToken(token)
           router.push('/customers')
         }
       } else {
-        // Step 2: TOTP code
         if (!mfaCode || mfaCode.length !== 6) {
           throw new Error('Enter the 6-digit code from your authenticator app')
         }
@@ -78,24 +74,26 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-700 to-blue-900 p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-2xl p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-100 rounded-2xl mb-4">
-              <Shield className="h-8 w-8 text-blue-600" />
-            </div>
-            <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
-            <p className="text-sm text-gray-500 mt-1">Tek Watch Platform Management</p>
+    <div className="flex min-h-screen items-center justify-center p-4">
+      <div className="w-full max-w-md animate-fade-up">
+        {/* Brand mark */}
+        <div className="mb-8 flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl aurora-grad shadow-2xl shadow-violet-900/50">
+            <Shield className="h-8 w-8 text-white" />
           </div>
+          <h1 className="text-3xl font-bold tracking-tight">
+            <span className="gradient-text">Tek Watch</span>
+          </h1>
+          <p className="mt-1 text-sm text-muted-ink">Platform Admin · command center</p>
+        </div>
 
+        <div className="glass-card p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
             {!showMfa ? (
               <>
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Email Address
+                  <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                    Email address
                   </label>
                   <input
                     id="email"
@@ -103,14 +101,13 @@ export default function AdminLoginPage() {
                     required
                     autoComplete="email"
                     value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="input-glass"
                     placeholder="admin@tektribe.io"
                   />
                 </div>
-
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1.5">
+                  <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-muted-ink">
                     Password
                   </label>
                   <input
@@ -119,20 +116,19 @@ export default function AdminLoginPage() {
                     required
                     autoComplete="current-password"
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    className="w-full px-3.5 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="input-glass"
+                    placeholder="••••••••••••"
                   />
                 </div>
               </>
             ) : (
               <div>
-                <div className="text-center mb-4">
-                  <p className="text-sm text-gray-600">
-                    Enter the 6-digit code from your authenticator app
-                  </p>
-                </div>
-                <label htmlFor="mfaCode" className="block text-sm font-medium text-gray-700 mb-1.5">
-                  MFA Code
+                <p className="mb-4 text-center text-sm text-muted-ink">
+                  Enter the 6-digit code from your authenticator app
+                </p>
+                <label htmlFor="mfaCode" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                  MFA code
                 </label>
                 <input
                   id="mfaCode"
@@ -143,15 +139,19 @@ export default function AdminLoginPage() {
                   inputMode="numeric"
                   autoComplete="one-time-code"
                   value={mfaCode}
-                  onChange={e => setMfaCode(e.target.value.replace(/\D/g, ''))}
-                  className="w-full px-3.5 py-3 border border-gray-300 rounded-lg text-center text-2xl tracking-[0.5em] font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onChange={(e) => setMfaCode(e.target.value.replace(/\D/g, ''))}
+                  className="input-glass text-center font-mono text-2xl tracking-[0.5em]"
                   placeholder="000000"
                   autoFocus
                 />
                 <button
                   type="button"
-                  onClick={() => { setShowMfa(false); setMfaCode(''); setError('') }}
-                  className="mt-3 text-sm text-blue-600 hover:text-blue-700"
+                  onClick={() => {
+                    setShowMfa(false)
+                    setMfaCode('')
+                    setError('')
+                  }}
+                  className="mt-3 text-sm text-violet-300 hover:text-violet-200"
                 >
                   ← Back to login
                 </button>
@@ -159,53 +159,39 @@ export default function AdminLoginPage() {
             )}
 
             {error && (
-              <div className="p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+              <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
                 {error}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-2.5 px-4 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {loading
-                ? 'Authenticating…'
-                : showMfa
-                  ? 'Verify Code'
-                  : 'Continue'}
+            <button type="submit" disabled={loading} className="btn-primary w-full">
+              {loading ? 'Authenticating…' : showMfa ? 'Verify code' : 'Continue'}
+              {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
           </form>
 
           {DEMO && (
             <div className="mt-5">
               <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-200" /></div>
-                <div className="relative flex justify-center text-xs"><span className="bg-white px-2 text-gray-400">demo</span></div>
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-white/10" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-transparent px-3 text-xs uppercase tracking-widest text-faint-ink">demo</span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={enterDemo}
-                disabled={loading}
-                className="w-full py-2.5 px-4 border border-blue-600 text-blue-700 rounded-lg text-sm font-medium hover:bg-blue-50 disabled:opacity-50 transition-colors"
-              >
-                Enter demo (no credentials needed)
+              <button type="button" onClick={enterDemo} disabled={loading} className="btn-ghost w-full">
+                Enter demo — no credentials needed
               </button>
-              <p className="mt-2 text-center text-xs text-gray-400">
-                Sample data only — no AWS backend. Or sign in above with any email/password.
+              <p className="mt-2 text-center text-xs text-faint-ink">
+                Sample data only · no AWS backend · or sign in above with any email/password
               </p>
             </div>
           )}
+        </div>
 
-          <div className="mt-6 text-center text-xs text-gray-400 space-y-1">
-            <p>Admin access only. All actions are logged.</p>
-            <p>
-              Need help?{' '}
-              <a href="mailto:ops@tektribe.io" className="text-blue-500 hover:underline">
-                ops@tektribe.io
-              </a>
-            </p>
-          </div>
+        <div className="mt-6 text-center text-xs text-faint-ink">
+          <p>Admin access only · all actions are logged</p>
         </div>
       </div>
     </div>
