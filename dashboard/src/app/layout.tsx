@@ -1,19 +1,20 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import { Inter, Space_Grotesk } from 'next/font/google'
 import { ThemeProvider } from '@/contexts/ThemeContext'
 import './globals.css'
 
-const inter = Inter({ subsets: ['latin'] })
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
+const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-display' })
 
 export const metadata: Metadata = {
-  title: 'Tek Watch — AWS Infrastructure Intelligence',
-  description: 'AI-powered cloud monitoring platform for MSPs and cloud-first teams. Real-time AWS visibility across every region.',
+  title: 'TekWatch — AI-Powered Cloud Intelligence for UK SMEs',
+  description: 'Real-time AWS monitoring, AI anomaly detection, and built-in UK GDPR & Cyber Essentials Plus compliance — priced for SMEs, not enterprises.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${spaceGrotesk.variable} font-sans`}>
         <ThemeProvider>
           {children}
         </ThemeProvider>
