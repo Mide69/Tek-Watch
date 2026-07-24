@@ -2,7 +2,12 @@ variable "name_prefix" { type = string }
 variable "environment" { type = string }
 variable "aws_region" { type = string }
 variable "vpc_id" { type = string }
-variable "private_subnet_ids" { type = list(string) }
+variable "task_subnet_ids" { type = list(string) }
+variable "assign_public_ip" {
+  description = "Assign a public IP to ECS tasks. True when task_subnet_ids are public subnets (no NAT gateway); false for private subnets."
+  type        = bool
+  default     = false
+}
 variable "alb_security_group_id" { type = string }
 variable "alb_target_group_arn" { type = string }
 variable "api_image_uri" { type = string }
@@ -55,13 +60,13 @@ resource "aws_ecs_cluster_capacity_providers" "main" {
 
 resource "aws_cloudwatch_log_group" "api" {
   name              = "/ecs/${var.name_prefix}/api"
-  retention_in_days = 30
+  retention_in_days = 14
   tags              = { Name = "${var.name_prefix}-api-logs" }
 }
 
 resource "aws_cloudwatch_log_group" "consumer" {
   name              = "/ecs/${var.name_prefix}/ingest-consumer"
-  retention_in_days = 30
+  retention_in_days = 14
   tags              = { Name = "${var.name_prefix}-consumer-logs" }
 }
 
@@ -288,9 +293,9 @@ resource "aws_ecs_service" "api" {
   force_new_deployment              = true
 
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   load_balancer {
@@ -350,13 +355,21 @@ resource "aws_ecs_service" "consumer" {
   cluster              = aws_ecs_cluster.main.id
   task_definition      = aws_ecs_task_definition.consumer.arn
   desired_count        = var.consumer_desired_count
-  launch_type          = "FARGATE"
   force_new_deployment = true
 
+  # Fargate Spot — the consumer is an SQS poller with no user-facing latency
+  # requirement; a Spot reclaim just means the in-flight message becomes
+  # visible again after sqs_visibility_timeout_seconds and another task picks
+  # it up. ~70% cheaper than on-demand for a workload that tolerates this.
+  capacity_provider_strategy {
+    capacity_provider = "FARGATE_SPOT"
+    weight            = 1
+  }
+
   network_configuration {
-    subnets          = var.private_subnet_ids
+    subnets          = var.task_subnet_ids
     security_groups  = [aws_security_group.ecs_tasks.id]
-    assign_public_ip = false
+    assign_public_ip = var.assign_public_ip
   }
 
   deployment_circuit_breaker {
@@ -413,7 +426,7 @@ resource "aws_appautoscaling_policy" "api_cpu" {
 
 resource "aws_cloudwatch_log_group" "agent" {
   name              = "/ecs/${var.name_prefix}/agent"
-  retention_in_days = 30
+  retention_in_days = 14
   tags              = { Name = "${var.name_prefix}-agent-logs" }
 }
 
@@ -570,12 +583,18 @@ resource "aws_cloudwatch_event_target" "agent" {
   ecs_target {
     task_definition_arn = aws_ecs_task_definition.agent.arn
     task_count          = 1
-    launch_type         = "FARGATE"
+
+    # Fargate Spot — a 5-minute scheduled batch job that publishes to SQS and
+    # exits; a Spot reclaim just delays that run to the next schedule tick.
+    capacity_provider_strategy {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 1
+    }
 
     network_configuration {
-      subnets          = var.private_subnet_ids
+      subnets          = var.task_subnet_ids
       security_groups  = [aws_security_group.agent_task.id]
-      assign_public_ip = false
+      assign_public_ip = var.assign_public_ip
     }
   }
 }

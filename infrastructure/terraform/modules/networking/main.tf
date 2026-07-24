@@ -9,6 +9,12 @@ variable "acm_certificate_arn" {
   default = ""
 }
 
+variable "enable_nat_gateway" {
+  description = "Create NAT gateways for private-subnet egress. When false, ECS tasks run in public subnets with public IPs instead (SG-locked to ALB-only inbound) — saves ~$33-45/mo per NAT gateway with no functional loss for a service that only ever accepts inbound via the ALB."
+  type        = bool
+  default     = true
+}
+
 # ── VPC ───────────────────────────────────────────────────────────────────────
 
 resource "aws_vpc" "main" {
@@ -45,13 +51,13 @@ resource "aws_subnet" "private" {
 # ── NAT Gateways ──────────────────────────────────────────────────────────────
 
 resource "aws_eip" "nat" {
-  count  = length(var.availability_zones)
+  count  = var.enable_nat_gateway ? length(var.availability_zones) : 0
   domain = "vpc"
   tags   = { Name = "${var.name_prefix}-nat-eip-${count.index + 1}" }
 }
 
 resource "aws_nat_gateway" "main" {
-  count         = length(var.availability_zones)
+  count         = var.enable_nat_gateway ? length(var.availability_zones) : 0
   allocation_id = aws_eip.nat[count.index].id
   subnet_id     = aws_subnet.public[count.index].id
   tags          = { Name = "${var.name_prefix}-nat-${count.index + 1}" }
@@ -78,10 +84,15 @@ resource "aws_route_table_association" "public" {
 resource "aws_route_table" "private" {
   count  = length(var.availability_zones)
   vpc_id = aws_vpc.main.id
-  route {
-    cidr_block     = "0.0.0.0/0"
-    nat_gateway_id = aws_nat_gateway.main[count.index].id
+
+  dynamic "route" {
+    for_each = var.enable_nat_gateway ? [1] : []
+    content {
+      cidr_block     = "0.0.0.0/0"
+      nat_gateway_id = aws_nat_gateway.main[count.index].id
+    }
   }
+
   tags = { Name = "${var.name_prefix}-private-rt-${count.index + 1}" }
 }
 
