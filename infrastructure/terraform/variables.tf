@@ -45,6 +45,12 @@ variable "public_subnet_cidrs" {
   default     = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 }
 
+variable "enable_nat_gateway" {
+  description = "Create NAT gateways for private-subnet egress. False runs ECS tasks in public subnets instead (SG-locked to ALB-only inbound) to skip the ~$33-45/mo per-gateway cost."
+  type        = bool
+  default     = true
+}
+
 # ── ECS ───────────────────────────────────────────────────────────────────────
 
 variable "api_cpu" {

@@ -58,6 +58,11 @@ locals {
   # match your actual DNS plan.
   dashboard_domain = var.environment == "prod" ? "app.${var.domain_name}" : "${var.environment}.${var.domain_name}"
   admin_domain     = var.environment == "prod" ? "admin.${var.domain_name}" : "admin-${var.environment}.${var.domain_name}"
+
+  # Without a NAT gateway, ECS tasks have no private-subnet egress path, so
+  # they run in public subnets with a public IP instead (still SG-locked to
+  # ALB-only inbound — see modules/networking's enable_nat_gateway doc).
+  ecs_task_subnet_ids = var.enable_nat_gateway ? module.networking.private_subnet_ids : module.networking.public_subnet_ids
 }
 
 # ── SNS — Ops Alerts (created before modules to avoid circular dependency) ────
@@ -80,6 +85,7 @@ module "networking" {
   private_subnet_cidrs = var.private_subnet_cidrs
   public_subnet_cidrs  = var.public_subnet_cidrs
   acm_certificate_arn  = var.acm_certificate_arn
+  enable_nat_gateway   = var.enable_nat_gateway
 }
 
 # ── ECR ───────────────────────────────────────────────────────────────────────
@@ -152,7 +158,8 @@ module "ecs" {
   aws_region  = var.aws_region
 
   vpc_id                = module.networking.vpc_id
-  private_subnet_ids    = module.networking.private_subnet_ids
+  task_subnet_ids       = local.ecs_task_subnet_ids
+  assign_public_ip      = !var.enable_nat_gateway
   alb_security_group_id = module.networking.alb_security_group_id
   alb_target_group_arn  = module.networking.api_target_group_arn
 
