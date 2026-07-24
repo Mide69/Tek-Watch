@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useId } from 'react'
+import { useState, useId, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, Award, BadgeCheck, ShieldCheck,
   ArrowRight, Check, Gavel, PoundSterling, BarChart3,
-  Linkedin, Youtube, Mail, MapPin,
+  Linkedin, Youtube, Mail, MapPin, Bot, Sparkles, Key, Users,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -39,6 +39,51 @@ const serviceCostData = [
   { service: 'Other', cost: 195 },
 ]
 const maxServiceCost = Math.max(...serviceCostData.map(d => d.cost))
+
+const SERVICE_COLORS = ['#818cf8', '#22d3ee', '#fbbf24', '#34d399', '#f97316', '#a78bfa']
+const DONUT_R = 62, DONUT_CX = 78, DONUT_CY = 78
+const donutCirc = 2 * Math.PI * DONUT_R
+const donutTotal = serviceCostData.reduce((s, d) => s + d.cost, 0)
+const donutSegments = serviceCostData.reduce<{ frac: number; offset: number; color: string }[]>((acc, d, i) => {
+  const frac = d.cost / donutTotal
+  const offset = acc.length ? acc[acc.length - 1].offset + acc[acc.length - 1].frac : 0
+  acc.push({ frac, offset, color: SERVICE_COLORS[i % SERVICE_COLORS.length] })
+  return acc
+}, [])
+
+const guardDutyPreview = [
+  { title: 'UnauthorizedAccess:IAMUser/ConsoleLoginSuccess.B', severity: 'MEDIUM', resource: 'IAM · admin-ci-user', age: '2h ago' },
+  { title: 'Recon:EC2/PortProbeUnprotectedPort', severity: 'LOW', resource: 'EC2 · web-server-03', age: '1d ago' },
+]
+
+const compliancePreview = [
+  { label: 'UK GDPR', score: 96 },
+  { label: 'Cyber Essentials Plus', score: 91 },
+  { label: 'FCA PS21/3', score: 78 },
+  { label: 'ISO 27001', score: 88 },
+]
+
+const securitySummaryTiles = [
+  { icon: AlertTriangle, label: 'GuardDuty Findings', value: '2', tone: 'text-red-400', bg: 'bg-red-500/10 border-red-500/20' },
+  { icon: Users, label: 'Users w/o MFA', value: '1', tone: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+  { icon: Key, label: 'Old Access Keys', value: '3', tone: 'text-amber-400', bg: 'bg-amber-500/10 border-amber-500/20' },
+  { icon: ShieldCheck, label: 'Certs Expiring <30d', value: '0', tone: 'text-emerald-400', bg: 'bg-emerald-500/10 border-emerald-500/20' },
+]
+
+const chatExchange = {
+  question: 'Why did my AWS bill spike this week?',
+  answer: 'Your spend jumped 18% on Tuesday — mostly EC2. Three on-demand instances in eu-west-2 have run at steady utilisation for 30 days straight; switching them to Reserved would save roughly £140/month.',
+  tools: ['Cost breakdown', 'EC2 instances'],
+}
+
+const previewTabs = [
+  { id: 'overview', label: 'Overview', path: '/overview' },
+  { id: 'security', label: 'Security', path: '/security' },
+  { id: 'cost', label: 'Cost', path: '/cost' },
+  { id: 'assistant', label: 'AI Assistant', path: '/chat' },
+] as const
+
+type PreviewTabId = typeof previewTabs[number]['id']
 
 const statTiles = [
   { icon: Cpu, label: 'Monitored Resources', value: '847', delta: '+12%', good: true, sub: 'vs last month', trend: [620, 640, 655, 670, 690, 705, 720, 735, 760, 780, 810, 847] },
@@ -99,6 +144,20 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
 
 export default function LandingPage() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
+  const [activeTab, setActiveTab] = useState<PreviewTabId>('overview')
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    const id = setTimeout(() => {
+      setActiveTab(prev => {
+        const idx = previewTabs.findIndex(t => t.id === prev)
+        return previewTabs[(idx + 1) % previewTabs.length].id
+      })
+    }, 6000)
+    return () => clearTimeout(id)
+  }, [activeTab])
+
+  const activePath = previewTabs.find(t => t.id === activeTab)?.path ?? '/overview'
 
   return (
     <div className="dark min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -228,20 +287,40 @@ export default function LandingPage() {
         <section className="relative px-6 pb-24">
           <div className="max-w-5xl mx-auto">
             <div className="rounded-lg border border-border bg-card/90 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/50">
+              {/* Fake browser tab strip — doubles as the view switcher */}
+              <div className="flex items-center gap-1 px-3 pt-3 bg-black/20 border-b border-border overflow-x-auto">
+                {previewTabs.map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    aria-current={activeTab === tab.id ? 'true' : undefined}
+                    className={`flex-shrink-0 px-3.5 py-2 rounded-t-md text-xs font-medium font-mono transition-colors ${
+                      activeTab === tab.id
+                        ? 'bg-card text-foreground border border-b-0 border-border'
+                        : 'text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
               {/* Mock browser chrome */}
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-black/20">
                 <div className="w-3 h-3 rounded-full bg-red-400/70" />
                 <div className="w-3 h-3 rounded-full bg-amber-400/70" />
                 <div className="w-3 h-3 rounded-full bg-emerald-400/70" />
                 <div className="flex-1 mx-4">
-                  <div className="h-5 rounded-md bg-background border border-border w-72 mx-auto flex items-center justify-center">
-                    <span className="text-xs text-muted-foreground">app.tekwatch.co.uk/overview</span>
+                  <div className="h-5 rounded-md bg-background border border-border w-72 mx-auto flex items-center justify-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs text-muted-foreground font-mono">app.tekwatch.co.uk{activePath}</span>
                   </div>
                 </div>
               </div>
 
               {/* Mock dashboard */}
-              <div className="p-5 space-y-3">
+              <div key={activeTab} className="p-5 space-y-3 animate-fade-in">
+              {activeTab === 'overview' && (<>
                 {/* Stat tiles */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {statTiles.map(s => (
@@ -357,6 +436,149 @@ export default function LandingPage() {
                   <div className="text-xs text-foreground/80 flex-1">CPU utilisation on web-server-01 is 92.4% (threshold: 80%)</div>
                   <div className="text-xs text-muted-foreground">15m ago</div>
                 </div>
+              </>)}
+
+              {activeTab === 'security' && (<>
+                {/* Summary tiles */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {securitySummaryTiles.map(s => (
+                    <div key={s.label} className="rounded-xl border border-border bg-background/60 p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">{s.label}</span>
+                        <div className={`w-6 h-6 rounded-md border flex items-center justify-center ${s.bg}`}>
+                          <s.icon className={`w-3.5 h-3.5 ${s.tone}`} />
+                        </div>
+                      </div>
+                      <div className={`font-mono text-2xl font-semibold ${s.tone}`}>{s.value}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Compliance posture bars */}
+                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                  <div className="text-xs text-muted-foreground mb-3">Compliance Posture — 4 frameworks</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                    {compliancePreview.map(c => (
+                      <div key={c.label}>
+                        <div className="flex items-center justify-between mb-1.5 text-xs">
+                          <span className="text-foreground/80">{c.label}</span>
+                          <span className="font-mono font-semibold text-foreground">{c.score}%</span>
+                        </div>
+                        <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div
+                            className={`h-full rounded-full ${c.score >= 90 ? 'bg-emerald-400' : c.score >= 75 ? 'bg-amber-400' : 'bg-red-400'}`}
+                            style={{ width: `${c.score}%` }}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* GuardDuty findings */}
+                <div className="rounded-xl border border-border bg-background/60 p-4">
+                  <div className="text-xs text-muted-foreground mb-3">GuardDuty Findings</div>
+                  <div className="space-y-2">
+                    {guardDutyPreview.map(f => (
+                      <div key={f.title} className="flex items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5">
+                        <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                          f.severity === 'MEDIUM' ? 'text-amber-400 bg-amber-500/10 border border-amber-500/20' : 'text-muted-foreground bg-white/5 border border-white/10'
+                        }`}>{f.severity}</span>
+                        <span className="text-xs text-foreground/80 flex-1 truncate">{f.title}</span>
+                        <span className="text-[11px] text-muted-foreground hidden sm:inline">{f.resource}</span>
+                        <span className="text-[11px] text-muted-foreground flex-shrink-0">{f.age}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>)}
+
+              {activeTab === 'cost' && (<>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Donut breakdown */}
+                  <div className="rounded-xl border border-border bg-background/60 p-4">
+                    <div className="text-xs text-muted-foreground mb-3">MTD Spend by Service</div>
+                    <div className="flex items-center gap-5">
+                      <svg width={156} height={156} viewBox="0 0 156 156" className="flex-shrink-0" aria-hidden="true">
+                        {donutSegments.map(s => (
+                          <circle
+                            key={s.color}
+                            cx={DONUT_CX} cy={DONUT_CY} r={DONUT_R}
+                            fill="none" stroke={s.color} strokeWidth={18}
+                            strokeDasharray={`${s.frac * donutCirc} ${donutCirc}`}
+                            strokeDashoffset={-s.offset * donutCirc}
+                            transform={`rotate(-90 ${DONUT_CX} ${DONUT_CY})`}
+                          />
+                        ))}
+                        <text x={DONUT_CX} y={DONUT_CY - 4} textAnchor="middle" fill="#e2eaf4" fontSize={16} fontFamily="var(--font-mono)" fontWeight="600">
+                          £{donutTotal.toLocaleString('en-GB')}
+                        </text>
+                        <text x={DONUT_CX} y={DONUT_CY + 14} textAnchor="middle" fill="#64748b" fontSize={9}>MTD total</text>
+                      </svg>
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        {serviceCostData.map((d, i) => (
+                          <div key={d.service} className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-sm flex-shrink-0" style={{ background: SERVICE_COLORS[i % SERVICE_COLORS.length] }} />
+                            <span className="text-xs text-muted-foreground truncate flex-1">{d.service}</span>
+                            <span className="text-xs font-mono text-foreground">£{d.cost}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Forecast callout */}
+                  <div className="rounded-xl border border-border bg-background/60 p-4 flex flex-col justify-between">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-2">Month-End Forecast</div>
+                      <div className="font-mono text-3xl font-semibold text-foreground mb-1.5">£2,140</div>
+                      <div className="flex items-center gap-1 text-xs font-medium text-amber-400">
+                        <TrendingUp className="w-3 h-3" /> +8% <span className="text-muted-foreground font-normal">vs last month</span>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
+                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />
+                      <span className="text-[11px] text-foreground/80 leading-relaxed">
+                        AI flagged 2 cost anomalies this month — largest: an idle RDS instance running 24/7 in eu-west-1.
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </>)}
+
+              {activeTab === 'assistant' && (<>
+                <div className="rounded-xl border border-border bg-background/60 p-4 space-y-4">
+                  <div className="flex justify-end">
+                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-indigo-600 text-white text-sm px-4 py-2.5">
+                      {chatExchange.question}
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-full bg-white/5 border border-border flex items-center justify-center flex-shrink-0">
+                      <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                    </div>
+                    <div className="space-y-2 flex-1">
+                      <div className="rounded-2xl rounded-tl-sm bg-background border border-border text-foreground/90 text-sm leading-relaxed px-4 py-3">
+                        {chatExchange.answer}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {chatExchange.tools.map(t => (
+                          <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                            <Sparkles className="w-2.5 h-2.5" />
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-border bg-background/60 p-3 flex items-center gap-2 text-xs text-muted-foreground">
+                  <span className="flex-1">Ask about cost, security, or anything in your AWS estate...</span>
+                  <span className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                    <ArrowRight className="w-3 h-3 text-white" />
+                  </span>
+                </div>
+              </>)}
               </div>
             </div>
           </div>
