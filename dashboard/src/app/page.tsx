@@ -107,10 +107,10 @@ export default function LandingPage() {
       <nav className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Radio className="w-4 h-4 text-white" />
+            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center">
+              <Radio className="w-4 h-4 text-white" strokeWidth={2.25} />
             </div>
-            <span className="font-display font-bold text-foreground text-base tracking-tight">TekWatch</span>
+            <span className="font-semibold text-foreground text-base tracking-tight">TekWatch</span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             <a href="#features" className="hover:text-foreground transition-colors">Platform</a>
@@ -123,7 +123,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/overview"
-              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg transition-colors shadow-md shadow-indigo-500/20"
+              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-md transition-colors"
             >
               Live Demo <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -135,46 +135,21 @@ export default function LandingPage() {
       {/* ── Hero + Dashboard Preview (forced-dark zone) ─────── */}
       <div className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_30%,transparent_75%)]" />
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[1000px] h-[560px] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none animate-glow-breathe" />
-
-        {/* Orbit graphic */}
-        <div className="hidden lg:block absolute top-24 -right-32 w-[680px] h-[680px] pointer-events-none opacity-80 animate-drift" aria-hidden="true">
-          <svg viewBox="0 0 640 640" className="w-full h-full">
-            <circle cx="320" cy="320" r="90" fill="none" stroke="rgba(129,140,248,0.16)" strokeWidth="1" />
-            <circle cx="320" cy="320" r="180" fill="none" stroke="rgba(129,140,248,0.12)" strokeWidth="1" />
-            <circle cx="320" cy="320" r="270" fill="none" stroke="rgba(129,140,248,0.08)" strokeWidth="1" />
-            <circle cx="320" cy="320" r="42" fill="rgba(99,102,241,0.18)" />
-            <circle cx="320" cy="320" r="16" fill="#6366f1" className="animate-pulse-ring" />
-            <g className="animate-orbit" style={{ transformOrigin: '320px 320px' }}>
-              <circle cx="320" cy="140" r="4" fill="#818cf8" className="animate-node-pulse" />
-              <circle cx="470" cy="230" r="3" fill="#a78bfa" className="animate-node-pulse" />
-              <circle cx="470" cy="410" r="3.5" fill="#818cf8" className="animate-node-pulse" />
-              <circle cx="320" cy="500" r="4" fill="#22d3ee" className="animate-node-pulse" />
-              <circle cx="170" cy="410" r="3" fill="#818cf8" className="animate-node-pulse" />
-              <circle cx="170" cy="230" r="3.5" fill="#a78bfa" className="animate-node-pulse" />
-            </g>
-            <g className="animate-orbit-slow" style={{ transformOrigin: '320px 320px' }}>
-              <circle cx="320" cy="50" r="3" fill="#22d3ee" className="animate-node-pulse" />
-              <circle cx="590" cy="320" r="3" fill="#818cf8" className="animate-node-pulse" />
-              <circle cx="320" cy="590" r="3" fill="#a78bfa" className="animate-node-pulse" />
-              <circle cx="50" cy="320" r="3" fill="#818cf8" className="animate-node-pulse" />
-            </g>
-          </svg>
-        </div>
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
 
         <section className="relative pt-20 pb-16 px-6">
           <div className="relative max-w-4xl mx-auto text-center">
-            <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 text-xs font-semibold tracking-wide mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+            <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 text-xs font-mono font-medium tracking-wide mb-8">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
               AI-POWERED CLOUD INTELLIGENCE, BUILT FOR UK SMEs
             </div>
 
             <h1
-              className="animate-fade-in-up font-display text-5xl md:text-7xl font-bold text-foreground leading-[1.05] mb-6 tracking-tight"
+              className="animate-fade-in-up text-4xl md:text-6xl font-semibold text-foreground leading-[1.1] mb-6 tracking-tight"
               style={{ animationDelay: '90ms' }}
             >
               Your AWS estate.<br />
-              <span className="animate-gradient-text bg-gradient-to-r from-indigo-400 via-violet-400 to-cyan-300 bg-clip-text text-transparent">
+              <span className="text-indigo-400">
                 Fully visible. Always compliant.
               </span>
             </h1>
@@ -195,13 +170,13 @@ export default function LandingPage() {
             >
               <Link
                 href="/overview"
-                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25 hover:shadow-indigo-500/40"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
               <a
                 href="#how-it-works"
-                className="flex items-center justify-center gap-2 px-6 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-xl transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-md transition-colors"
               >
                 See how it works
               </a>
@@ -219,24 +194,27 @@ export default function LandingPage() {
                 ['0', 'firewall changes needed'],
               ].map(([val, label], i) => (
                 <div key={label} className={`text-center px-6 py-2 ${i > 0 ? 'sm:border-l sm:border-border' : ''}`}>
-                  <div className="font-display text-2xl md:text-3xl font-bold text-foreground [font-variant-numeric:proportional-nums]">{val}</div>
+                  <div className="font-mono text-2xl md:text-3xl font-semibold text-foreground [font-variant-numeric:proportional-nums]">{val}</div>
                   <div className="text-muted-foreground text-xs mt-1">{label}</div>
                 </div>
               ))}
             </div>
 
             {/* Credibility strip */}
-            <div className="animate-fade-in-up mt-14 pt-8 border-t border-border" style={{ animationDelay: '450ms' }}>
-              <p className="text-center text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">
+            <div
+              className="animate-fade-in-up mt-14 rounded-lg border border-border bg-white/[0.03] px-6 py-6"
+              style={{ animationDelay: '450ms' }}
+            >
+              <p className="text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">
                 Built by AWS-certified cloud engineers
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3">
+              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
                 {[
                   { icon: Award, label: 'AWS Community Builder' },
                   { icon: BadgeCheck, label: '5× AWS Certified' },
                   { icon: ShieldCheck, label: 'ISC² Certified in Cybersecurity' },
                 ].map(b => (
-                  <div key={b.label} className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <div key={b.label} className="flex items-center gap-2 rounded-md border border-border bg-background/60 px-3.5 py-2 text-foreground/80 text-sm font-medium">
                     <b.icon className="w-4 h-4 text-indigo-400" />
                     {b.label}
                   </div>
@@ -249,7 +227,7 @@ export default function LandingPage() {
         {/* ── Dashboard Preview ──────────────────────────── */}
         <section className="relative px-6 pb-24">
           <div className="max-w-5xl mx-auto">
-            <div className="rounded-2xl border border-border bg-card/90 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/50 ring-1 ring-white/5">
+            <div className="rounded-lg border border-border bg-card/90 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/50">
               {/* Mock browser chrome */}
               <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-black/20">
                 <div className="w-3 h-3 rounded-full bg-red-400/70" />
@@ -273,7 +251,7 @@ export default function LandingPage() {
                           <s.icon className="w-3.5 h-3.5" />
                           {s.label}
                         </div>
-                        <div className="font-display text-2xl font-bold text-foreground mb-1.5">{s.value}</div>
+                        <div className="font-mono text-2xl font-semibold text-foreground mb-1.5">{s.value}</div>
                         <div className={`flex items-center gap-1 text-xs font-medium ${s.good ? 'text-emerald-400' : 'text-amber-400'}`}>
                           {s.good ? <TrendingDown className="w-3 h-3" /> : <TrendingUp className="w-3 h-3" />}
                           {s.delta} <span className="text-muted-foreground font-normal">{s.sub}</span>
@@ -337,7 +315,7 @@ export default function LandingPage() {
                         </RadialBarChart>
                       </ResponsiveContainer></div>
                       <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <span className="font-display text-2xl font-bold text-foreground">91%</span>
+                        <span className="font-mono text-2xl font-semibold text-foreground">91%</span>
                       </div>
                     </div>
                     <div className="mt-2 pt-2 border-t border-white/5 space-y-1.5">
@@ -390,7 +368,7 @@ export default function LandingPage() {
         <div className="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,#000_20%,transparent_75%)] opacity-60 pointer-events-none" />
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-red-400 mb-3">The Problem</p>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-red-400 mb-3">The Problem</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
               UK SMEs spend £28bn a year on AWS.<br className="hidden md:block" /> Most of it runs unmonitored.
             </h2>
@@ -404,7 +382,7 @@ export default function LandingPage() {
             {problemStats.map(s => (
               <div key={s.label} className="rounded-xl border border-white/10 bg-white/[0.03] p-5">
                 <s.icon className="w-5 h-5 text-red-400 mb-4" />
-                <div className="font-display text-3xl font-bold text-foreground mb-2 [font-variant-numeric:proportional-nums]">{s.value}</div>
+                <div className="font-mono text-3xl font-semibold text-foreground mb-2 [font-variant-numeric:proportional-nums]">{s.value}</div>
                 <p className="text-sm text-muted-foreground leading-snug mb-3">{s.label}</p>
                 <p className="text-[11px] text-muted-foreground/70">{s.source}</p>
               </div>
@@ -417,7 +395,7 @@ export default function LandingPage() {
       <section id="features" className="px-6 py-24 border-t border-border">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Capabilities</p>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Capabilities</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Everything your team needs</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               From real-time resource health to UK-specific compliance evidence — in one place.
@@ -469,7 +447,7 @@ export default function LandingPage() {
                 points: ['ECS Fargate', 'Read-only IAM role', 'Auto-deploy CloudFormation'],
               },
             ].map(f => (
-              <div key={f.title} className="group rounded-xl border border-white/10 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/20 p-5 transition-all hover:-translate-y-0.5 hover:shadow-lg">
+              <div key={f.title} className="group rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/20 p-5 transition-colors">
                 <div className={`w-10 h-10 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center mb-4`}>
                   <f.icon className={`w-5 h-5 ${f.color}`} />
                 </div>
@@ -494,7 +472,7 @@ export default function LandingPage() {
         <section className="px-6 py-24">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-16">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-3">Onboarding</p>
+              <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-3">Onboarding</p>
               <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Up and running in 30 minutes</h2>
               <p className="text-muted-foreground text-lg">No sales call. No credit card. No specialist knowledge required.</p>
             </div>
@@ -517,7 +495,7 @@ export default function LandingPage() {
               ].map((s, i) => (
                 <div key={s.title} className="relative">
                   <div className="relative z-10 w-12 h-12 rounded-full border border-indigo-400/30 bg-background flex items-center justify-center mb-5">
-                    <span className="font-display text-lg font-bold text-indigo-400">{i + 1}</span>
+                    <span className="font-mono text-lg font-semibold text-indigo-400">{i + 1}</span>
                   </div>
                   <h3 className="font-semibold text-foreground mb-2">{s.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
@@ -532,7 +510,7 @@ export default function LandingPage() {
       <section id="pricing" className="px-6 py-24 border-t border-border">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Pricing</p>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Pricing</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Simple, predictable pricing</h2>
             <p className="text-muted-foreground text-lg">Self-service SaaS. No implementation fees, no sales call required.</p>
           </div>
@@ -557,9 +535,9 @@ export default function LandingPage() {
             {pricingTiers.map(p => {
               const displayPrice = billing === 'annual' ? Math.round(p.monthly * (1 - p.discount)) : p.monthly
               return (
-                <div key={p.name} className={`rounded-2xl border p-6 relative ${
+                <div key={p.name} className={`rounded-lg border p-6 relative ${
                   p.highlight
-                    ? 'border-indigo-500/50 bg-white/[0.05] shadow-xl shadow-indigo-500/10 ring-1 ring-indigo-500/20'
+                    ? 'border-indigo-500/50 bg-white/[0.05]'
                     : 'border-white/10 bg-white/[0.03]'
                 }`}>
                   {p.highlight && (
@@ -569,7 +547,7 @@ export default function LandingPage() {
                   )}
                   <h3 className="font-semibold text-foreground mb-1">{p.name}</h3>
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="font-display text-3xl font-bold text-foreground [font-variant-numeric:proportional-nums]">£{displayPrice}</span>
+                    <span className="font-mono text-3xl font-semibold text-foreground [font-variant-numeric:proportional-nums]">£{displayPrice}</span>
                     <span className="text-sm text-muted-foreground">/month</span>
                   </div>
                   <div className="h-5 mb-2">
@@ -588,7 +566,7 @@ export default function LandingPage() {
                   </ul>
                   <Link
                     href="/overview"
-                    className={`block text-center py-2.5 rounded-xl text-sm font-semibold transition-colors ${
+                    className={`block text-center py-2.5 rounded-md text-sm font-semibold transition-colors ${
                       p.highlight
                         ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
                         : 'border border-border text-foreground hover:bg-accent'
@@ -610,7 +588,7 @@ export default function LandingPage() {
       {/* ── CTA + Footer (forced-dark band) ─────────────── */}
       <div className="bg-background border-t border-border">
         <section className="relative px-6 py-24 overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[400px] bg-indigo-600/15 rounded-full blur-[100px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[220px] bg-indigo-600/8 rounded-full blur-[90px] pointer-events-none" />
           <div className="relative max-w-2xl mx-auto text-center">
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
               See your AWS estate, clearly.
@@ -622,13 +600,13 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/overview"
-                className="flex items-center justify-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl transition-all shadow-lg shadow-indigo-500/25"
+                className="flex items-center justify-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
               <a
                 href="mailto:hello@tekwatch.co.uk"
-                className="flex items-center justify-center gap-2 px-8 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-xl transition-colors"
+                className="flex items-center justify-center gap-2 px-8 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-md transition-colors"
               >
                 Contact us
               </a>
@@ -644,10 +622,10 @@ export default function LandingPage() {
               {/* Brand */}
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-7 h-7 bg-gradient-to-br from-indigo-500 to-violet-600 rounded-lg flex items-center justify-center">
-                    <Radio className="w-3.5 h-3.5 text-white" />
+                  <div className="w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center">
+                    <Radio className="w-3.5 h-3.5 text-white" strokeWidth={2.25} />
                   </div>
-                  <span className="font-display font-bold text-foreground text-base">TekWatch</span>
+                  <span className="font-semibold text-foreground text-base">TekWatch</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed mb-5">
                   AI-powered AWS monitoring and UK compliance intelligence, built for SMEs by Tek Tribe Ltd —
