@@ -15,7 +15,8 @@ module.exports = {
     extend: {
       fontFamily: {
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
-        display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
+        display: ["var(--font-sans)", "system-ui", "sans-serif"],
+        mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
         border:      "hsl(var(--border) / <alpha-value>)",
@@ -65,12 +66,10 @@ module.exports = {
         sm: "calc(var(--radius) - 4px)",
       },
       keyframes: {
-        "fade-in":    { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },
-        "pulse-ring": { "0%, 100%": { opacity: "1" }, "50%": { opacity: "0.3" } },
+        "fade-in": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },
       },
       animation: {
-        "fade-in":    "fade-in 0.35s ease-out",
-        "pulse-ring": "pulse-ring 2s ease-in-out infinite",
+        "fade-in": "fade-in 0.35s ease-out",
       },
     },
   },

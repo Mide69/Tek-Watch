@@ -136,49 +136,13 @@
 .animate-fade-in { animation: fade-in 0.35s ease-out backwards; }
 .animate-fade-in-up { animation: fade-in 0.7s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
 
-/* ── Marketing page: grid + glow + orbit ──────────────── */
+/* ── Marketing page: background grid ──────────────────── */
 .bg-grid-pattern {
   background-image:
     linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
     linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
   background-size: 44px 44px;
 }
-@keyframes orbit-spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes orbit-spin-reverse {
-  from { transform: rotate(360deg); }
-  to   { transform: rotate(0deg); }
-}
-@keyframes node-pulse {
-  0%, 100% { opacity: 0.4; r: 2.5; }
-  50%      { opacity: 1;   r: 4; }
-}
-.animate-orbit { animation: orbit-spin 40s linear infinite; }
-.animate-orbit-slow { animation: orbit-spin-reverse 60s linear infinite; }
-.animate-node-pulse { animation: node-pulse 3s ease-in-out infinite; }
-
-@keyframes gradient-shift {
-  0%, 100% { background-position: 0% 50%; }
-  50%      { background-position: 100% 50%; }
-}
-.animate-gradient-text {
-  background-size: 200% auto;
-  animation: gradient-shift 6s ease-in-out infinite;
-}
-
-@keyframes glow-breathe {
-  0%, 100% { opacity: 0.7; transform: scale(1); }
-  50%      { opacity: 1;   transform: scale(1.06); }
-}
-.animate-glow-breathe { animation: glow-breathe 5s ease-in-out infinite; }
-
-@keyframes drift-y {
-  0%, 100% { transform: translateY(0px); }
-  50%      { transform: translateY(-10px); }
-}
-.animate-drift { animation: drift-y 7s ease-in-out infinite; }
 
 /* ── Respect reduced-motion preference ────────────────── */
 @media (prefers-reduced-motion: reduce) {
