@@ -3,6 +3,7 @@
 import { useState, useId, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { Plus_Jakarta_Sans } from 'next/font/google'
+import { LogoMark } from '@/components/ui/Logo'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, Award, BadgeCheck, ShieldCheck,
@@ -324,7 +325,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-cyan-600 rounded-md flex items-center justify-center">
-              <Radio className="w-4 h-4 text-white" strokeWidth={2.25} />
+              <LogoMark className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold text-foreground text-base tracking-tight">TekWatch</span>
           </div>
@@ -942,7 +943,7 @@ export default function LandingPage() {
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2.5 mb-4">
                   <div className="w-7 h-7 bg-cyan-600 rounded-md flex items-center justify-center">
-                    <Radio className="w-3.5 h-3.5 text-white" strokeWidth={2.25} />
+                    <LogoMark className="w-3.5 h-3.5 text-white" />
                   </div>
                   <span className="font-semibold text-foreground text-base">TekWatch</span>
                 </div>

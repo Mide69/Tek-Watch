@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import axios from 'axios'
-import { Radio, Check, ArrowRight } from 'lucide-react'
+import { Check, ArrowRight } from 'lucide-react'
+import { LogoMark } from '@/components/ui/Logo'
 import { isDemoMode } from '@/lib/demoMode'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -48,7 +49,7 @@ export default function SignupPage() {
         <div className="relative">
           <Link href="/" className="flex items-center gap-3 mb-10">
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
-              <Radio className="w-5 h-5 text-white" />
+              <LogoMark className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-white">TekWatch</span>
           </Link>
@@ -83,15 +84,15 @@ export default function SignupPage() {
         <div className="w-full max-w-md">
           <div className="flex items-center gap-2.5 mb-8 lg:hidden">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-              <Radio className="w-4 h-4 text-white" />
+              <LogoMark className="w-4 h-4 text-white" />
             </div>
             <span className="font-bold text-white">TekWatch</span>
           </div>
 
           {isDemoMode() ? (
             <div className="text-center">
-              <div className="w-16 h-16 bg-indigo-500/15 border border-indigo-500/25 rounded-full flex items-center justify-center mx-auto mb-5">
-                <Radio className="w-7 h-7 text-indigo-400" />
+              <div className="w-16 h-16 bg-cyan-500/15 border border-cyan-500/25 rounded-full flex items-center justify-center mx-auto mb-5">
+                <LogoMark className="w-7 h-7 text-cyan-400" />
               </div>
               <h1 className="text-xl font-bold text-white mb-2">This is a demo deployment</h1>
               <p className="text-slate-400 text-sm mb-6 leading-relaxed">
