@@ -181,3 +181,23 @@ class TestMetricsEndpoint:
             assert data["resource_id"] == "i-abc123"
             assert data["metric_name"] == "cpu_utilization_percent"
             assert "data" in data
+
+
+class TestAgentCfnTemplateEndpoint:
+    def test_returns_yaml_attachment_for_own_customer(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = {
+                "customer_id": "TT-0001", "name": "Acme Ltd",
+            }
+            resp = client.get("/api/v1/agent/cfn-template")
+            assert resp.status_code == 200
+            assert resp.headers["content-type"].startswith("application/x-yaml")
+            assert "attachment" in resp.headers["content-disposition"]
+            assert "TT-0001" in resp.text
+            assert "AgentTaskRole" in resp.text
+
+    def test_404_when_profile_missing(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = None
+            resp = client.get("/api/v1/agent/cfn-template")
+            assert resp.status_code == 404

@@ -1,11 +1,13 @@
-"""Agent router — agent health status and heartbeat history."""
+"""Agent router — agent health status, heartbeat history, and deployment template."""
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from auth.dependencies import CustomerContext, get_current_customer
+from config import load_config
+from services.cfn_template import generate_agent_template
 from services.dynamodb import DynamoDBService
 from services.timestream import TimestreamQueryService
 
@@ -106,3 +108,28 @@ async def get_agent_health(
         "collectors_enabled":     ALL_COLLECTORS,
         "version":                "1.0.0",
     }
+
+
+@router.get("/cfn-template")
+async def download_own_cfn_template(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Download the CloudFormation template for the logged-in customer's own agent."""
+    db = DynamoDBService()
+    profile = db.get_customer(customer.customer_id)
+
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer profile not found",
+        )
+
+    config = load_config()
+    template_yaml = generate_agent_template(customer.customer_id, profile.get("name", ""), config)
+    filename = f"tek-watch-agent-{customer.customer_id}.yaml"
+
+    return Response(
+        content=template_yaml,
+        media_type="application/x-yaml",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

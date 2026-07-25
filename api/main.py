@@ -39,6 +39,7 @@ from routers import (
     notifications,
     overview,
     security,
+    signup,
     storage,
 )
 from routers.admin import customers, operations, thresholds
@@ -168,6 +169,9 @@ def create_app() -> FastAPI:
     @app.get("/health", tags=["Health"])
     async def health_check():
         return {"status": "healthy", "environment": config.environment}
+
+    # ── Public routers (no auth) ──────────────────────────────────────────────
+    app.include_router(signup.router,         prefix="/api/v1/signup",       tags=["Signup"])
 
     # ── Customer dashboard routers ────────────────────────────────────────────
     app.include_router(overview.router,       prefix="/api/v1",              tags=["Overview"])

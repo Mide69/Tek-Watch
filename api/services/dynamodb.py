@@ -126,6 +126,17 @@ class DynamoDBService:
             logger.error("rotate_api_key failed for %s: %s", customer_id, exc)
             return None
 
+    def delete_customer(self, customer_id: str) -> bool:
+        """Delete a customer profile. Used to roll back a failed signup —
+        not exposed via any admin endpoint (customers are deactivated via
+        status, not deleted, once they have real data)."""
+        try:
+            self._customers.delete_item(Key={"customer_id": customer_id, "SK": "PROFILE"})
+            return True
+        except ClientError as exc:
+            logger.error("delete_customer failed for %s: %s", customer_id, exc)
+            return False
+
     def update_agent_heartbeat(self, customer_id: str, status: str = "healthy") -> None:
         """Update last_agent_seen and agent_status for a customer."""
         try:

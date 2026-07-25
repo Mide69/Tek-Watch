@@ -877,14 +877,14 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Link
-                    href="/overview"
+                    href="/signup"
                     className={`block text-center py-2.5 rounded-md text-sm font-semibold transition-colors ${
                       p.highlight
                         ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
                         : 'border border-border text-foreground hover:bg-accent'
                     }`}
                   >
-                    Try it live
+                    Start free trial
                   </Link>
                 </div>
               )
@@ -906,8 +906,8 @@ export default function LandingPage() {
               See your AWS estate, clearly.
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
-              Try the live demo instantly, no account needed. Want your own AWS environment
-              connected? Get in touch and we will set you up.
+              Try the live demo instantly, no account needed. Or create your account
+              and connect your own AWS environment in minutes.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -917,10 +917,10 @@ export default function LandingPage() {
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
-                href="/contact"
+                href="/signup"
                 className="flex items-center justify-center gap-2 px-8 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-md transition-colors"
               >
-                Contact us
+                Start free trial
               </Link>
             </div>
           </div>
@@ -976,6 +976,7 @@ export default function LandingPage() {
               <div>
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground mb-4">Company</h3>
                 <ul className="space-y-3 text-sm text-muted-foreground">
+                  <li><Link href="/signup" className="hover:text-foreground transition-colors">Sign up</Link></li>
                   <li><Link href="/login" className="hover:text-foreground transition-colors">Sign in</Link></li>
                   <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact us</Link></li>
                 </ul>

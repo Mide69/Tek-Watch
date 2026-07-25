@@ -139,6 +139,10 @@ export default function LoginPage() {
                     Try demo instead →
                   </Link>
                 </div>
+                <p className="text-center text-sm text-slate-500">
+                  Don&apos;t have an account?{' '}
+                  <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 transition-colors">Sign up</Link>
+                </p>
               </form>
             </>
           )}
@@ -187,7 +191,7 @@ export default function LoginPage() {
           )}
 
           <p className="mt-10 text-center text-xs text-slate-600">
-            Accounts are provisioned by Tek Watch administrators.{' '}
+            Need help signing in?{' '}
             <a href="mailto:support@tektribe.io" className="text-indigo-500 hover:text-indigo-400">
               support@tektribe.io
             </a>
