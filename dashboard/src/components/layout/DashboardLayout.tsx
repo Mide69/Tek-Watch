@@ -6,9 +6,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Activity, AlertTriangle, Database, DollarSign, Globe,
   HardDrive, LayoutDashboard, LogOut, Mail, Menu, MessageSquare,
-  RefreshCw, Server, Shield, X, Radio, CheckCircle,
+  RefreshCw, Server, Shield, X, CheckCircle,
   AlertCircle, Info, XCircle,
 } from 'lucide-react'
+import { LogoMark } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
 import { isDemoMode } from '@/lib/demoMode'
 import {
@@ -94,7 +95,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
       {/* Logo */}
       <div className="flex items-center gap-3 h-16 px-5 border-b border-sidebar-border">
         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
-          <Radio className="w-4 h-4 text-white" />
+          <LogoMark className="w-4 h-4 text-white" />
         </div>
         <span className="text-base font-bold text-sidebar-foreground tracking-tight">Tek Watch</span>
       </div>

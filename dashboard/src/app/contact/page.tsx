@@ -2,7 +2,8 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Radio, Mail, MapPin, Copy, Check, ArrowLeft, Send } from 'lucide-react'
+import { Mail, MapPin, Copy, Check, ArrowLeft, Send } from 'lucide-react'
+import { LogoMark } from '@/components/ui/Logo'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', company: '', message: '' })
@@ -40,7 +41,7 @@ export default function ContactPage() {
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center">
-              <Radio className="w-4 h-4 text-white" strokeWidth={2.25} />
+              <LogoMark className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold text-foreground text-base tracking-tight">TekWatch</span>
           </Link>
