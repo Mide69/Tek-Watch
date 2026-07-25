@@ -1,13 +1,77 @@
 'use client'
 
+import { useState } from 'react'
+import axios from 'axios'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
-import { Activity, CheckCircle, Radio, Clock, AlertTriangle } from 'lucide-react'
+import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
+import { isDemoMode } from '@/lib/demoMode'
+import apiClient from '@/lib/api'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+
+function DeployAgentCard({ customerId }: { customerId: string }) {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+
+  async function handleDownload() {
+    setError('')
+    setDownloading(true)
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/agent/cfn-template`, {
+        headers: { Authorization: `Bearer ${apiClient.getToken()}` },
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `tek-watch-agent-${customerId}.yaml`
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Could not download the template right now. Please try again shortly.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Card className="border-indigo-500/20 bg-indigo-500/5">
+      <CardContent className="p-5">
+        <div className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <h3 className="font-semibold text-foreground mb-1">Deploy your monitoring agent</h3>
+            <p className="text-sm text-muted-foreground max-w-xl">
+              Download your pre-filled CloudFormation template and deploy the read-only
+              agent into your own AWS account. Takes about 30 minutes, no inbound
+              firewall changes needed.
+            </p>
+            {error && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{error}</p>}
+          </div>
+          {isDemoMode() ? (
+            <span className="text-xs text-muted-foreground px-3 py-2">
+              Available on a real account, not this demo
+            </span>
+          ) : (
+            <button
+              onClick={handleDownload}
+              disabled={downloading}
+              className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-lg disabled:opacity-50 transition-colors flex-shrink-0"
+            >
+              <Download className="w-4 h-4" />
+              {downloading ? 'Preparing…' : 'Download CloudFormation Template'}
+            </button>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
 
 export default function AgentPage() {
   const { customerId }      = useAuth()
@@ -38,6 +102,8 @@ export default function AgentPage() {
             Collection agent running in the customer&apos;s AWS account
           </p>
         </div>
+
+        <DeployAgentCard customerId={customerId || a.customer_id} />
 
         {/* Status hero */}
         <Card className={a.status === 'healthy' ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}>
