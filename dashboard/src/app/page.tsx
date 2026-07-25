@@ -2,6 +2,7 @@
 
 import { useState, useId, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { Plus_Jakarta_Sans } from 'next/font/google'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, Award, BadgeCheck, ShieldCheck,
@@ -14,6 +15,11 @@ import {
   BarChart, Bar, Cell,
 } from 'recharts'
 
+// Scoped to this page only (rounder, friendlier geometric sans than the
+// site-wide Inter) — matches the reference brand direction requested for
+// the marketing page without changing typography inside the dashboard app.
+const jakarta = Plus_Jakarta_Sans({ subsets: ['latin'], weight: ['400', '500', '600', '700', '800'] })
+
 const TIP_STY = { borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#0e1525', fontSize: 12, color: '#e2eaf4' }
 
 const spendCurrent = [45, 52, 48, 61, 58, 70, 65, 72, 68, 75, 80, 73, 69, 78, 82, 88, 77, 74, 83, 91, 86, 79, 88, 95, 92, 88, 97, 105, 99, 112]
@@ -22,7 +28,7 @@ const spendData = spendCurrent.map((v, i) => ({ day: i + 1, spend: v, prevSpend:
 const avgSpend = Math.round(spendCurrent.reduce((s, v) => s + v, 0) / spendCurrent.length)
 const anomalyPoint = spendData[spendData.length - 1]
 
-const scoreData = [{ name: 'score', value: 91, fill: '#818cf8' }]
+const scoreData = [{ name: 'score', value: 91, fill: '#22d3ee' }]
 
 const complianceFrameworks = [
   { label: 'UK GDPR', status: 'pass' as const },
@@ -40,7 +46,7 @@ const serviceCostData = [
 ]
 const maxServiceCost = Math.max(...serviceCostData.map(d => d.cost))
 
-const SERVICE_COLORS = ['#818cf8', '#22d3ee', '#fbbf24', '#34d399', '#f97316', '#a78bfa']
+const SERVICE_COLORS = ['#22d3ee', '#2dd4bf', '#38bdf8', '#fbbf24', '#f97316', '#34d399']
 const DONUT_R = 62, DONUT_CX = 78, DONUT_CY = 78
 const donutCirc = 2 * Math.PI * DONUT_R
 const donutTotal = serviceCostData.reduce((s, d) => s + d.cost, 0)
@@ -87,22 +93,22 @@ type PreviewTabId = typeof previewTabs[number]['id']
 
 const FEATURES = [
   {
-    icon: Activity, color: 'text-indigo-600 dark:text-indigo-400',
-    bg: 'bg-indigo-500/8 dark:bg-indigo-500/10', border: 'border-indigo-500/20',
+    icon: Activity, color: 'text-cyan-600 dark:text-cyan-400',
+    bg: 'bg-cyan-500/8 dark:bg-cyan-500/10', border: 'border-cyan-500/20',
     title: 'Real-time Visibility',
     desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services, giving you full visibility across every active region from your first dashboard load.',
     points: ['20+ AWS services monitored', 'Every active region, day one', '90-day metric history'],
   },
   {
-    icon: Zap, color: 'text-violet-600 dark:text-violet-400',
-    bg: 'bg-violet-500/8 dark:bg-violet-500/10', border: 'border-violet-500/20',
+    icon: Zap, color: 'text-teal-600 dark:text-teal-400',
+    bg: 'bg-teal-500/8 dark:bg-teal-500/10', border: 'border-teal-500/20',
     title: 'AI Anomaly Detection',
     desc: "TekWatch's AI engine learns your normal baseline and flags genuine anomalies on its own, with no manual thresholds or specialist configuration required.",
     points: ['Zero-configuration, self-learning', 'Cost, performance & security', 'Plain-English explanations'],
   },
   {
-    icon: Shield, color: 'text-cyan-600 dark:text-cyan-400',
-    bg: 'bg-cyan-500/8 dark:bg-cyan-500/10', border: 'border-cyan-500/20',
+    icon: Shield, color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-500/8 dark:bg-blue-500/10', border: 'border-blue-500/20',
     title: 'UK Compliance Intelligence',
     desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face, with automated evidence instead of a generic US compliance checklist.',
     points: ['UK GDPR & Cyber Essentials Plus', 'FCA PS21/3 resilience module', 'GuardDuty & Security Hub findings'],
@@ -311,13 +317,13 @@ export default function LandingPage() {
   const [featuresRef, featuresInView] = useReveal<HTMLDivElement>()
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className={`dark min-h-screen bg-background text-foreground overflow-x-hidden ${jakarta.className}`}>
 
       {/* ── Nav ──────────────────────────────────────────── */}
       <nav className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-indigo-600 rounded-md flex items-center justify-center">
+            <div className="w-8 h-8 bg-cyan-600 rounded-md flex items-center justify-center">
               <Radio className="w-4 h-4 text-white" strokeWidth={2.25} />
             </div>
             <span className="font-semibold text-foreground text-base tracking-tight">TekWatch</span>
@@ -333,7 +339,7 @@ export default function LandingPage() {
             </Link>
             <Link
               href="/overview"
-              className="flex items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-md transition-colors"
+              className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-md transition-colors"
             >
               Live Demo <ArrowRight className="w-3.5 h-3.5" />
             </Link>
@@ -345,11 +351,12 @@ export default function LandingPage() {
       {/* ── Hero + Dashboard Preview (forced-dark zone) ─────── */}
       <div className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_30%,transparent_75%)]" />
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/6 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[700px] h-[380px] bg-cyan-500/12 rounded-full blur-[110px] pointer-events-none" />
+        <div className="absolute top-40 left-1/2 -translate-x-1/2 w-[900px] h-[420px] bg-teal-500/8 rounded-full blur-[130px] pointer-events-none" />
 
         <section className="relative pt-20 pb-16 px-6">
           <div className="relative max-w-4xl mx-auto text-center">
-            <p className="animate-fade-in-up text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-6">
+            <p className="animate-fade-in-up text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-400 mb-6">
               AI-powered cloud intelligence, built for UK SMEs
             </p>
 
@@ -358,7 +365,7 @@ export default function LandingPage() {
               style={{ animationDelay: '90ms' }}
             >
               Your AWS estate.<br />
-              <span className="text-indigo-400">
+              <span className="text-cyan-400">
                 Fully visible. Always compliant.
               </span>
             </h1>
@@ -379,7 +386,7 @@ export default function LandingPage() {
             >
               <Link
                 href="/overview"
-                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-md transition-colors"
+                className="flex items-center justify-center gap-2 px-6 py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
@@ -424,7 +431,7 @@ export default function LandingPage() {
                   { icon: ShieldCheck, label: 'ISC² Certified in Cybersecurity' },
                 ].map(b => (
                   <div key={b.label} className="flex items-center gap-2 rounded-md border border-border bg-background/60 px-3.5 py-2 text-foreground/80 text-sm font-medium">
-                    <b.icon className="w-4 h-4 text-indigo-400" />
+                    <b.icon className="w-4 h-4 text-cyan-400" />
                     {b.label}
                   </div>
                 ))}
@@ -497,7 +504,7 @@ export default function LandingPage() {
                     <div className="flex items-center justify-between mb-2">
                       <div className="text-xs text-muted-foreground">Daily AWS Spend (Last 30 Days)</div>
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
-                        <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-[2px] rounded-full bg-indigo-400" />This month</span>
+                        <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-[2px] rounded-full bg-cyan-400" />This month</span>
                         <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-slate-500" />Last month</span>
                       </div>
                     </div>
@@ -505,9 +512,9 @@ export default function LandingPage() {
                       <AreaChart data={spendData} margin={{ top: 14, right: 60, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#818cf8" stopOpacity={0.16} />
-                            <stop offset="60%" stopColor="#818cf8" stopOpacity={0.03} />
-                            <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                            <stop offset="0%" stopColor="#22d3ee" stopOpacity={0.16} />
+                            <stop offset="60%" stopColor="#22d3ee" stopOpacity={0.03} />
+                            <stop offset="100%" stopColor="#22d3ee" stopOpacity={0} />
                           </linearGradient>
                         </defs>
                         <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
@@ -522,9 +529,9 @@ export default function LandingPage() {
                         <ReferenceLine y={avgSpend} stroke="rgba(255,255,255,0.18)" strokeDasharray="3 3" />
                         <Area type="monotone" dataKey="prevSpend" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3"
                           fill="none" dot={false} activeDot={{ r: 3, fill: '#64748b', stroke: '#0e1525', strokeWidth: 1.5 }} />
-                        <Area type="monotone" dataKey="spend" stroke="#818cf8" strokeWidth={2}
+                        <Area type="monotone" dataKey="spend" stroke="#22d3ee" strokeWidth={2}
                           fill="url(#spendFill)" dot={false}
-                          activeDot={{ r: 4, fill: '#818cf8', stroke: '#0e1525', strokeWidth: 2 }} />
+                          activeDot={{ r: 4, fill: '#22d3ee', stroke: '#0e1525', strokeWidth: 2 }} />
                         <ReferenceDot
                           x={anomalyPoint.day} y={anomalyPoint.spend} r={5}
                           fill="#fbbf24" stroke="#0e1525" strokeWidth={2}
@@ -572,7 +579,7 @@ export default function LandingPage() {
                       <Tooltip contentStyle={TIP_STY} formatter={(v: number) => [`£${v}`, 'Cost']} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                       <Bar dataKey="cost" radius={[0, 4, 4, 0]} barSize={14}>
                         {serviceCostData.map((d, i) => (
-                          <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#818cf8'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.65} />
+                          <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#22d3ee'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.65} />
                         ))}
                       </Bar>
                     </BarChart>
@@ -605,7 +612,7 @@ export default function LandingPage() {
                 </div>
 
                 {/* Compliance posture bars */}
-                <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
+                <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
                   <div className="text-xs text-muted-foreground mb-3">Compliance Posture (4 frameworks)</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                     {compliancePreview.map(c => (
@@ -686,8 +693,8 @@ export default function LandingPage() {
                         <TrendingUp className="w-3 h-3" /> +8% <span className="text-muted-foreground font-normal">vs last month</span>
                       </div>
                     </div>
-                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
-                      <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />
+                    <div className="mt-4 flex items-start gap-2 rounded-lg border border-cyan-500/20 bg-cyan-500/5 p-2.5">
+                      <Sparkles className="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5" />
                       <span className="text-[11px] text-foreground/80 leading-relaxed">
                         AI flagged 2 cost anomalies this month. The largest: an idle RDS instance running 24/7 in eu-west-1.
                       </span>
@@ -699,13 +706,13 @@ export default function LandingPage() {
               {activeTab === 'assistant' && (<>
                 <div className="rounded-xl border border-border bg-background/60 p-4 space-y-4">
                   <div className="flex justify-end">
-                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-indigo-600 text-white text-sm px-4 py-2.5">
+                    <div className="max-w-[80%] rounded-2xl rounded-tr-sm bg-cyan-600 text-white text-sm px-4 py-2.5">
                       {chatExchange.question}
                     </div>
                   </div>
                   <div className="flex items-start gap-2.5">
                     <div className="w-7 h-7 rounded-full bg-white/5 border border-border flex items-center justify-center flex-shrink-0">
-                      <Bot className="w-3.5 h-3.5 text-indigo-400" />
+                      <Bot className="w-3.5 h-3.5 text-cyan-400" />
                     </div>
                     <div className="space-y-2 flex-1">
                       <div className="rounded-2xl rounded-tl-sm bg-background border border-border text-foreground/90 text-sm leading-relaxed px-4 py-3">
@@ -713,7 +720,7 @@ export default function LandingPage() {
                       </div>
                       <div className="flex flex-wrap gap-1.5">
                         {chatExchange.tools.map(t => (
-                          <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-300">
+                          <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-cyan-500/10 border border-cyan-500/20 text-cyan-300">
                             <Sparkles className="w-2.5 h-2.5" />
                             {t}
                           </span>
@@ -724,7 +731,7 @@ export default function LandingPage() {
                 </div>
                 <div className="rounded-xl border border-border bg-background/60 p-3 flex items-center gap-2 text-xs text-muted-foreground">
                   <span className="flex-1">Ask about cost, security, or anything in your AWS estate...</span>
-                  <span className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center flex-shrink-0">
+                  <span className="w-6 h-6 rounded-md bg-cyan-600 flex items-center justify-center flex-shrink-0">
                     <ArrowRight className="w-3 h-3 text-white" />
                   </span>
                 </div>
@@ -741,7 +748,7 @@ export default function LandingPage() {
         <div className="relative max-w-5xl mx-auto">
           <div className="text-center mb-14">
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-red-400 mb-3">The Problem</p>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
               UK SMEs spend £28bn a year on AWS.<br className="hidden md:block" /> Most of it runs unmonitored.
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
@@ -767,8 +774,8 @@ export default function LandingPage() {
       <section id="features" className="px-6 py-24 border-t border-border">
         <div className="max-w-5xl mx-auto">
           <div className="text-center mb-14">
-            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Capabilities</p>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Everything your team needs</h2>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400 mb-3">Capabilities</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Everything your team needs</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
               From real-time resource health to UK-specific compliance evidence, all in one place.
             </p>
@@ -787,27 +794,27 @@ export default function LandingPage() {
         <section className="px-6 py-24">
           <div className="max-w-4xl mx-auto">
             <div className="text-center mb-16">
-              <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-3">Onboarding</p>
-              <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Up and running in 30 minutes</h2>
+              <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-400 mb-3">Onboarding</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Up and running in 30 minutes</h2>
               <p className="text-muted-foreground text-lg">No sales call. No credit card. No specialist knowledge required.</p>
             </div>
 
             <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10">
               {/* Connector line + a pulse that continuously travels it, left to right */}
               <div className="hidden md:block absolute top-6 left-[16.6%] right-[16.6%] h-px bg-border overflow-visible">
-                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/50 via-violet-400/30 to-cyan-400/50" />
+                <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/50 via-teal-400/30 to-cyan-400/50" />
                 <div
                   aria-hidden="true"
-                  className="animate-travel-dot absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-indigo-400 shadow-[0_0_10px_2px_rgba(129,140,248,0.7)]"
+                  className="animate-travel-dot absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-cyan-400 shadow-[0_0_10px_2px_rgba(129,140,248,0.7)]"
                 />
               </div>
               {ONBOARDING_STEPS.map((s, i) => (
                 <div key={s.title} className="relative">
                   <div
-                    className="relative z-10 w-12 h-12 rounded-full border border-indigo-400/30 bg-background flex items-center justify-center mb-5 animate-step-activate"
+                    className="relative z-10 w-12 h-12 rounded-full border border-cyan-400/30 bg-background flex items-center justify-center mb-5 animate-step-activate"
                     style={{ animationDelay: `${i * 1.5}s` }}
                   >
-                    <span className="font-mono text-lg font-semibold text-indigo-400">{i + 1}</span>
+                    <span className="font-mono text-lg font-semibold text-cyan-400">{i + 1}</span>
                   </div>
                   <h3 className="font-semibold text-foreground mb-2">{s.title}</h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
@@ -822,8 +829,8 @@ export default function LandingPage() {
       <section id="pricing" className="px-6 py-24 border-t border-border">
         <div className="max-w-4xl mx-auto">
           <div className="text-center mb-10">
-            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Pricing</p>
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Simple, predictable pricing</h2>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400 mb-3">Pricing</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Simple, predictable pricing</h2>
             <p className="text-muted-foreground text-lg">Self-service SaaS. No implementation fees, no sales call required.</p>
           </div>
 
@@ -849,11 +856,11 @@ export default function LandingPage() {
               return (
                 <div key={p.name} className={`group rounded-lg border p-6 relative transition-all duration-300 hover:-translate-y-2 ${
                   p.highlight
-                    ? 'border-indigo-500/50 bg-white/[0.05] hover:border-indigo-400/80 hover:shadow-2xl hover:shadow-indigo-500/15'
+                    ? 'border-cyan-500/50 bg-white/[0.05] hover:border-cyan-400/80 hover:shadow-2xl hover:shadow-cyan-500/15'
                     : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20'
                 }`}>
                   {p.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white shadow-sm">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold bg-cyan-600 text-white shadow-sm">
                       Most popular
                     </div>
                   )}
@@ -880,7 +887,7 @@ export default function LandingPage() {
                     href="/signup"
                     className={`block text-center py-2.5 rounded-md text-sm font-semibold transition-colors ${
                       p.highlight
-                        ? 'bg-indigo-600 hover:bg-indigo-500 text-white'
+                        ? 'bg-cyan-600 hover:bg-cyan-500 text-white'
                         : 'border border-border text-foreground hover:bg-accent'
                     }`}
                   >
@@ -900,9 +907,9 @@ export default function LandingPage() {
       {/* ── CTA + Footer (forced-dark band) ─────────────── */}
       <div className="bg-background border-t border-border">
         <section className="relative px-6 py-24 overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[220px] bg-indigo-600/5 rounded-full blur-[90px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[280px] bg-cyan-500/10 rounded-full blur-[100px] pointer-events-none" />
           <div className="relative max-w-2xl mx-auto text-center">
-            <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
               See your AWS estate, clearly.
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
@@ -912,7 +919,7 @@ export default function LandingPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/overview"
-                className="flex items-center justify-center gap-2 px-8 py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-md transition-colors"
+                className="flex items-center justify-center gap-2 px-8 py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
@@ -934,7 +941,7 @@ export default function LandingPage() {
               {/* Brand */}
               <div className="col-span-2 md:col-span-1">
                 <div className="flex items-center gap-2.5 mb-4">
-                  <div className="w-7 h-7 bg-indigo-600 rounded-md flex items-center justify-center">
+                  <div className="w-7 h-7 bg-cyan-600 rounded-md flex items-center justify-center">
                     <Radio className="w-3.5 h-3.5 text-white" strokeWidth={2.25} />
                   </div>
                   <span className="font-semibold text-foreground text-base">TekWatch</span>
