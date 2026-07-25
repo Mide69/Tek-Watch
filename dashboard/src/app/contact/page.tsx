@@ -17,7 +17,7 @@ export default function ContactPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const subject = `Contact from tekwatch.co.uk — ${form.name}`
+    const subject = `Contact from tekwatch.co.uk: ${form.name}`
     const body = [
       form.company && `Company: ${form.company}`,
       `Email: ${form.email}`,
@@ -58,8 +58,8 @@ export default function ContactPage() {
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-3">Contact</p>
             <h1 className="text-3xl md:text-4xl font-semibold text-foreground mb-4 tracking-tight">Talk to us</h1>
             <p className="text-muted-foreground text-lg leading-relaxed">
-              Questions about TekWatch, Managed Cloud Services, or the Digital Careers Programme —
-              send us a message or email directly. We reply within one business day.
+              Questions about TekWatch, Managed Cloud Services, or the Digital Careers Programme?
+              Send us a message or email directly. We reply within one business day.
             </p>
           </div>
 
@@ -118,7 +118,7 @@ export default function ContactPage() {
 
               <p className="text-xs text-muted-foreground leading-relaxed">
                 {sent
-                  ? "Opening your email client to finish sending. If nothing happened, use the email address on the right — it's a guaranteed way to reach us."
+                  ? "Opening your email client to finish sending. If nothing happened, use the email address on the right instead, it's guaranteed to work."
                   : 'This opens a pre-filled email in your own mail client. No mail app configured? Email or copy the address on the right instead.'}
               </p>
             </form>
@@ -154,7 +154,7 @@ export default function ContactPage() {
                 <p className="text-sm text-foreground/80 leading-relaxed">
                   Looking for hands-on help instead of self-service?{' '}
                   <span className="text-foreground font-medium">Managed Cloud Services</span> start from £500/month,
-                  TekWatch included — mention it in your message.
+                  TekWatch included, just mention it in your message.
                 </p>
               </div>
             </div>

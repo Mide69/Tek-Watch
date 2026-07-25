@@ -72,7 +72,7 @@ const securitySummaryTiles = [
 
 const chatExchange = {
   question: 'Why did my AWS bill spike this week?',
-  answer: 'Your spend jumped 18% on Tuesday — mostly EC2. Three on-demand instances in eu-west-2 have run at steady utilisation for 30 days straight; switching them to Reserved would save roughly £140/month.',
+  answer: 'Your spend jumped 18% on Tuesday, mostly EC2. Three on-demand instances in eu-west-2 have run at steady utilisation for 30 days straight; switching them to Reserved would save roughly £140/month.',
   tools: ['Cost breakdown', 'EC2 instances'],
 }
 
@@ -90,21 +90,21 @@ const FEATURES = [
     icon: Activity, color: 'text-indigo-600 dark:text-indigo-400',
     bg: 'bg-indigo-500/8 dark:bg-indigo-500/10', border: 'border-indigo-500/20',
     title: 'Real-time Visibility',
-    desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services — full visibility across every active region from your first dashboard load.',
+    desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services, giving you full visibility across every active region from your first dashboard load.',
     points: ['20+ AWS services monitored', 'Every active region, day one', '90-day metric history'],
   },
   {
     icon: Zap, color: 'text-violet-600 dark:text-violet-400',
     bg: 'bg-violet-500/8 dark:bg-violet-500/10', border: 'border-violet-500/20',
     title: 'AI Anomaly Detection',
-    desc: "TekWatch's proprietary AI engine learns your normal baseline and flags genuine anomalies — no manual thresholds, no specialist configuration required.",
+    desc: "TekWatch's AI engine learns your normal baseline and flags genuine anomalies on its own, with no manual thresholds or specialist configuration required.",
     points: ['Zero-configuration, self-learning', 'Cost, performance & security', 'Plain-English explanations'],
   },
   {
     icon: Shield, color: 'text-cyan-600 dark:text-cyan-400',
     bg: 'bg-cyan-500/8 dark:bg-cyan-500/10', border: 'border-cyan-500/20',
     title: 'UK Compliance Intelligence',
-    desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face — automated evidence, not a generic US compliance checklist.',
+    desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face, with automated evidence instead of a generic US compliance checklist.',
     points: ['UK GDPR & Cyber Essentials Plus', 'FCA PS21/3 resilience module', 'GuardDuty & Security Hub findings'],
   },
   {
@@ -118,7 +118,7 @@ const FEATURES = [
     icon: Server, color: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-500/8 dark:bg-amber-500/10', border: 'border-amber-500/20',
     title: 'Managed Service Option',
-    desc: "Don't want to DIY? Tek Tribe's own engineers monitor and manage it for you — from £500/month, with TekWatch included.",
+    desc: "Don't want to DIY? Tek Tribe's own engineers monitor and manage it for you, from £500/month, with TekWatch included.",
     points: ['Continuous monitoring & patching', 'Compliance reporting included', '20–30% typical cost savings'],
   },
   {
@@ -132,16 +132,16 @@ const FEATURES = [
 
 const ONBOARDING_STEPS = [
   {
-    title: 'Start your free trial',
-    desc: 'Create an account at tekwatch.co.uk. 14 days free, no credit card required — you can be looking at your own data within minutes.',
+    title: 'See it running instantly',
+    desc: 'Launch the live demo, no signup or credit card needed. You will be looking at real infrastructure data within seconds.',
   },
   {
     title: 'Deploy in under 30 minutes',
-    desc: 'Download your pre-configured CloudFormation template and deploy the read-only monitoring agent. No inbound firewall changes needed.',
+    desc: 'When you are ready to connect your own AWS account, we hand you a pre-configured CloudFormation template for the read-only monitoring agent. No inbound firewall changes needed.',
   },
   {
     title: 'See what’s really going on',
-    desc: 'Your dashboard populates with live infrastructure data immediately — anomalies, compliance gaps and cost overruns, explained in plain English.',
+    desc: 'Your dashboard populates with live infrastructure data immediately: anomalies, compliance gaps and cost overruns, all explained in plain English.',
   },
 ]
 
@@ -236,40 +236,57 @@ interface Feature {
 
 function FeatureCard({ f, index, inView }: { f: Feature; index: number; inView: boolean }) {
   const [spot, setSpot] = useState({ x: 50, y: 0 })
+  const [tilt, setTilt] = useState({ x: 0, y: 0 })
+
+  function handleMove(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const px = (e.clientX - rect.left) / rect.width
+    const py = (e.clientY - rect.top) / rect.height
+    setSpot({ x: px * 100, y: py * 100 })
+    setTilt({ x: (0.5 - py) * 14, y: (px - 0.5) * 14 })
+  }
 
   return (
+    // Outer wrapper: scroll-triggered reveal only (slow, staggered)
     <div
-      onMouseMove={e => {
-        const rect = e.currentTarget.getBoundingClientRect()
-        setSpot({ x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 })
-      }}
-      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.03] hover:border-white/20 p-5 transition-[transform,border-color] duration-500 hover:-translate-y-1"
       style={{
         opacity: inView ? 1 : 0,
         transform: inView ? undefined : 'translateY(16px)',
-        transition: `opacity 0.6s ease-out ${index * 90}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${index * 90}ms, border-color 0.3s, translate 0.5s`,
+        transition: `opacity 0.6s ease-out ${index * 90}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${index * 90}ms`,
       }}
     >
-      {/* Cursor-tracked spotlight */}
+      {/* Inner wrapper: 3D cursor-tracked tilt, independent fast transition */}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-        style={{ background: `radial-gradient(280px circle at ${spot.x}% ${spot.y}%, rgba(129,140,248,0.12), transparent 70%)` }}
-      />
-      <div className="relative">
-        <div className={`w-10 h-10 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}>
-          <f.icon className={`w-5 h-5 ${f.color}`} />
+        onMouseMove={handleMove}
+        onMouseLeave={() => setTilt({ x: 0, y: 0 })}
+        className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.03] hover:border-white/20 p-5 [transform-style:preserve-3d]"
+        style={{
+          transform: `perspective(900px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg) scale(${tilt.x || tilt.y ? 1.02 : 1})`,
+          transition: 'transform 150ms ease-out, border-color 0.3s',
+          boxShadow: (tilt.x || tilt.y) ? `${-tilt.y * 1.2}px ${tilt.x * 1.2}px 24px -8px rgba(0,0,0,0.45)` : 'none',
+        }}
+      >
+        {/* Cursor-tracked spotlight */}
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+          style={{ background: `radial-gradient(280px circle at ${spot.x}% ${spot.y}%, rgba(129,140,248,0.14), transparent 70%)` }}
+        />
+        <div className="relative" style={{ transform: 'translateZ(24px)' }}>
+          <div className={`w-10 h-10 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110`}>
+            <f.icon className={`w-5 h-5 ${f.color}`} />
+          </div>
+          <h3 className="font-semibold text-foreground mb-2">{f.title}</h3>
+          <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{f.desc}</p>
+          <ul className="space-y-1.5">
+            {f.points.map(p => (
+              <li key={p} className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Check className={`w-3.5 h-3.5 ${f.color} flex-shrink-0`} />
+                {p}
+              </li>
+            ))}
+          </ul>
         </div>
-        <h3 className="font-semibold text-foreground mb-2">{f.title}</h3>
-        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{f.desc}</p>
-        <ul className="space-y-1.5">
-          {f.points.map(p => (
-            <li key={p} className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Check className={`w-3.5 h-3.5 ${f.color} flex-shrink-0`} />
-              {p}
-            </li>
-          ))}
-        </ul>
       </div>
     </div>
   )
@@ -328,14 +345,13 @@ export default function LandingPage() {
       {/* ── Hero + Dashboard Preview (forced-dark zone) ─────── */}
       <div className="relative overflow-hidden bg-background">
         <div className="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_80%_60%_at_50%_0%,#000_30%,transparent_75%)]" />
-        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/10 rounded-full blur-[100px] pointer-events-none" />
+        <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-indigo-600/6 rounded-full blur-[100px] pointer-events-none" />
 
         <section className="relative pt-20 pb-16 px-6">
           <div className="relative max-w-4xl mx-auto text-center">
-            <div className="animate-fade-in-up inline-flex items-center gap-2 px-3 py-1.5 rounded-md border border-indigo-400/30 bg-indigo-500/10 text-indigo-300 text-xs font-mono font-medium tracking-wide mb-8">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              AI-POWERED CLOUD INTELLIGENCE, BUILT FOR UK SMEs
-            </div>
+            <p className="animate-fade-in-up text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-6">
+              AI-powered cloud intelligence, built for UK SMEs
+            </p>
 
             <h1
               className="animate-fade-in-up text-4xl md:text-6xl font-semibold text-foreground leading-[1.1] mb-6 tracking-tight"
@@ -351,10 +367,10 @@ export default function LandingPage() {
               className="animate-fade-in-up text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto mb-10 leading-relaxed"
               style={{ animationDelay: '180ms' }}
             >
-              TekWatch gives UK SMEs real-time visibility across their AWS estate —
-              with a proprietary AI engine that catches cost spikes, performance issues
-              and security risks, and built-in UK GDPR and Cyber Essentials Plus
-              compliance from day one.
+              Know the moment something&apos;s wrong in your AWS estate. TekWatch watches your
+              infrastructure around the clock, catching cost spikes, performance issues and
+              security risks as they happen, with UK GDPR and Cyber Essentials Plus
+              compliance built in from day one.
             </p>
 
             <div
@@ -421,7 +437,7 @@ export default function LandingPage() {
         <section className="relative px-6 pb-24">
           <div className="max-w-5xl mx-auto">
             <div className="rounded-lg border border-border bg-card/90 backdrop-blur-xl overflow-hidden shadow-2xl shadow-black/50">
-              {/* Fake browser tab strip — doubles as the view switcher */}
+              {/* Fake browser tab strip, doubles as the view switcher */}
               <div className="flex items-center gap-1 px-3 pt-3 bg-black/20 border-b border-border overflow-x-auto">
                 {previewTabs.map(tab => (
                   <button
@@ -479,7 +495,7 @@ export default function LandingPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="md:col-span-2 min-w-0 rounded-xl border border-border bg-background/60 p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <div className="text-xs text-muted-foreground">Daily AWS Spend — Last 30 Days</div>
+                      <div className="text-xs text-muted-foreground">Daily AWS Spend (Last 30 Days)</div>
                       <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                         <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-[2px] rounded-full bg-indigo-400" />This month</span>
                         <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-slate-500" />Last month</span>
@@ -489,8 +505,8 @@ export default function LandingPage() {
                       <AreaChart data={spendData} margin={{ top: 14, right: 60, left: 0, bottom: 0 }}>
                         <defs>
                           <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#818cf8" stopOpacity={0.28} />
-                            <stop offset="60%" stopColor="#818cf8" stopOpacity={0.06} />
+                            <stop offset="0%" stopColor="#818cf8" stopOpacity={0.16} />
+                            <stop offset="60%" stopColor="#818cf8" stopOpacity={0.03} />
                             <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
                           </linearGradient>
                         </defs>
@@ -547,7 +563,7 @@ export default function LandingPage() {
 
                 {/* Per-service cost breakdown */}
                 <div className="rounded-xl border border-border bg-background/60 p-4">
-                  <div className="text-xs text-muted-foreground mb-2">Top AWS Services by Cost — This Month</div>
+                  <div className="text-xs text-muted-foreground mb-2">Top AWS Services by Cost (This Month)</div>
                   <div aria-hidden="true"><ResponsiveContainer width="100%" height={150}>
                     <BarChart data={serviceCostData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                       <CartesianGrid horizontal={false} vertical={false} />
@@ -590,7 +606,7 @@ export default function LandingPage() {
 
                 {/* Compliance posture bars */}
                 <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/5 p-4">
-                  <div className="text-xs text-muted-foreground mb-3">Compliance Posture — 4 frameworks</div>
+                  <div className="text-xs text-muted-foreground mb-3">Compliance Posture (4 frameworks)</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                     {compliancePreview.map(c => (
                       <div key={c.label}>
@@ -673,7 +689,7 @@ export default function LandingPage() {
                     <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
                       <Sparkles className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5" />
                       <span className="text-[11px] text-foreground/80 leading-relaxed">
-                        AI flagged 2 cost anomalies this month — largest: an idle RDS instance running 24/7 in eu-west-1.
+                        AI flagged 2 cost anomalies this month. The largest: an idle RDS instance running 24/7 in eu-west-1.
                       </span>
                     </div>
                   </div>
@@ -730,7 +746,7 @@ export default function LandingPage() {
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Enterprise tools like Datadog cost £800–£5,000/month and need a specialist to run.
-              For 5.5 million UK SMEs, that&apos;s not a pricing tier — it&apos;s a locked door.
+              For 5.5 million UK SMEs, that&apos;s not a pricing tier. It&apos;s a locked door.
             </p>
           </div>
 
@@ -754,7 +770,7 @@ export default function LandingPage() {
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-500 dark:text-indigo-400 mb-3">Capabilities</p>
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Everything your team needs</h2>
             <p className="text-muted-foreground text-lg max-w-xl mx-auto">
-              From real-time resource health to UK-specific compliance evidence — in one place.
+              From real-time resource health to UK-specific compliance evidence, all in one place.
             </p>
           </div>
 
@@ -831,10 +847,10 @@ export default function LandingPage() {
             {pricingTiers.map(p => {
               const displayPrice = billing === 'annual' ? Math.round(p.monthly * (1 - p.discount)) : p.monthly
               return (
-                <div key={p.name} className={`rounded-lg border p-6 relative ${
+                <div key={p.name} className={`group rounded-lg border p-6 relative transition-all duration-300 hover:-translate-y-2 ${
                   p.highlight
-                    ? 'border-indigo-500/50 bg-white/[0.05]'
-                    : 'border-white/10 bg-white/[0.03]'
+                    ? 'border-indigo-500/50 bg-white/[0.05] hover:border-indigo-400/80 hover:shadow-2xl hover:shadow-indigo-500/15'
+                    : 'border-white/10 bg-white/[0.03] hover:border-white/25 hover:bg-white/[0.06] hover:shadow-xl hover:shadow-black/20'
                 }`}>
                   {p.highlight && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-600 text-white shadow-sm">
@@ -843,7 +859,7 @@ export default function LandingPage() {
                   )}
                   <h3 className="font-semibold text-foreground mb-1">{p.name}</h3>
                   <div className="flex items-baseline gap-1 mb-1">
-                    <span className="font-mono text-3xl font-semibold text-foreground [font-variant-numeric:proportional-nums]">£{displayPrice}</span>
+                    <span className="font-mono text-3xl font-semibold text-foreground [font-variant-numeric:proportional-nums] transition-transform duration-300 group-hover:scale-105 inline-block">£{displayPrice}</span>
                     <span className="text-sm text-muted-foreground">/month</span>
                   </div>
                   <div className="h-5 mb-2">
@@ -868,7 +884,7 @@ export default function LandingPage() {
                         : 'border border-border text-foreground hover:bg-accent'
                     }`}
                   >
-                    Start free trial
+                    Try it live
                   </Link>
                 </div>
               )
@@ -884,14 +900,14 @@ export default function LandingPage() {
       {/* ── CTA + Footer (forced-dark band) ─────────────── */}
       <div className="bg-background border-t border-border">
         <section className="relative px-6 py-24 overflow-hidden">
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[220px] bg-indigo-600/8 rounded-full blur-[90px] pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[220px] bg-indigo-600/5 rounded-full blur-[90px] pointer-events-none" />
           <div className="relative max-w-2xl mx-auto text-center">
             <h2 className="font-display text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
               See your AWS estate, clearly.
             </h2>
             <p className="text-muted-foreground text-lg mb-8">
-              Try the live demo — no account needed. Or start your 14-day free trial
-              and see your own AWS environment in minutes.
+              Try the live demo instantly, no account needed. Want your own AWS environment
+              connected? Get in touch and we will set you up.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -924,7 +940,7 @@ export default function LandingPage() {
                   <span className="font-semibold text-foreground text-base">TekWatch</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-                  AI-powered AWS monitoring and UK compliance intelligence, built for SMEs by Tek Tribe Ltd —
+                  AI-powered AWS monitoring and UK compliance intelligence, built for SMEs by Tek Tribe Ltd,
                   the commercial evolution of an 8,000+ strong UK &amp; Nigeria tech community.
                 </p>
                 <div className="flex items-center gap-3">

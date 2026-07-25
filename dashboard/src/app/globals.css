@@ -145,7 +145,7 @@
 }
 
 /* ── Onboarding steps: continuous "data flowing through the
-   pipeline" animation — a pulse travels the connector line and
+   pipeline" animation: a pulse travels the connector line and
    each step circle lights up in sequence as it passes ────── */
 @keyframes travel-dot {
   0%   { left: 0%;   opacity: 0; }
