@@ -6,7 +6,7 @@ import { Plus_Jakarta_Sans } from 'next/font/google'
 import { LogoMark } from '@/components/ui/Logo'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
-  TrendingUp, TrendingDown, Award, BadgeCheck, ShieldCheck,
+  TrendingUp, TrendingDown, ShieldCheck,
   ArrowRight, Check, Gavel, PoundSterling, BarChart3,
   Linkedin, Youtube, Mail, MapPin, Bot, Sparkles, Key, Users,
 } from 'lucide-react'
@@ -417,26 +417,18 @@ export default function LandingPage() {
               ))}
             </div>
 
-            {/* Credibility strip */}
+            {/* Mission strip */}
             <div
-              className="animate-fade-in-up mt-14 rounded-lg border border-border bg-white/[0.03] px-6 py-6"
+              className="animate-fade-in-up mt-14 rounded-lg border border-border bg-white/[0.03] px-6 py-7 text-center"
               style={{ animationDelay: '450ms' }}
             >
-              <p className="text-center font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground mb-5">
-                Built by AWS-certified cloud engineers
+              <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-cyan-400 mb-3">
+                Why we built this
               </p>
-              <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-3">
-                {[
-                  { icon: Award, label: 'AWS Community Builder' },
-                  { icon: BadgeCheck, label: '5× AWS Certified' },
-                  { icon: ShieldCheck, label: 'ISC² Certified in Cybersecurity' },
-                ].map(b => (
-                  <div key={b.label} className="flex items-center gap-2 rounded-md border border-border bg-background/60 px-3.5 py-2 text-foreground/80 text-sm font-medium">
-                    <b.icon className="w-4 h-4 text-cyan-400" />
-                    {b.label}
-                  </div>
-                ))}
-              </div>
+              <p className="text-foreground/90 text-base md:text-lg font-medium max-w-xl mx-auto leading-relaxed">
+                Built by engineers who monitor AWS for a living. Made for the businesses
+                who don&apos;t have one on staff.
+              </p>
             </div>
           </div>
         </section>
