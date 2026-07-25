@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useId, useEffect } from 'react'
+import { useState, useId, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
@@ -85,6 +85,66 @@ const previewTabs = [
 
 type PreviewTabId = typeof previewTabs[number]['id']
 
+const FEATURES = [
+  {
+    icon: Activity, color: 'text-indigo-600 dark:text-indigo-400',
+    bg: 'bg-indigo-500/8 dark:bg-indigo-500/10', border: 'border-indigo-500/20',
+    title: 'Real-time Visibility',
+    desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services — full visibility across every active region from your first dashboard load.',
+    points: ['20+ AWS services monitored', 'Every active region, day one', '90-day metric history'],
+  },
+  {
+    icon: Zap, color: 'text-violet-600 dark:text-violet-400',
+    bg: 'bg-violet-500/8 dark:bg-violet-500/10', border: 'border-violet-500/20',
+    title: 'AI Anomaly Detection',
+    desc: "TekWatch's proprietary AI engine learns your normal baseline and flags genuine anomalies — no manual thresholds, no specialist configuration required.",
+    points: ['Zero-configuration, self-learning', 'Cost, performance & security', 'Plain-English explanations'],
+  },
+  {
+    icon: Shield, color: 'text-cyan-600 dark:text-cyan-400',
+    bg: 'bg-cyan-500/8 dark:bg-cyan-500/10', border: 'border-cyan-500/20',
+    title: 'UK Compliance Intelligence',
+    desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face — automated evidence, not a generic US compliance checklist.',
+    points: ['UK GDPR & Cyber Essentials Plus', 'FCA PS21/3 resilience module', 'GuardDuty & Security Hub findings'],
+  },
+  {
+    icon: DollarSign, color: 'text-emerald-600 dark:text-emerald-400',
+    bg: 'bg-emerald-500/8 dark:bg-emerald-500/10', border: 'border-emerald-500/20',
+    title: 'Cost Intelligence',
+    desc: 'MTD spend, 30-day trends, per-service breakdowns, and AI-flagged cost anomalies before the bill arrives.',
+    points: ['Daily spend trends', 'Per-service breakdown', 'AI cost anomaly alerts'],
+  },
+  {
+    icon: Server, color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-500/8 dark:bg-amber-500/10', border: 'border-amber-500/20',
+    title: 'Managed Service Option',
+    desc: "Don't want to DIY? Tek Tribe's own engineers monitor and manage it for you — from £500/month, with TekWatch included.",
+    points: ['Continuous monitoring & patching', 'Compliance reporting included', '20–30% typical cost savings'],
+  },
+  {
+    icon: Radio, color: 'text-rose-600 dark:text-rose-400',
+    bg: 'bg-rose-500/8 dark:bg-rose-500/10', border: 'border-rose-500/20',
+    title: 'Lightweight Agent',
+    desc: 'A single ECS Fargate task in your AWS account. Read-only IAM, outbound-only, zero firewall changes.',
+    points: ['ECS Fargate', 'Read-only IAM role', 'Auto-deploy CloudFormation'],
+  },
+]
+
+const ONBOARDING_STEPS = [
+  {
+    title: 'Start your free trial',
+    desc: 'Create an account at tekwatch.co.uk. 14 days free, no credit card required — you can be looking at your own data within minutes.',
+  },
+  {
+    title: 'Deploy in under 30 minutes',
+    desc: 'Download your pre-configured CloudFormation template and deploy the read-only monitoring agent. No inbound firewall changes needed.',
+  },
+  {
+    title: 'See what’s really going on',
+    desc: 'Your dashboard populates with live infrastructure data immediately — anomalies, compliance gaps and cost overruns, explained in plain English.',
+  },
+]
+
 const statTiles = [
   { icon: Cpu, label: 'Monitored Resources', value: '847', delta: '+12%', good: true, sub: 'vs last month', trend: [620, 640, 655, 670, 690, 705, 720, 735, 760, 780, 810, 847] },
   { icon: AlertTriangle, label: 'Active Alerts', value: '3', delta: '−40%', good: true, sub: 'vs last week', trend: [9, 8, 8, 7, 6, 6, 5, 5, 4, 4, 3, 3] },
@@ -142,6 +202,79 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   )
 }
 
+/** Fires once when the element scrolls into view; stays true afterwards. */
+function useReveal<T extends HTMLElement>() {
+  const ref = useRef<T>(null)
+  const [inView, setInView] = useState(false)
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setInView(true)
+          observer.disconnect()
+        }
+      },
+      { threshold: 0.2 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+  return [ref, inView] as const
+}
+
+interface Feature {
+  icon: typeof Activity
+  color: string
+  bg: string
+  border: string
+  title: string
+  desc: string
+  points: string[]
+}
+
+function FeatureCard({ f, index, inView }: { f: Feature; index: number; inView: boolean }) {
+  const [spot, setSpot] = useState({ x: 50, y: 0 })
+
+  return (
+    <div
+      onMouseMove={e => {
+        const rect = e.currentTarget.getBoundingClientRect()
+        setSpot({ x: ((e.clientX - rect.left) / rect.width) * 100, y: ((e.clientY - rect.top) / rect.height) * 100 })
+      }}
+      className="group relative overflow-hidden rounded-lg border border-white/10 bg-white/[0.03] hover:border-white/20 p-5 transition-[transform,border-color] duration-500 hover:-translate-y-1"
+      style={{
+        opacity: inView ? 1 : 0,
+        transform: inView ? undefined : 'translateY(16px)',
+        transition: `opacity 0.6s ease-out ${index * 90}ms, transform 0.6s cubic-bezier(0.16,1,0.3,1) ${index * 90}ms, border-color 0.3s, translate 0.5s`,
+      }}
+    >
+      {/* Cursor-tracked spotlight */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+        style={{ background: `radial-gradient(280px circle at ${spot.x}% ${spot.y}%, rgba(129,140,248,0.12), transparent 70%)` }}
+      />
+      <div className="relative">
+        <div className={`w-10 h-10 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center mb-4 transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-3`}>
+          <f.icon className={`w-5 h-5 ${f.color}`} />
+        </div>
+        <h3 className="font-semibold text-foreground mb-2">{f.title}</h3>
+        <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{f.desc}</p>
+        <ul className="space-y-1.5">
+          {f.points.map(p => (
+            <li key={p} className="flex items-center gap-2 text-xs text-muted-foreground">
+              <Check className={`w-3.5 h-3.5 ${f.color} flex-shrink-0`} />
+              {p}
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
 export default function LandingPage() {
   const [billing, setBilling] = useState<'monthly' | 'annual'>('monthly')
   const [activeTab, setActiveTab] = useState<PreviewTabId>('overview')
@@ -158,6 +291,7 @@ export default function LandingPage() {
   }, [activeTab])
 
   const activePath = previewTabs.find(t => t.id === activeTab)?.path ?? '/overview'
+  const [featuresRef, featuresInView] = useReveal<HTMLDivElement>()
 
   return (
     <div className="dark min-h-screen bg-background text-foreground overflow-x-hidden">
@@ -624,66 +758,9 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {[
-              {
-                icon: Activity, color: 'text-indigo-600 dark:text-indigo-400',
-                bg: 'bg-indigo-500/8 dark:bg-indigo-500/10', border: 'border-indigo-500/20',
-                title: 'Real-time Visibility',
-                desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services — full visibility across every active region from your first dashboard load.',
-                points: ['20+ AWS services monitored', 'Every active region, day one', '90-day metric history'],
-              },
-              {
-                icon: Zap, color: 'text-violet-600 dark:text-violet-400',
-                bg: 'bg-violet-500/8 dark:bg-violet-500/10', border: 'border-violet-500/20',
-                title: 'AI Anomaly Detection',
-                desc: "TekWatch's proprietary AI engine learns your normal baseline and flags genuine anomalies — no manual thresholds, no specialist configuration required.",
-                points: ['Zero-configuration, self-learning', 'Cost, performance & security', 'Plain-English explanations'],
-              },
-              {
-                icon: Shield, color: 'text-cyan-600 dark:text-cyan-400',
-                bg: 'bg-cyan-500/8 dark:bg-cyan-500/10', border: 'border-cyan-500/20',
-                title: 'UK Compliance Intelligence',
-                desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face — automated evidence, not a generic US compliance checklist.',
-                points: ['UK GDPR & Cyber Essentials Plus', 'FCA PS21/3 resilience module', 'GuardDuty & Security Hub findings'],
-              },
-              {
-                icon: DollarSign, color: 'text-emerald-600 dark:text-emerald-400',
-                bg: 'bg-emerald-500/8 dark:bg-emerald-500/10', border: 'border-emerald-500/20',
-                title: 'Cost Intelligence',
-                desc: 'MTD spend, 30-day trends, per-service breakdowns, and AI-flagged cost anomalies before the bill arrives.',
-                points: ['Daily spend trends', 'Per-service breakdown', 'AI cost anomaly alerts'],
-              },
-              {
-                icon: Server, color: 'text-amber-600 dark:text-amber-400',
-                bg: 'bg-amber-500/8 dark:bg-amber-500/10', border: 'border-amber-500/20',
-                title: 'Managed Service Option',
-                desc: "Don't want to DIY? Tek Tribe's own engineers monitor and manage it for you — from £500/month, with TekWatch included.",
-                points: ['Continuous monitoring & patching', 'Compliance reporting included', '20–30% typical cost savings'],
-              },
-              {
-                icon: Radio, color: 'text-rose-600 dark:text-rose-400',
-                bg: 'bg-rose-500/8 dark:bg-rose-500/10', border: 'border-rose-500/20',
-                title: 'Lightweight Agent',
-                desc: 'A single ECS Fargate task in your AWS account. Read-only IAM, outbound-only, zero firewall changes.',
-                points: ['ECS Fargate', 'Read-only IAM role', 'Auto-deploy CloudFormation'],
-              },
-            ].map(f => (
-              <div key={f.title} className="group rounded-lg border border-white/10 bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/20 p-5 transition-colors">
-                <div className={`w-10 h-10 rounded-lg ${f.bg} border ${f.border} flex items-center justify-center mb-4`}>
-                  <f.icon className={`w-5 h-5 ${f.color}`} />
-                </div>
-                <h3 className="font-semibold text-foreground mb-2">{f.title}</h3>
-                <p className="text-sm text-muted-foreground mb-4 leading-relaxed">{f.desc}</p>
-                <ul className="space-y-1.5">
-                  {f.points.map(p => (
-                    <li key={p} className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <Check className={`w-3.5 h-3.5 ${f.color} flex-shrink-0`} />
-                      {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
+          <div ref={featuresRef} className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {FEATURES.map((f, i) => (
+              <FeatureCard key={f.title} f={f} index={i} inView={featuresInView} />
             ))}
           </div>
         </div>
@@ -700,23 +777,20 @@ export default function LandingPage() {
             </div>
 
             <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10">
-              <div className="hidden md:block absolute top-6 left-[16.6%] right-[16.6%] h-px bg-gradient-to-r from-indigo-500/40 via-border to-indigo-500/40" />
-              {[
-                {
-                  title: 'Start your free trial',
-                  desc: 'Create an account at tekwatch.co.uk. 14 days free, no credit card required — you can be looking at your own data within minutes.',
-                },
-                {
-                  title: 'Deploy in under 30 minutes',
-                  desc: 'Download your pre-configured CloudFormation template and deploy the read-only monitoring agent. No inbound firewall changes needed.',
-                },
-                {
-                  title: 'See what’s really going on',
-                  desc: 'Your dashboard populates with live infrastructure data immediately — anomalies, compliance gaps and cost overruns, explained in plain English.',
-                },
-              ].map((s, i) => (
+              {/* Connector line + a pulse that continuously travels it, left to right */}
+              <div className="hidden md:block absolute top-6 left-[16.6%] right-[16.6%] h-px bg-border overflow-visible">
+                <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/50 via-violet-400/30 to-cyan-400/50" />
+                <div
+                  aria-hidden="true"
+                  className="animate-travel-dot absolute top-1/2 w-2.5 h-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-indigo-400 shadow-[0_0_10px_2px_rgba(129,140,248,0.7)]"
+                />
+              </div>
+              {ONBOARDING_STEPS.map((s, i) => (
                 <div key={s.title} className="relative">
-                  <div className="relative z-10 w-12 h-12 rounded-full border border-indigo-400/30 bg-background flex items-center justify-center mb-5">
+                  <div
+                    className="relative z-10 w-12 h-12 rounded-full border border-indigo-400/30 bg-background flex items-center justify-center mb-5 animate-step-activate"
+                    style={{ animationDelay: `${i * 1.5}s` }}
+                  >
                     <span className="font-mono text-lg font-semibold text-indigo-400">{i + 1}</span>
                   </div>
                   <h3 className="font-semibold text-foreground mb-2">{s.title}</h3>
@@ -826,12 +900,12 @@ export default function LandingPage() {
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
               </Link>
-              <a
-                href="mailto:hello@tekwatch.co.uk"
+              <Link
+                href="/contact"
                 className="flex items-center justify-center gap-2 px-8 py-3.5 border border-border text-foreground hover:bg-accent font-semibold rounded-md transition-colors"
               >
                 Contact us
-              </a>
+              </Link>
             </div>
           </div>
         </section>
@@ -887,7 +961,7 @@ export default function LandingPage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wider text-foreground mb-4">Company</h3>
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li><Link href="/login" className="hover:text-foreground transition-colors">Sign in</Link></li>
-                  <li><a href="mailto:hello@tekwatch.co.uk" className="hover:text-foreground transition-colors">Contact us</a></li>
+                  <li><Link href="/contact" className="hover:text-foreground transition-colors">Contact us</Link></li>
                 </ul>
               </div>
 
