@@ -26,8 +26,11 @@ resource "aws_cognito_user_pool" "customers" {
     case_sensitive = false
   }
 
+  # 7 is the operator's chosen minimum. Cognito's own floor is 6. The character
+  # classes below are deliberately kept on: at 7 characters they are doing most
+  # of the work that length used to do.
   password_policy {
-    minimum_length                   = 12
+    minimum_length                   = 7
     require_lowercase                = true
     require_uppercase                = true
     require_numbers                  = true
@@ -99,8 +102,11 @@ resource "aws_cognito_user_pool" "admins" {
   username_attributes      = ["email"]
   auto_verified_attributes = ["email"]
 
+  # Matched to the customer pool at the operator's request (was 16). Symbols stay
+  # required here — this pool fronts an admin console with account-wide reach, so
+  # it keeps the stricter character set even though the length now matches.
   password_policy {
-    minimum_length                   = 16
+    minimum_length                   = 7
     require_lowercase                = true
     require_uppercase                = true
     require_numbers                  = true
