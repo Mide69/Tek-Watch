@@ -265,8 +265,8 @@ export default function LoginPage() {
 
           <p className="mt-10 text-center text-xs text-slate-600">
             Need help signing in?{' '}
-            <a href="mailto:support@tektribe.io" className="text-indigo-500 hover:text-indigo-400">
-              support@tektribe.io
+            <a href="mailto:support@tekwatch.io" className="text-indigo-500 hover:text-indigo-400">
+              support@tekwatch.io
             </a>
           </p>
         </div>

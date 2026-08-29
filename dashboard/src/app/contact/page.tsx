@@ -10,7 +10,7 @@ export default function ContactPage() {
   const [sent, setSent] = useState(false)
   const [copied, setCopied] = useState(false)
 
-  const email = 'hello@tekwatch.co.uk'
+  const email = 'hello@tekwatch.io'
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) {
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
@@ -18,7 +18,7 @@ export default function ContactPage() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const subject = `Contact from tekwatch.co.uk: ${form.name}`
+    const subject = `Contact from tekwatch.io: ${form.name}`
     const body = [
       form.company && `Company: ${form.company}`,
       `Email: ${form.email}`,
