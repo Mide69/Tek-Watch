@@ -74,6 +74,20 @@ resource "aws_sns_topic" "ops_alerts" {
   tags = { Name = "${local.name_prefix}-ops-alerts" }
 }
 
+# Every alarm in the monitoring module publishes here. With no subscription the
+# topic silently swallows them, which is how this environment shipped: four
+# working alarms firing into nothing. AWS emails a confirmation link on create;
+# the subscription stays "pending confirmation" until it is clicked.
+#
+# Set via a gitignored *.auto.tfvars file rather than environments/*.tfvars —
+# this repository is public and the value is a personal address.
+resource "aws_sns_topic_subscription" "ops_alerts_email" {
+  count     = var.ops_alert_email != "" ? 1 : 0
+  topic_arn = aws_sns_topic.ops_alerts.arn
+  protocol  = "email"
+  endpoint  = var.ops_alert_email
+}
+
 # ── Networking ────────────────────────────────────────────────────────────────
 
 module "networking" {
