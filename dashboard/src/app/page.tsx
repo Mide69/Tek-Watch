@@ -216,6 +216,13 @@ function useReveal<T extends HTMLElement>() {
   useEffect(() => {
     const el = ref.current
     if (!el) return
+    // Reveal immediately where IntersectionObserver is unavailable. Revealed
+    // content starts at opacity 0, so failing closed would leave the page
+    // blank rather than merely unanimated.
+    if (typeof IntersectionObserver === 'undefined') {
+      setInView(true)
+      return
+    }
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
@@ -223,12 +230,46 @@ function useReveal<T extends HTMLElement>() {
           observer.disconnect()
         }
       },
-      { threshold: 0.2 }
+      // Slightly early, and a low threshold so tall sections do not wait until
+      // a fifth of a full-height block has scrolled past.
+      { threshold: 0.15, rootMargin: '0px 0px -80px 0px' }
     )
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
   return [ref, inView] as const
+}
+
+/**
+ * Fades a block up the first time it enters the viewport.
+ *
+ * The page already had useReveal but only the features grid used it, so
+ * everything below the fold appeared abruptly. `delay` staggers siblings —
+ * keep it small; the point is to guide the eye down the page, not to make
+ * people wait for content.
+ *
+ * prefers-reduced-motion is handled globally in globals.css, which collapses
+ * the animation to ~0s, so reduced-motion users still see the content.
+ */
+function Reveal({
+  children,
+  delay = 0,
+  className = '',
+}: {
+  children: React.ReactNode
+  delay?: number
+  className?: string
+}) {
+  const [ref, inView] = useReveal<HTMLDivElement>()
+  return (
+    <div
+      ref={ref}
+      className={`${className} ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}
+      style={inView && delay ? { animationDelay: `${delay}ms` } : undefined}
+    >
+      {children}
+    </div>
+  )
 }
 
 interface Feature {
@@ -463,7 +504,7 @@ export default function LandingPage() {
                 <div className="flex-1 mx-4">
                   <div className="h-5 rounded-md bg-background border border-border w-72 mx-auto flex items-center justify-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs text-muted-foreground font-mono">app.tekwatch.co.uk{activePath}</span>
+                    <span className="text-xs text-muted-foreground font-mono">app.tekwatch.io{activePath}</span>
                   </div>
                 </div>
               </div>
@@ -739,6 +780,7 @@ export default function LandingPage() {
       <section className="relative px-6 py-24 border-t border-border overflow-hidden">
         <div className="absolute inset-0 bg-grid-pattern [mask-image:radial-gradient(ellipse_70%_50%_at_50%_50%,#000_20%,transparent_75%)] opacity-60 pointer-events-none" />
         <div className="relative max-w-5xl mx-auto">
+          <Reveal>
           <div className="text-center mb-14">
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-red-400 mb-3">The Problem</p>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
@@ -749,6 +791,7 @@ export default function LandingPage() {
               For 5.5 million UK SMEs, that&apos;s not a pricing tier. It&apos;s a locked door.
             </p>
           </div>
+          </Reveal>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             {problemStats.map(s => (
@@ -766,6 +809,7 @@ export default function LandingPage() {
       {/* ── Features ─────────────────────────────────────── */}
       <section id="features" className="px-6 py-24 border-t border-border">
         <div className="max-w-5xl mx-auto">
+          <Reveal>
           <div className="text-center mb-14">
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400 mb-3">Capabilities</p>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Everything your team needs</h2>
@@ -773,6 +817,7 @@ export default function LandingPage() {
               From real-time resource health to UK-specific compliance evidence, all in one place.
             </p>
           </div>
+          </Reveal>
 
           <div ref={featuresRef} className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {FEATURES.map((f, i) => (
@@ -786,11 +831,13 @@ export default function LandingPage() {
       <div id="how-it-works" className="bg-background border-t border-border">
         <section className="px-6 py-24">
           <div className="max-w-4xl mx-auto">
+            <Reveal>
             <div className="text-center mb-16">
               <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-400 mb-3">Onboarding</p>
               <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Up and running in 30 minutes</h2>
               <p className="text-muted-foreground text-lg">No sales call. No credit card. No specialist knowledge required.</p>
             </div>
+            </Reveal>
 
             <div className="relative grid grid-cols-1 md:grid-cols-3 gap-10">
               {/* Connector line + a pulse that continuously travels it, left to right */}
@@ -821,11 +868,13 @@ export default function LandingPage() {
       {/* ── Pricing ──────────────────────────────────────── */}
       <section id="pricing" className="px-6 py-24 border-t border-border">
         <div className="max-w-4xl mx-auto">
+          <Reveal>
           <div className="text-center mb-10">
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-500 dark:text-cyan-400 mb-3">Pricing</p>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">Simple, predictable pricing</h2>
             <p className="text-muted-foreground text-lg">Self-service SaaS. No implementation fees, no sales call required.</p>
           </div>
+          </Reveal>
 
           <div className="flex items-center justify-center gap-3 mb-10">
             <button
@@ -988,7 +1037,7 @@ export default function LandingPage() {
                 <ul className="space-y-3 text-sm text-muted-foreground">
                   <li className="flex items-center gap-2">
                     <Mail className="w-3.5 h-3.5 flex-shrink-0" />
-                    <a href="mailto:hello@tekwatch.co.uk" className="hover:text-foreground transition-colors">hello@tekwatch.co.uk</a>
+                    <a href="mailto:hello@tekwatch.io" className="hover:text-foreground transition-colors">hello@tekwatch.io</a>
                   </li>
                   <li className="flex items-center gap-2">
                     <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
