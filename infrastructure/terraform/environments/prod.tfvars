@@ -60,5 +60,17 @@ sqs_visibility_timeout_seconds = 300
 sqs_message_retention_seconds = 1209600
 sqs_dlq_max_receive_count     = 3
 
-domain_name         = "tekwatch.io"
-acm_certificate_arn = "" # Set via GitHub secret ACM_CERT_ARN_PROD
+# Registered and delegated to Cloudflare. Drives the dashboard_domain and
+# admin_domain locals in main.tf, so prod serves app.tekwatch.io and
+# admin.tekwatch.io. DNS is at Cloudflare, not Route 53, which is why the ACM
+# validation records have to be added there by hand.
+domain_name = "tekwatch.io"
+
+# Phase 1 requests the us-east-1 cert; flip attach_custom_domain to true only
+# once it reports ISSUED. See the comment on aws_acm_certificate.cloudfront.
+enable_custom_domain = true
+# Cert verified ISSUED (both app. and admin. validated SUCCESS) before flipping
+# this — CloudFront rejects a certificate still in PENDING_VALIDATION.
+attach_custom_domain = true
+
+acm_certificate_arn = "" # ALB HTTPS listener; API is served via the CloudFront /api/* proxy for now
