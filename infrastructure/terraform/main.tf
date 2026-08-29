@@ -224,6 +224,9 @@ module "monitoring" {
 
   ingest_queue_depth_threshold          = var.ingest_queue_depth_threshold
   ingest_queue_depth_evaluation_periods = var.ingest_queue_depth_evaluation_periods
+  consumer_desired_count                = var.consumer_desired_count
+  alb_arn_suffix                        = module.networking.alb_arn_suffix
+  api_target_group_arn_suffix           = module.networking.api_target_group_arn_suffix
 }
 
 # ── Static site hosting (dashboard + admin portal) ────────────────────────────
