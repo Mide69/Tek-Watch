@@ -107,6 +107,36 @@ variable "agent_schedule_expression" {
   default     = "rate(5 minutes)"
 }
 
+variable "enable_self_hosted_agent" {
+  description = "Run the central account's own monitoring agent on a schedule. Costs a Fargate task launch per firing, so keep it off until TEK_WATCH_API_KEY is configured."
+  type        = bool
+  default     = true
+}
+
+variable "enable_container_insights" {
+  description = "ECS Container Insights (per-task custom metrics, billed per metric). Logs and alarms are unaffected when disabled."
+  type        = bool
+  default     = true
+}
+
+variable "api_use_spot" {
+  description = "Run the API service on FARGATE_SPOT (~70% cheaper, occasional 2-minute-notice reclaims)."
+  type        = bool
+  default     = false
+}
+
+variable "ingest_queue_depth_threshold" {
+  description = "Messages visible before the ingest-queue alarm fires. Set to 0 whenever consumer_desired_count is 0."
+  type        = number
+  default     = 10000
+}
+
+variable "ingest_queue_depth_evaluation_periods" {
+  description = "5-minute periods the ingest-queue threshold must be breached before alarming."
+  type        = number
+  default     = 3
+}
+
 # ── SQS ───────────────────────────────────────────────────────────────────────
 
 variable "sqs_visibility_timeout_seconds" {
