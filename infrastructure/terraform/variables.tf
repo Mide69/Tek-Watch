@@ -125,6 +125,12 @@ variable "api_use_spot" {
   default     = false
 }
 
+variable "ops_alert_email" {
+  description = "Address subscribed to the ops-alerts SNS topic. Empty means alarms fire into a topic with no subscribers and nobody is told. Set it in a gitignored *.auto.tfvars file, not environments/*.tfvars — this repo is public."
+  type        = string
+  default     = ""
+}
+
 variable "ingest_queue_depth_threshold" {
   description = "Messages visible before the ingest-queue alarm fires. Set to 0 whenever consumer_desired_count is 0."
   type        = number

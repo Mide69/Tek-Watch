@@ -58,3 +58,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Local terraform overrides holding personal/sensitive values (e.g. the ops
+# alert email). Terraform auto-loads *.auto.tfvars; this repo is public, so
+# those values must not be committed. environments/*.tfvars stay tracked.
+*.auto.tfvars
