@@ -17,8 +17,16 @@ variable "certificate_arn" {
   default     = ""
 }
 
+variable "api_origin_domain_name" {
+  description = "ALB DNS name to serve under /api/*. Empty disables the API origin. CloudFront serves the site over HTTPS while the ALB is HTTP-only until a real cert/domain exists, and browsers block an HTTPS page calling an HTTP API. Routing /api/* through this same distribution makes those calls same-origin HTTPS, with CloudFront reaching the ALB over HTTP internally."
+  type        = string
+  default     = ""
+}
+
 locals {
   use_custom_domain = var.certificate_arn != ""
+  use_api_origin    = var.api_origin_domain_name != ""
+  api_origin_id     = "alb-${var.site_name}-api"
 }
 
 # ── S3 — origin bucket (private; CloudFront reaches it via OAC only) ─────────
@@ -103,6 +111,21 @@ resource "aws_cloudfront_distribution" "site" {
     origin_access_control_id = aws_cloudfront_origin_access_control.site.id
   }
 
+  dynamic "origin" {
+    for_each = local.use_api_origin ? [1] : []
+    content {
+      domain_name = var.api_origin_domain_name
+      origin_id   = local.api_origin_id
+
+      custom_origin_config {
+        http_port              = 80
+        https_port             = 443
+        origin_protocol_policy = "http-only" # ALB has no cert yet; switch to https-only once it does
+        origin_ssl_protocols   = ["TLSv1.2"]
+      }
+    }
+  }
+
   default_cache_behavior {
     target_origin_id       = "s3-${var.site_name}"
     viewer_protocol_policy = "redirect-to-https"
@@ -127,19 +150,60 @@ resource "aws_cloudfront_distribution" "site" {
     max_ttl     = 86400
   }
 
+  # API passthrough. Deliberately has NO function_association: the rewrite_index
+  # function above appends /index.html to any URI without a dot, which would
+  # turn /api/v1/overview into /api/v1/overview/index.html and 404 at the ALB.
+  # Caching is fully disabled (all TTLs 0) — these are per-customer authenticated
+  # reads, and Authorization must reach the API for Cognito JWT validation.
+  dynamic "ordered_cache_behavior" {
+    for_each = local.use_api_origin ? [1] : []
+    content {
+      path_pattern           = "/api/*"
+      target_origin_id       = local.api_origin_id
+      viewer_protocol_policy = "https-only"
+      allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+      cached_methods         = ["GET", "HEAD"]
+      compress               = true
+
+      forwarded_values {
+        query_string = true
+        headers      = ["Authorization", "Content-Type", "Accept", "Origin", "Referer"]
+        cookies {
+          forward = "all"
+        }
+      }
+
+      min_ttl     = 0
+      default_ttl = 0
+      max_ttl     = 0
+    }
+  }
+
   # Next.js static export with trailingSlash:true pre-renders every route as
   # /<route>/index.html. A request for a path with no matching object (e.g. a
   # stale bookmark) would otherwise surface S3's raw access-denied response —
   # serve the SPA's actual 404 page instead.
+  # S3-behind-OAC returns 403 (not 404) for a missing key, because the bucket
+  # policy grants GetObject only — so this one mapping is what actually serves
+  # the SPA's 404 page for stale bookmarks.
   custom_error_response {
     error_code         = 403
     response_code      = 404
     response_page_path = "/404.html"
   }
-  custom_error_response {
-    error_code         = 404
-    response_code      = 404
-    response_page_path = "/404.html"
+
+  # CloudFront applies custom_error_response across ALL behaviours — it cannot
+  # be scoped to one. With an API origin attached, mapping 404 here would rewrite
+  # a legitimate JSON 404 from the API into the SPA's HTML 404 page, breaking
+  # client-side error handling. The 403 mapping above already covers the S3 case,
+  # so this is only needed when no API shares the distribution.
+  dynamic "custom_error_response" {
+    for_each = local.use_api_origin ? [] : [1]
+    content {
+      error_code         = 404
+      response_code      = 404
+      response_page_path = "/404.html"
+    }
   }
 
   restrictions {

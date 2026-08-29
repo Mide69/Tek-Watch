@@ -178,6 +178,9 @@ module "ecs" {
   agent_cpu                 = var.agent_cpu
   agent_memory              = var.agent_memory
   agent_schedule_expression = var.agent_schedule_expression
+  enable_self_hosted_agent  = var.enable_self_hosted_agent
+  enable_container_insights = var.enable_container_insights
+  api_use_spot              = var.api_use_spot
 
   secrets_manager_arn = module.secrets.secret_arn
 
@@ -218,6 +221,9 @@ module "monitoring" {
   dynamodb_customers_table  = module.dynamodb.customers_table_name
   dynamodb_alerts_table     = module.dynamodb.alerts_table_name
   dynamodb_heartbeats_table = module.dynamodb.heartbeats_table_name
+
+  ingest_queue_depth_threshold          = var.ingest_queue_depth_threshold
+  ingest_queue_depth_evaluation_periods = var.ingest_queue_depth_evaluation_periods
 }
 
 # ── Static site hosting (dashboard + admin portal) ────────────────────────────
@@ -232,6 +238,12 @@ module "dashboard_hosting" {
   environment     = var.environment
   domain_name     = local.dashboard_domain
   certificate_arn = var.cloudfront_certificate_arn
+
+  # Serve the API under /api/* on this same distribution so the HTTPS frontend
+  # can call the HTTP-only ALB without tripping browser mixed-content blocking.
+  # Once api.tekwatch.io has an ACM cert the frontends can point straight at it
+  # and this can be dropped by clearing the variable.
+  api_origin_domain_name = module.networking.alb_dns_name
 }
 
 module "admin_hosting" {
@@ -241,4 +253,6 @@ module "admin_hosting" {
   environment     = var.environment
   domain_name     = local.admin_domain
   certificate_arn = var.cloudfront_certificate_arn
+
+  api_origin_domain_name = module.networking.alb_dns_name
 }

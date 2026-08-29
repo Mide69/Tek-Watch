@@ -6,6 +6,18 @@ variable "ecs_cluster_name" { type = string }
 variable "api_service_name" { type = string }
 variable "consumer_service_name" { type = string }
 variable "sqs_ingest_queue_name" { type = string }
+
+variable "ingest_queue_depth_threshold" {
+  description = "Messages visible before the ingest-queue alarm fires. 10000 suits a running consumer falling behind; set to 0 while consumer_desired_count is 0, so ANY arriving message pages you before SQS retention drops it."
+  type        = number
+  default     = 10000
+}
+
+variable "ingest_queue_depth_evaluation_periods" {
+  description = "5-minute periods the threshold must be breached before alarming."
+  type        = number
+  default     = 3
+}
 variable "sqs_dlq_name" { type = string }
 variable "dynamodb_customers_table" { type = string }
 variable "dynamodb_alerts_table" { type = string }
@@ -128,12 +140,12 @@ resource "aws_cloudwatch_metric_alarm" "ingest_queue_depth" {
   alarm_name          = "${var.name_prefix}-ingest-queue-depth"
   alarm_description   = "Ingest queue depth is high — consumer may be falling behind"
   comparison_operator = "GreaterThanThreshold"
-  evaluation_periods  = 3
+  evaluation_periods  = var.ingest_queue_depth_evaluation_periods
   metric_name         = "ApproximateNumberOfMessagesVisible"
   namespace           = "AWS/SQS"
   period              = 300
   statistic           = "Maximum"
-  threshold           = 10000
+  threshold           = var.ingest_queue_depth_threshold
   treat_missing_data  = "notBreaching"
 
   dimensions = { QueueName = var.sqs_ingest_queue_name }
