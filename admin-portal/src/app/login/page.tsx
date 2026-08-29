@@ -3,7 +3,13 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Shield, ArrowRight } from 'lucide-react'
-import { configureAmplify, adminSignIn, adminConfirmMfa, getAdminToken } from '@/lib/auth'
+import {
+  configureAmplify,
+  adminSignIn,
+  adminRespond,
+  getAdminToken,
+  type AdminAuthStep,
+} from '@/lib/auth'
 import { isDemoMode } from '@/lib/demoMode'
 import adminApi from '@/lib/api'
 
@@ -15,9 +21,39 @@ export default function AdminLoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [mfaCode, setMfaCode] = useState('')
-  const [showMfa, setShowMfa] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  // null = still on the email/password form; anything else is a pending challenge.
+  const [step, setStep] = useState<AdminAuthStep | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  const resetToStart = () => {
+    setStep(null)
+    setMfaCode('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setError('')
+  }
+
+  // A single place to land the session, since three different branches finish.
+  const complete = () => {
+    const token = getAdminToken()
+    if (token) adminApi.setToken(token)
+    router.push('/customers')
+  }
+
+  // Answering one challenge often reveals the next (new password -> TOTP setup
+  // -> done), so advance until Cognito says DONE rather than assuming one hop.
+  const advance = (next: AdminAuthStep) => {
+    if (next.kind === 'DONE') complete()
+    else {
+      setStep(next)
+      setMfaCode('')
+      setNewPassword('')
+      setConfirmPassword('')
+    }
+  }
 
   useEffect(() => {
     const token = getAdminToken()
@@ -32,9 +68,7 @@ export default function AdminLoginPage() {
     setLoading(true)
     try {
       await adminSignIn('demo@tektribe.io', 'demo')
-      const token = getAdminToken()
-      if (token) adminApi.setToken(token)
-      router.push('/customers')
+      complete()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not enter demo')
     } finally {
@@ -48,23 +82,21 @@ export default function AdminLoginPage() {
     setLoading(true)
 
     try {
-      if (!showMfa) {
-        const { mfaRequired } = await adminSignIn(email, password)
-        if (mfaRequired) {
-          setShowMfa(true)
-        } else {
-          const token = getAdminToken()
-          if (token) adminApi.setToken(token)
-          router.push('/customers')
+      if (step === null) {
+        advance(await adminSignIn(email, password))
+      } else if (step.kind === 'NEW_PASSWORD_REQUIRED') {
+        // Cognito enforces the pool's policy server-side; this only catches the
+        // mismatch early so the user is not bounced by a round trip.
+        if (newPassword !== confirmPassword) {
+          throw new Error('Passwords do not match')
         }
+        advance(await adminRespond(newPassword))
       } else {
+        // Both TOTP_SETUP and TOTP_CODE are answered with a 6-digit code.
         if (!mfaCode || mfaCode.length !== 6) {
           throw new Error('Enter the 6-digit code from your authenticator app')
         }
-        await adminConfirmMfa(mfaCode)
-        const token = getAdminToken()
-        if (token) adminApi.setToken(token)
-        router.push('/customers')
+        advance(await adminRespond(mfaCode))
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Authentication failed')
@@ -89,7 +121,7 @@ export default function AdminLoginPage() {
 
         <div className="glass-card p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!showMfa ? (
+            {step === null ? (
               <>
                 <div>
                   <label htmlFor="email" className="mb-1.5 block text-sm font-medium text-muted-ink">
@@ -122,11 +154,82 @@ export default function AdminLoginPage() {
                   />
                 </div>
               </>
+            ) : step.kind === 'NEW_PASSWORD_REQUIRED' ? (
+              <div className="space-y-4">
+                <p className="text-center text-sm text-muted-ink">
+                  Choose a new password to replace the temporary one.
+                </p>
+                <div>
+                  <label
+                    htmlFor="newPassword"
+                    className="mb-1.5 block text-sm font-medium text-muted-ink"
+                  >
+                    New password
+                  </label>
+                  <input
+                    id="newPassword"
+                    type="password"
+                    required
+                    minLength={16}
+                    autoComplete="new-password"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="input-glass"
+                    placeholder="••••••••••••••••"
+                    autoFocus
+                  />
+                  <p className="mt-1.5 text-xs text-faint-ink">
+                    At least 16 characters, with upper and lower case, a number and a symbol.
+                  </p>
+                </div>
+                <div>
+                  <label
+                    htmlFor="confirmPassword"
+                    className="mb-1.5 block text-sm font-medium text-muted-ink"
+                  >
+                    Confirm new password
+                  </label>
+                  <input
+                    id="confirmPassword"
+                    type="password"
+                    required
+                    minLength={16}
+                    autoComplete="new-password"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="input-glass"
+                    placeholder="••••••••••••••••"
+                  />
+                </div>
+              </div>
             ) : (
               <div>
-                <p className="mb-4 text-center text-sm text-muted-ink">
-                  Enter the 6-digit code from your authenticator app
-                </p>
+                {step.kind === 'TOTP_SETUP' ? (
+                  <div className="mb-5 space-y-3">
+                    <p className="text-center text-sm text-muted-ink">
+                      Set up multi-factor authentication. Add this secret to your authenticator
+                      app, then enter the code it shows.
+                    </p>
+                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <p className="mb-1 text-xs uppercase tracking-widest text-faint-ink">
+                        Setup key
+                      </p>
+                      <code className="block break-all font-mono text-sm text-violet-200">
+                        {step.secret}
+                      </code>
+                    </div>
+                    <a
+                      href={step.setupUri}
+                      className="block text-center text-xs text-violet-300 hover:text-violet-200"
+                    >
+                      Or open directly in your authenticator app →
+                    </a>
+                  </div>
+                ) : (
+                  <p className="mb-4 text-center text-sm text-muted-ink">
+                    Enter the 6-digit code from your authenticator app
+                  </p>
+                )}
                 <label htmlFor="mfaCode" className="mb-1.5 block text-sm font-medium text-muted-ink">
                   MFA code
                 </label>
@@ -146,11 +249,7 @@ export default function AdminLoginPage() {
                 />
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowMfa(false)
-                    setMfaCode('')
-                    setError('')
-                  }}
+                  onClick={resetToStart}
                   className="mt-3 text-sm text-violet-300 hover:text-violet-200"
                 >
                   ← Back to login
@@ -165,7 +264,15 @@ export default function AdminLoginPage() {
             )}
 
             <button type="submit" disabled={loading} className="btn-primary w-full">
-              {loading ? 'Authenticating…' : showMfa ? 'Verify code' : 'Continue'}
+              {loading
+                ? 'Authenticating…'
+                : step === null
+                  ? 'Continue'
+                  : step.kind === 'NEW_PASSWORD_REQUIRED'
+                    ? 'Set password'
+                    : step.kind === 'TOTP_SETUP'
+                      ? 'Verify and enable MFA'
+                      : 'Verify code'}
               {!loading && <ArrowRight className="h-4 w-4" />}
             </button>
           </form>
