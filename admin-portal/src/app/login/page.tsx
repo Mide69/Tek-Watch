@@ -2,11 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Shield, ArrowRight } from 'lucide-react'
+import { Shield, ArrowRight, ArrowLeft, Check } from 'lucide-react'
 import {
   configureAmplify,
   adminSignIn,
   adminRespond,
+  adminForgotPassword,
+  adminConfirmForgotPassword,
   getAdminToken,
   type AdminAuthStep,
 } from '@/lib/auth'
@@ -23,16 +25,21 @@ export default function AdminLoginPage() {
   const [mfaCode, setMfaCode] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [resetCode, setResetCode] = useState('')
   // null = still on the email/password form; anything else is a pending challenge.
   const [step, setStep] = useState<AdminAuthStep | null>(null)
+  // Forgot-password is a separate track from the sign-in state machine.
+  const [view, setView] = useState<'signin' | 'forgot' | 'forgot-confirm' | 'forgot-done'>('signin')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
   const resetToStart = () => {
     setStep(null)
+    setView('signin')
     setMfaCode('')
     setNewPassword('')
     setConfirmPassword('')
+    setResetCode('')
     setError('')
   }
 
@@ -47,7 +54,13 @@ export default function AdminLoginPage() {
   // -> done), so advance until Cognito says DONE rather than assuming one hop.
   const advance = (next: AdminAuthStep) => {
     if (next.kind === 'DONE') complete()
-    else {
+    else if (next.kind === 'RESET_REQUIRED') {
+      // Cognito already emailed the code when the reset was triggered, so go
+      // straight to code entry rather than making them request another.
+      setStep(null)
+      setView('forgot-confirm')
+      setError('')
+    } else {
       setStep(next)
       setMfaCode('')
       setNewPassword('')
@@ -71,6 +84,35 @@ export default function AdminLoginPage() {
       complete()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not enter demo')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgot = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      await adminForgotPassword(email)
+      setView('forgot-confirm')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not start the reset')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgotConfirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      if (newPassword !== confirmPassword) throw new Error('Passwords do not match')
+      await adminConfirmForgotPassword(email, resetCode, newPassword)
+      setView('forgot-done')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset the password')
     } finally {
       setLoading(false)
     }
@@ -120,7 +162,152 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="glass-card p-8">
-          <form onSubmit={handleSubmit} className="space-y-4">
+          {view === 'forgot' && (
+            <form onSubmit={handleForgot} className="space-y-4">
+              <button
+                type="button"
+                onClick={resetToStart}
+                className="flex items-center gap-1.5 text-sm text-violet-300 hover:text-violet-200"
+              >
+                <ArrowLeft className="h-4 w-4" /> Back to sign in
+              </button>
+              <div>
+                <h2 className="text-lg font-semibold">Reset your password</h2>
+                <p className="mt-1 text-sm text-muted-ink">
+                  We will email you a 6-digit code to set a new password.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="resetEmail" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                  Email address
+                </label>
+                <input
+                  id="resetEmail"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="input-glass"
+                  placeholder="admin@tektribe.io"
+                  autoFocus
+                />
+              </div>
+              {error && (
+                <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {error}
+                </div>
+              )}
+              <button type="submit" disabled={loading} className="btn-primary w-full">
+                {loading ? 'Sending…' : 'Send code'}
+                {!loading && <ArrowRight className="h-4 w-4" />}
+              </button>
+            </form>
+          )}
+
+          {view === 'forgot-confirm' && (
+            <form onSubmit={handleForgotConfirm} className="space-y-4">
+              <button
+                type="button"
+                onClick={() => { setView('forgot'); setError('') }}
+                className="flex items-center gap-1.5 text-sm text-violet-300 hover:text-violet-200"
+              >
+                <ArrowLeft className="h-4 w-4" /> Use a different email
+              </button>
+              <div>
+                <h2 className="text-lg font-semibold">Enter your code</h2>
+                <p className="mt-1 text-sm text-muted-ink">
+                  If an account exists for {email}, a 6-digit code is on its way.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="resetCode" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                  Reset code
+                </label>
+                <input
+                  id="resetCode"
+                  type="text"
+                  required
+                  maxLength={6}
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={resetCode}
+                  onChange={(e) => setResetCode(e.target.value.replace(/\D/g, ''))}
+                  className="input-glass text-center font-mono text-2xl tracking-[0.5em]"
+                  placeholder="000000"
+                  autoFocus
+                />
+              </div>
+              <div>
+                <label htmlFor="resetNew" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                  New password
+                </label>
+                <input
+                  id="resetNew"
+                  type="password"
+                  required
+                  minLength={7}
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="input-glass"
+                  placeholder="•••••••"
+                />
+                <p className="mt-1.5 text-xs text-faint-ink">
+                  At least 7 characters, with upper and lower case, a number and a symbol.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="resetConfirm" className="mb-1.5 block text-sm font-medium text-muted-ink">
+                  Confirm new password
+                </label>
+                <input
+                  id="resetConfirm"
+                  type="password"
+                  required
+                  minLength={7}
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="input-glass"
+                  placeholder="•••••••"
+                />
+              </div>
+              {error && (
+                <div className="rounded-xl border border-rose-400/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-200">
+                  {error}
+                </div>
+              )}
+              <button type="submit" disabled={loading} className="btn-primary w-full">
+                {loading ? 'Resetting…' : 'Set new password'}
+                {!loading && <ArrowRight className="h-4 w-4" />}
+              </button>
+            </form>
+          )}
+
+          {view === 'forgot-done' && (
+            <div className="flex flex-col items-center gap-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full border border-emerald-400/25 bg-emerald-500/15">
+                <Check className="h-7 w-7 text-emerald-300" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Password updated</h2>
+                <p className="mt-1 text-sm text-muted-ink">
+                  Sign in with your new password. You will be asked for your authenticator code.
+                </p>
+              </div>
+              <button type="button" onClick={resetToStart} className="btn-primary w-full">
+                Back to sign in
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          <form
+            onSubmit={handleSubmit}
+            className={view === 'signin' ? 'space-y-4' : 'hidden'}
+            aria-hidden={view !== 'signin'}
+          >
             {step === null ? (
               <>
                 <div>
@@ -150,9 +337,16 @@ export default function AdminLoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="input-glass"
-                    placeholder="••••••••••••"
+                    placeholder="•••••••"
                   />
                 </div>
+                <button
+                  type="button"
+                  onClick={() => { setView('forgot'); setError('') }}
+                  className="text-sm text-violet-300 hover:text-violet-200"
+                >
+                  Forgot your password?
+                </button>
               </>
             ) : step.kind === 'NEW_PASSWORD_REQUIRED' ? (
               <div className="space-y-4">
@@ -179,7 +373,7 @@ export default function AdminLoginPage() {
                     autoFocus
                   />
                   <p className="mt-1.5 text-xs text-faint-ink">
-                    At least 16 characters, with upper and lower case, a number and a symbol.
+                    At least 7 characters, with upper and lower case, a number and a symbol.
                   </p>
                 </div>
                 <div>
@@ -277,7 +471,7 @@ export default function AdminLoginPage() {
             </button>
           </form>
 
-          {DEMO && (
+          {DEMO && view === 'signin' && (
             <div className="mt-5">
               <div className="relative my-4">
                 <div className="absolute inset-0 flex items-center">

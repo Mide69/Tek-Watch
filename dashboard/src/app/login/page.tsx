@@ -5,18 +5,29 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
-import { configureAmplify, authSignIn, authForgotPassword } from '@/lib/auth'
+import {
+  configureAmplify,
+  authSignIn,
+  authForgotPassword,
+  authConfirmForgotPassword,
+} from '@/lib/auth'
 import apiClient from '@/lib/api'
 
 configureAmplify()
 
-type View = 'login' | 'forgot' | 'forgot-sent'
+// 'forgot-sent' collects the emailed code. Cognito sends a numeric CODE, not a
+// link, so without this step the reset email had nowhere to be used and anyone
+// who forgot their password was permanently locked out.
+type View = 'login' | 'forgot' | 'forgot-sent' | 'forgot-done'
 
 export default function LoginPage() {
   const router = useRouter()
   const [view, setView] = useState<View>('login')
   const [customerId, setCustomerId] = useState('')
   const [password, setPassword] = useState('')
+  const [resetCode, setResetCode] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
@@ -45,6 +56,21 @@ export default function LoginPage() {
       setView('forgot-sent')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to send reset email')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgotConfirm = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      if (newPassword !== confirmPassword) throw new Error('Passwords do not match')
+      await authConfirmForgotPassword(customerId.toUpperCase(), resetCode, newPassword)
+      setView('forgot-done')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reset the password')
     } finally {
       setLoading(false)
     }
@@ -156,7 +182,7 @@ export default function LoginPage() {
               </button>
               <div className="mb-8">
                 <h1 className="text-2xl font-bold text-white">Reset password</h1>
-                <p className="text-slate-400 mt-1.5 text-sm">Enter your Customer ID and we&apos;ll send a reset link.</p>
+                <p className="text-slate-400 mt-1.5 text-sm">Enter your Customer ID and we&apos;ll email you a 6-digit code.</p>
               </div>
               <form onSubmit={handleForgot} className="space-y-5">
                 <div>
@@ -169,20 +195,66 @@ export default function LoginPage() {
                 )}
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
-                  {loading ? 'Sending…' : 'Send reset link'}
+                  {loading ? 'Sending…' : 'Send reset code'}
                 </button>
               </form>
             </>
           )}
 
           {view === 'forgot-sent' && (
+            <>
+              <button onClick={() => { setView('forgot'); setError('') }}
+                className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-8 transition-colors">
+                <ArrowLeft className="w-4 h-4" /> Use a different Customer ID
+              </button>
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-white">Enter your code</h1>
+                <p className="text-slate-400 mt-1.5 text-sm">
+                  If an account exists for {customerId}, a 6-digit code is on its way.
+                </p>
+              </div>
+              <form onSubmit={handleForgotConfirm} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Reset code</label>
+                  <input type="text" required maxLength={6} inputMode="numeric" autoComplete="one-time-code"
+                    placeholder="000000" value={resetCode}
+                    onChange={e => setResetCode(e.target.value.replace(/\D/g, ''))}
+                    className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <input type="password" required minLength={7} autoComplete="new-password"
+                    placeholder="•••••••" value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)} className={inputCls} />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    At least 7 characters, with upper and lower case and a number.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <input type="password" required minLength={7} autoComplete="new-password"
+                    placeholder="•••••••" value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
+                </div>
+                {error && (
+                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                )}
+                <button type="submit" disabled={loading}
+                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {loading ? 'Resetting…' : 'Set new password'}
+                </button>
+              </form>
+            </>
+          )}
+
+          {view === 'forgot-done' && (
             <div className="text-center">
               <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-5">
                 <Check className="w-7 h-7 text-emerald-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Check your email</h2>
+              <h2 className="text-xl font-bold text-white mb-2">Password updated</h2>
               <p className="text-slate-400 text-sm mb-6">
-                If an account exists for {customerId}, a password reset link has been sent.
+                You can now sign in with your new password.
               </p>
               <button onClick={() => { setView('login'); setError('') }}
                 className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
