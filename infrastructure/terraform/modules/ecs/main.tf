@@ -33,6 +33,24 @@ variable "agent_schedule_expression" {
   default = "rate(5 minutes)"
 }
 
+variable "enable_self_hosted_agent" {
+  description = "Run the central account's own monitoring agent on a schedule. Each firing launches a Fargate task, so leaving it on before TEK_WATCH_API_KEY is configured burns ~8,700 task launches a month that do nothing but log a CRITICAL error."
+  type        = bool
+  default     = true
+}
+
+variable "api_use_spot" {
+  description = "Run the API service on FARGATE_SPOT (~70% cheaper). Spot reclaims give 2 minutes' notice, so with a single task expect occasional brief unavailability."
+  type        = bool
+  default     = false
+}
+
+variable "enable_container_insights" {
+  description = "ECS Container Insights. Publishes per-task custom metrics to CloudWatch, billed per metric — meaningful spend on a small cluster. CloudWatch logs and the alarms in the monitoring module are unaffected by turning this off."
+  type        = bool
+  default     = true
+}
+
 # ── ECS Cluster ───────────────────────────────────────────────────────────────
 
 resource "aws_ecs_cluster" "main" {
@@ -40,7 +58,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "enabled"
+    value = var.enable_container_insights ? "enabled" : "disabled"
   }
 
   tags = { Name = var.name_prefix }
@@ -269,10 +287,15 @@ resource "aws_ecs_task_definition" "api" {
       }
     }
 
+    # Must not use curl: the API image is python:3.12-slim, which ships no curl,
+    # so a curl-based probe always exits non-zero. startPeriod merely delays the
+    # kill, so the task looks healthy for its first minute and is then reaped in
+    # a loop. This mirrors the HEALTHCHECK in api/Dockerfile, which uses httpx
+    # (already a dependency) for exactly this reason.
     healthCheck = {
-      command     = ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      command     = ["CMD-SHELL", "python -c \"import httpx; httpx.get('http://localhost:8000/health', timeout=5)\" || exit 1"]
       interval    = 30
-      timeout     = 5
+      timeout     = 10
       retries     = 3
       startPeriod = 60
     }
@@ -288,9 +311,28 @@ resource "aws_ecs_service" "api" {
   cluster                           = aws_ecs_cluster.main.id
   task_definition                   = aws_ecs_task_definition.api.arn
   desired_count                     = var.api_desired_count
-  launch_type                       = "FARGATE"
   health_check_grace_period_seconds = 60
   force_new_deployment              = true
+
+  # Fargate Spot — ~70% cheaper than on-demand. A reclaim gives 2 minutes'
+  # notice and ECS starts a replacement, so with api_desired_count = 1 expect
+  # an occasional short gap in API availability. Set api_desired_count = 2 (or
+  # switch this back to FARGATE) once uptime matters more than the ~$7/mo.
+  dynamic "capacity_provider_strategy" {
+    for_each = var.api_use_spot ? [1] : []
+    content {
+      capacity_provider = "FARGATE_SPOT"
+      weight            = 1
+    }
+  }
+
+  dynamic "capacity_provider_strategy" {
+    for_each = var.api_use_spot ? [] : [1]
+    content {
+      capacity_provider = "FARGATE"
+      weight            = 1
+    }
+  }
 
   network_configuration {
     subnets          = var.task_subnet_ids
@@ -569,13 +611,15 @@ resource "aws_iam_role_policy" "agent_scheduler" {
 }
 
 resource "aws_cloudwatch_event_rule" "agent_schedule" {
+  count               = var.enable_self_hosted_agent ? 1 : 0
   name                = "${var.name_prefix}-agent-schedule"
   description         = "Run the self-hosted Tek Watch agent on a schedule"
   schedule_expression = var.agent_schedule_expression
 }
 
 resource "aws_cloudwatch_event_target" "agent" {
-  rule      = aws_cloudwatch_event_rule.agent_schedule.name
+  count     = var.enable_self_hosted_agent ? 1 : 0
+  rule      = aws_cloudwatch_event_rule.agent_schedule[0].name
   target_id = "agent-run-task"
   arn       = aws_ecs_cluster.main.arn
   role_arn  = aws_iam_role.agent_scheduler.arn

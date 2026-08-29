@@ -68,6 +68,11 @@ output "cognito_admin_user_pool_id" {
   value       = module.cognito.admin_user_pool_id
 }
 
+output "cognito_admin_app_client_id" {
+  description = "Cognito admin app client ID — set as COGNITO_ADMIN_APP_CLIENT_ID_* secret"
+  value       = module.cognito.admin_app_client_id
+}
+
 output "secrets_manager_arn" {
   description = "Secrets Manager secret ARN (set as SECRETS_MANAGER_SECRET_ARN env var)"
   value       = module.secrets.secret_arn
