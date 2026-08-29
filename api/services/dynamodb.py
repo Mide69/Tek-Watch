@@ -181,10 +181,37 @@ class DynamoDBService:
             logger.error("get_alerts failed for %s: %s", customer_id, exc)
             return []
 
-    def create_alert(self, customer_id: str, alert_data: Dict[str, Any]) -> str:
-        """Create a new alert record. Returns the alert_id."""
-        import ulid
-        alert_id = str(ulid.new())
+    def create_alert(
+        self,
+        customer_id: str,
+        alert_data: Dict[str, Any],
+        dedupe_key: Optional[str] = None,
+    ) -> str:
+        """Create a new alert record. Returns the alert_id, or "" if not created.
+
+        Pass dedupe_key for alerts that represent an ongoing condition (a metric
+        over threshold, say) rather than a point-in-time event. It makes the
+        range key deterministic and the write conditional, so concurrent callers
+        cannot both raise the same alert.
+
+        That matters because callers check "is there already an active alert for
+        this resource?" and then write, which is a read-then-write race: with
+        api_desired_count above 1 — the default in variables.tf — two replicas
+        evaluating the same threshold can both read "no alert", both write, and
+        both notify. DynamoDB settles it here instead, atomically.
+
+        The condition still allows a NEW alert once a previous one is resolved,
+        which a plain attribute_not_exists would block forever.
+        """
+        if dedupe_key:
+            alert_id = f"THRESHOLD#{dedupe_key}"
+        else:
+            # python-ulid (the pinned dependency) exposes a ULID class. The old
+            # call here was ulid.new(), which belongs to the unrelated ulid-py
+            # package, so this raised AttributeError for every alert created
+            # without a dedupe key.
+            from ulid import ULID
+            alert_id = str(ULID())
         item = {
             "customer_id": customer_id,
             "SK": alert_id,
@@ -193,10 +220,22 @@ class DynamoDBService:
             "triggered_at": _now_iso(),
             **alert_data,
         }
+        kwargs: Dict[str, Any] = {"Item": item}
+        if dedupe_key:
+            kwargs.update(
+                ConditionExpression="attribute_not_exists(SK) OR #st <> :active",
+                ExpressionAttributeNames={"#st": "status"},
+                ExpressionAttributeValues={":active": "active"},
+            )
         try:
-            self._alerts.put_item(Item=item)
+            self._alerts.put_item(**kwargs)
             return alert_id
         except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ConditionalCheckFailedException":
+                # Someone else already raised this one. Not an error — returning
+                # "" keeps the caller from sending a duplicate notification.
+                logger.debug("alert already active for %s (%s)", customer_id, dedupe_key)
+                return ""
             logger.error("create_alert failed for %s: %s", customer_id, exc)
             return ""
 

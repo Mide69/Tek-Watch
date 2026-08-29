@@ -254,7 +254,21 @@ resource "aws_iam_role_policy" "silence_detector" {
   })
 }
 
+# Lambda auto-creates its log group on first invocation with NO expiry, so the
+# silence detector — firing every 10 minutes, forever — was accumulating logs
+# that never age out. The ECS log groups in modules/ecs are managed with
+# retention; this one was simply missed. Declared explicitly so retention is
+# enforced and the group is destroyed with the environment.
+resource "aws_cloudwatch_log_group" "silence_detector" {
+  name              = "/aws/lambda/${var.name_prefix}-silence-detector"
+  retention_in_days = 14
+  tags              = { Name = "${var.name_prefix}-silence-detector-logs" }
+}
+
 resource "aws_lambda_function" "silence_detector" {
+  # Ensures the retention policy exists before the function can log anything.
+  depends_on = [aws_cloudwatch_log_group.silence_detector]
+
   function_name    = "${var.name_prefix}-silence-detector"
   role             = aws_iam_role.silence_detector.arn
   handler          = "handler.handler"

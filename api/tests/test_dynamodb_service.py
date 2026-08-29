@@ -2,6 +2,7 @@
 import hashlib
 import pytest
 from unittest.mock import MagicMock, patch
+from botocore.exceptions import ClientError
 from services.dynamodb import DynamoDBService
 
 
@@ -155,3 +156,50 @@ class TestDynamoDBServiceThresholds:
         )
         assert result is True
         thresholds.put_item.assert_called_once()
+
+
+class TestCreateAlertDedupe:
+    """create_alert's dedupe_key closes a read-then-write race.
+
+    Callers read "is there an active alert for this resource?" and then write.
+    With api_desired_count above 1 (the default in variables.tf) two replicas
+    can both read "no" and both write, producing duplicate alerts and duplicate
+    notifications. dedupe_key makes the range key deterministic and the write
+    conditional so DynamoDB settles it atomically.
+    """
+
+    def test_dedupe_key_makes_the_range_key_deterministic(self, db_service):
+        svc, _, alerts, _ = db_service
+        alerts.put_item.return_value = {}
+        alert_id = svc.create_alert(
+            "TT-0001", {"type": "threshold"}, dedupe_key="ec2#i-123#cpu"
+        )
+        assert alert_id == "THRESHOLD#ec2#i-123#cpu"
+        item = alerts.put_item.call_args.kwargs["Item"]
+        assert item["SK"] == "THRESHOLD#ec2#i-123#cpu"
+
+    def test_dedupe_key_writes_conditionally(self, db_service):
+        svc, _, alerts, _ = db_service
+        alerts.put_item.return_value = {}
+        svc.create_alert("TT-0001", {"type": "threshold"}, dedupe_key="ec2#i-123#cpu")
+        kwargs = alerts.put_item.call_args.kwargs
+        # Allows a fresh alert once the previous one is resolved; a plain
+        # attribute_not_exists would block that forever.
+        assert kwargs["ConditionExpression"] == "attribute_not_exists(SK) OR #st <> :active"
+        assert kwargs["ExpressionAttributeValues"] == {":active": "active"}
+
+    def test_losing_the_race_returns_empty_not_an_error(self, db_service):
+        svc, _, alerts, _ = db_service
+        alerts.put_item.side_effect = ClientError(
+            {"Error": {"Code": "ConditionalCheckFailedException", "Message": "exists"}},
+            "PutItem",
+        )
+        # "" tells the caller not to send a duplicate notification.
+        assert svc.create_alert("TT-0001", {}, dedupe_key="ec2#i-123#cpu") == ""
+
+    def test_without_dedupe_key_writes_unconditionally(self, db_service):
+        svc, _, alerts, _ = db_service
+        alerts.put_item.return_value = {}
+        alert_id = svc.create_alert("TT-0001", {"type": "manual"})
+        assert not alert_id.startswith("THRESHOLD#")
+        assert "ConditionExpression" not in alerts.put_item.call_args.kwargs
