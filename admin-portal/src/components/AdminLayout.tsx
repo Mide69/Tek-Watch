@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { adminSignOut } from '@/lib/auth'
 import adminApi from '@/lib/api'
+import { HistoryNav } from '@/components/HistoryNav'
 
 const navigation = [
   { name: 'Customers', href: '/customers', icon: Users },
@@ -132,6 +133,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Menu className="h-6 w-6" />
           </button>
+          <HistoryNav />
           <div className="flex-1" />
           <span className="pill text-emerald-300">
             <span className="relative flex h-1.5 w-1.5">
