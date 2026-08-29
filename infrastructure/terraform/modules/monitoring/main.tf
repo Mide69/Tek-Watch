@@ -5,6 +5,22 @@ variable "ops_alerts_topic_arn" { type = string }
 variable "ecs_cluster_name" { type = string }
 variable "api_service_name" { type = string }
 variable "consumer_service_name" { type = string }
+
+variable "alb_arn_suffix" {
+  description = "LoadBalancer dimension value for AWS/ApplicationELB metrics (aws_lb.arn_suffix)."
+  type        = string
+}
+
+variable "api_target_group_arn_suffix" {
+  description = "TargetGroup dimension value for AWS/ApplicationELB metrics (aws_lb_target_group.arn_suffix)."
+  type        = string
+}
+
+variable "consumer_desired_count" {
+  description = "Mirrors the ECS consumer service's desired count. At 0 the consumer task-count alarm is not created, since 'no tasks running' is the intended state."
+  type        = number
+  default     = 1
+}
 variable "sqs_ingest_queue_name" { type = string }
 
 variable "ingest_queue_depth_threshold" {
@@ -67,6 +83,10 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
     return_data = true
   }
 
+  # Both metrics need the LoadBalancer dimension. Without it CloudWatch looks
+  # for an undimensioned AWS/ApplicationELB metric that is never published, so
+  # this alarm evaluated on an empty series and sat permanently in OK —
+  # a 5xx alarm that could never fire.
   metric_query {
     id = "errors"
     metric {
@@ -74,6 +94,7 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
       namespace   = "AWS/ApplicationELB"
       period      = 60
       stat        = "Sum"
+      dimensions  = { LoadBalancer = var.alb_arn_suffix }
     }
   }
 
@@ -84,6 +105,7 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
       namespace   = "AWS/ApplicationELB"
       period      = 60
       stat        = "Sum"
+      dimensions  = { LoadBalancer = var.alb_arn_suffix }
     }
   }
 
@@ -92,29 +114,46 @@ resource "aws_cloudwatch_metric_alarm" "api_5xx" {
 }
 
 # API ECS task count drops to 0
-resource "aws_cloudwatch_metric_alarm" "api_task_count" {
-  alarm_name          = "${var.name_prefix}-api-task-count"
-  alarm_description   = "API ECS service has no running tasks"
+# Uses the ALB's HealthyHostCount rather than ECS/ContainerInsights
+# RunningTaskCount. RunningTaskCount only exists while Container Insights is
+# enabled, which is billed per metric — disabling it for cost silently left this
+# alarm with no datapoints and, with treat_missing_data = "breaching", stuck in
+# ALARM. HealthyHostCount is published by the ALB at no extra cost and is the
+# better signal anyway: it says the API is actually serving, not merely running.
+resource "aws_cloudwatch_metric_alarm" "api_healthy_hosts" {
+  alarm_name          = "${var.name_prefix}-api-healthy-hosts"
+  alarm_description   = "API has no healthy targets behind the ALB"
   comparison_operator = "LessThanThreshold"
   evaluation_periods  = 2
-  metric_name         = "RunningTaskCount"
-  namespace           = "ECS/ContainerInsights"
+  metric_name         = "HealthyHostCount"
+  namespace           = "AWS/ApplicationELB"
   period              = 60
   statistic           = "Minimum"
   threshold           = 1
   treat_missing_data  = "breaching"
 
   dimensions = {
-    ClusterName = var.ecs_cluster_name
-    ServiceName = var.api_service_name
+    LoadBalancer = var.alb_arn_suffix
+    TargetGroup  = var.api_target_group_arn_suffix
   }
 
   alarm_actions = [var.ops_alerts_topic_arn]
-  tags          = { Name = "${var.name_prefix}-api-task-count-alarm" }
+  tags          = { Name = "${var.name_prefix}-api-healthy-hosts-alarm" }
 }
 
 # Consumer ECS task count drops to 0
+# Only meaningful when the consumer is meant to be running. With
+# consumer_desired_count = 0 (idle until the first customer publishes) a
+# "no running tasks" alarm is just noise, and the ingest-queue-depth alarm —
+# thresholded at 0 in that mode — is what actually catches messages arriving
+# with nothing draining them.
+#
+# Still on ECS/ContainerInsights, so it only reports while Container Insights is
+# enabled. Left as-is because it is disabled in every environment today; if you
+# re-enable the consumer AND leave Insights off, move this to a queue-based
+# signal rather than trusting it.
 resource "aws_cloudwatch_metric_alarm" "consumer_task_count" {
+  count               = var.consumer_desired_count > 0 ? 1 : 0
   alarm_name          = "${var.name_prefix}-consumer-task-count"
   alarm_description   = "Ingest consumer ECS service has no running tasks"
   comparison_operator = "LessThanThreshold"

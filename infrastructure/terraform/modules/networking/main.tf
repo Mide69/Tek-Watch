@@ -232,3 +232,9 @@ output "alb_security_group_id" { value = aws_security_group.alb.id }
 output "ecs_sg_id" { value = aws_security_group.ecs_tasks.id }
 output "alb_dns_name" { value = aws_lb.api.dns_name }
 output "api_target_group_arn" { value = aws_lb_target_group.api.arn }
+
+# CloudWatch dimension values for AWS/ApplicationELB metrics. An alarm that
+# omits these matches the metric published with NO dimensions, which the ALB
+# never emits — so the alarm sits on an empty metric forever.
+output "alb_arn_suffix" { value = aws_lb.api.arn_suffix }
+output "api_target_group_arn_suffix" { value = aws_lb_target_group.api.arn_suffix }
