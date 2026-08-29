@@ -141,7 +141,17 @@ export default function AdminLoginPage() {
         advance(await adminRespond(mfaCode))
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+      // An account left in RESET_REQUIRED by admin-reset-user-password surfaces
+      // as a thrown exception, not as a sign-in step, so the RESET_REQUIRED step
+      // handling in advance() never sees it. Send them to code entry instead of
+      // showing a dead end — Cognito already emailed the code.
+      if ((err as { name?: string })?.name === 'PasswordResetRequiredException') {
+        setStep(null)
+        setView('forgot-confirm')
+        setError('Your password was reset. Enter the code we emailed you and choose a new password.')
+      } else {
+        setError(err instanceof Error ? err.message : 'Authentication failed')
+      }
     } finally {
       setLoading(false)
     }
