@@ -1,5 +1,15 @@
 name: Dashboard CI/CD
 
+# CD is gated behind the ENABLE_CD repository variable and is OFF by default.
+# Two things must be fixed before these jobs can succeed:
+#   1. ECR_REPOSITORY below names e.g. "tek-watch-api", but terraform creates
+#      per-environment repos ("tek-watch-prod-api"). The names do not exist.
+#   2. build-and-push declares no `environment:`, so it cannot read AWS_ROLE_ARN
+#      while that is stored as a dev *environment* secret.
+# Until then these jobs would fail on every push and drown out real signal.
+# To re-enable: set repository variable ENABLE_CD=true (Settings -> Secrets and
+# variables -> Actions -> Variables), after fixing 1 and 2 above.
+
 on:
   push:
     branches: [main]
@@ -126,7 +136,7 @@ jobs:
   deploy-dev:
     needs: [build, e2e]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: vars.ENABLE_CD == 'true' && (github.ref == 'refs/heads/main' && github.event_name == 'push')
     environment: dev
     steps:
       - uses: actions/checkout@v4
@@ -173,7 +183,7 @@ jobs:
   deploy-staging:
     needs: [build, e2e]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: vars.ENABLE_CD == 'true' && (startsWith(github.ref, 'refs/tags/v'))
     environment: staging
     steps:
       - uses: actions/checkout@v4
@@ -218,7 +228,7 @@ jobs:
   deploy-prod:
     needs: [build, e2e]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch'
+    if: vars.ENABLE_CD == 'true' && (github.event_name == 'workflow_dispatch')
     environment: prod
     steps:
       - uses: actions/checkout@v4
