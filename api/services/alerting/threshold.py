@@ -91,7 +91,9 @@ async def evaluate_thresholds_for_customer(
             if alert_key in active_keys:
                 continue
 
-            # Create new alert
+            # Create new alert. The active_keys check above is a cheap local
+            # filter; dedupe_key is what actually prevents two API replicas from
+            # both raising this alert, since each holds its own active_keys.
             alert_id = db_service.create_alert(customer_id, {
                 "type": "threshold",
                 "severity": severity,
@@ -105,7 +107,7 @@ async def evaluate_thresholds_for_customer(
                     f"{metric_name} is {current_value:.2f} "
                     f"({operator} {threshold_value})"
                 ),
-            })
+            }, dedupe_key=alert_key)
 
             if alert_id:
                 new_alerts += 1
