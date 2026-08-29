@@ -26,6 +26,7 @@ export default function AdminLoginPage() {
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [resetCode, setResetCode] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState('')
   // null = still on the email/password form; anything else is a pending challenge.
   const [step, setStep] = useState<AdminAuthStep | null>(null)
   // Forgot-password is a separate track from the sign-in state machine.
@@ -75,6 +76,40 @@ export default function AdminLoginPage() {
       router.replace('/customers')
     }
   }, [router])
+
+  // Render the otpauth:// URI as a scannable QR. Generated in the browser on
+  // purpose — the setup URI contains the TOTP shared secret, so handing it to an
+  // external QR service would hand away the second factor. Imported dynamically
+  // so the encoder is only fetched when someone actually enrols, rather than
+  // riding along in the main bundle of a static export.
+  useEffect(() => {
+    if (step?.kind !== 'TOTP_SETUP') {
+      setQrDataUrl('')
+      return
+    }
+    let cancelled = false
+    import('qrcode')
+      .then((QRCode) =>
+        QRCode.toDataURL(step.setupUri, {
+          margin: 2,
+          width: 220,
+          errorCorrectionLevel: 'M',
+          // Fixed dark-on-white regardless of theme; inverted codes are
+          // unreliable to scan, which is why it sits on a white plate below.
+          color: { dark: '#0B1020', light: '#FFFFFF' },
+        })
+      )
+      .then((url) => {
+        if (!cancelled) setQrDataUrl(url)
+      })
+      .catch(() => {
+        // Fall back to manual entry of the setup key, which is always shown.
+        if (!cancelled) setQrDataUrl('')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [step])
 
   const enterDemo = async () => {
     setError('')
@@ -409,25 +444,47 @@ export default function AdminLoginPage() {
             ) : (
               <div>
                 {step.kind === 'TOTP_SETUP' ? (
-                  <div className="mb-5 space-y-3">
+                  <div className="mb-5 space-y-4">
                     <p className="text-center text-sm text-muted-ink">
-                      Set up multi-factor authentication. Add this secret to your authenticator
-                      app, then enter the code it shows.
+                      Scan this with your authenticator app — Okta Verify, Google Authenticator,
+                      Authy, 1Password — then enter the code it shows.
                     </p>
-                    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
-                      <p className="mb-1 text-xs uppercase tracking-widest text-faint-ink">
-                        Setup key
+
+                    {qrDataUrl ? (
+                      <div className="flex justify-center">
+                        {/* White plate: QR codes scan far more reliably dark-on-light. */}
+                        <div className="rounded-xl bg-white p-3 shadow-lg">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={qrDataUrl}
+                            alt="QR code for setting up multi-factor authentication"
+                            width={220}
+                            height={220}
+                            className="block h-[220px] w-[220px]"
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-center text-xs text-faint-ink">
+                        Preparing QR code — use the setup key below if it does not appear.
                       </p>
-                      <code className="block break-all font-mono text-sm text-violet-200">
-                        {step.secret}
-                      </code>
-                    </div>
+                    )}
+
                     <a
                       href={step.setupUri}
                       className="block text-center text-xs text-violet-300 hover:text-violet-200"
                     >
-                      Or open directly in your authenticator app →
+                      Open directly in your authenticator app →
                     </a>
+
+                    <details className="rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
+                      <summary className="cursor-pointer text-xs uppercase tracking-widest text-faint-ink">
+                        Can&apos;t scan? Enter the key manually
+                      </summary>
+                      <code className="mt-2 block break-all font-mono text-sm text-violet-200">
+                        {step.secret}
+                      </code>
+                    </details>
                   </div>
                 ) : (
                   <p className="mb-4 text-center text-sm text-muted-ink">
