@@ -84,11 +84,26 @@ def is_silent(last_heartbeat_iso: str, threshold_minutes: int) -> bool:
         return True   # treat unparseable or missing timestamp as silent
 
 
+def silence_alert_sk(customer_id: str) -> str:
+    """Range key for a customer's silence alert.
+
+    The alerts table is keyed customer_id (HASH) + SK (RANGE). Deriving SK from
+    the customer id makes the write idempotent: re-raising a silence alert
+    overwrites the same item instead of accumulating one row per run.
+    """
+    return f"SILENCE-{customer_id}"
+
+
 def build_alert(customer_id: str, last_heartbeat: str, gap_minutes: float) -> dict:
     """Build the alert record for a silenced agent."""
     now = datetime.now(timezone.utc).isoformat()
     return {
-        "alert_id":       f"SILENCE-{customer_id}",
+        # SK is the table's range key and is mandatory — without it put_item
+        # fails with ValidationException. Its absence went unnoticed because the
+        # unit tests assert against a MagicMock table, which accepts any shape,
+        # and because the detector only writes when a real agent goes silent.
+        "SK":             silence_alert_sk(customer_id),
+        "alert_id":       silence_alert_sk(customer_id),
         "customer_id":    customer_id,
         "severity":       "critical",
         "status":         "active",
@@ -129,15 +144,18 @@ def resolve_alert(ddb, customer_id: str) -> None:
     """Remove or resolve a previously raised silence alert."""
     try:
         table = ddb.Table(ALERTS_TABLE)
+        # Must address the table's real composite key. This previously passed
+        # only alert_id, which is not a key attribute at all, so every resolve
+        # raised ValidationException rather than clearing the alert.
         table.update_item(
-            Key={"alert_id": f"SILENCE-{customer_id}"},
+            Key={"customer_id": customer_id, "SK": silence_alert_sk(customer_id)},
             UpdateExpression="SET #st = :resolved, resolved_at = :now",
             ExpressionAttributeNames={"#st": "status"},
             ExpressionAttributeValues={
                 ":resolved": "resolved",
                 ":now": datetime.now(timezone.utc).isoformat(),
             },
-            ConditionExpression="attribute_exists(alert_id)",
+            ConditionExpression="attribute_exists(SK)",
         )
         logger.info("Resolved silence alert for customer %s", customer_id)
     except ddb.meta.client.exceptions.ConditionalCheckFailedException:
