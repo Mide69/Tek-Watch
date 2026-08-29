@@ -124,3 +124,29 @@ output "admin_cf_domain_name" {
   description = "CloudFront default domain for admin portal (use until a custom domain/cert is set)"
   value       = module.admin_hosting.cloudfront_domain_name
 }
+
+# ── Custom domain ─────────────────────────────────────────────────────────────
+
+output "acm_validation_records" {
+  description = "CNAMEs to create at the DNS host to validate the CloudFront certificate. Empty until enable_custom_domain is true."
+  value = var.enable_custom_domain ? [
+    for o in aws_acm_certificate.cloudfront[0].domain_validation_options : {
+      name  = o.resource_record_name
+      type  = o.resource_record_type
+      value = o.resource_record_value
+    }
+  ] : []
+}
+
+output "acm_certificate_arn_cloudfront" {
+  description = "ARN of the terraform-managed us-east-1 certificate for the CloudFront custom domains."
+  value       = var.enable_custom_domain ? aws_acm_certificate.cloudfront[0].arn : ""
+}
+
+output "custom_domains" {
+  description = "The custom domains the distributions will serve once attach_custom_domain is true."
+  value = {
+    dashboard = local.dashboard_domain
+    admin     = local.admin_domain
+  }
+}
