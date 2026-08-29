@@ -203,7 +203,19 @@ variable "acm_certificate_arn" {
 }
 
 variable "cloudfront_certificate_arn" {
-  description = "ACM certificate ARN for CloudFront (must be in us-east-1)"
+  description = "Externally-managed ACM certificate ARN for CloudFront (must be in us-east-1). Ignored when enable_custom_domain and attach_custom_domain are both true, since terraform then manages its own."
   type        = string
   default     = ""
+}
+
+variable "enable_custom_domain" {
+  description = "Request a us-east-1 ACM certificate covering the dashboard and admin domains. Phase 1: creates the request and prints the DNS validation records to add at your DNS host."
+  type        = bool
+  default     = false
+}
+
+variable "attach_custom_domain" {
+  description = "Attach the certificate above to both CloudFront distributions. Phase 2 — only set true once the certificate reports ISSUED, because CloudFront rejects one that is still PENDING_VALIDATION."
+  type        = bool
+  default     = false
 }
