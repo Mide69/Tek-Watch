@@ -88,6 +88,47 @@ resource "aws_sns_topic_subscription" "ops_alerts_email" {
   endpoint  = var.ops_alert_email
 }
 
+# ── ACM certificate for the CloudFront custom domains ────────────────────────
+# Must live in us-east-1: CloudFront only accepts certificates from that region
+# no matter where the distribution or its origin sit. This is a common trip-up.
+#
+# Validation is DNS, and the zone for this domain is hosted at Cloudflare rather
+# than Route 53, so terraform cannot create the validation records itself. It
+# raises the request; the CNAMEs from the acm_validation_records output are added
+# by hand at the DNS host. There is deliberately no aws_acm_certificate_validation
+# resource — it would block the apply waiting on records that do not exist yet.
+#
+# Two-phase by design:
+#   enable_custom_domain = true  -> request the cert, print the records
+#   attach_custom_domain = true  -> once ISSUED, hand it to the distributions
+# Attaching a cert that is still PENDING_VALIDATION fails the CloudFront update,
+# so the second flag is only flipped after the first phase has validated.
+resource "aws_acm_certificate" "cloudfront" {
+  count    = var.enable_custom_domain ? 1 : 0
+  provider = aws.us_east_1
+
+  domain_name               = local.dashboard_domain
+  subject_alternative_names = [local.admin_domain]
+  validation_method         = "DNS"
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  tags = { Name = "${local.name_prefix}-cloudfront-cert" }
+}
+
+locals {
+  # Empty until the operator confirms the cert is ISSUED and flips
+  # attach_custom_domain, which is what switches the distributions onto their
+  # custom domains and their own certificate.
+  cloudfront_cert_arn = (
+    var.enable_custom_domain && var.attach_custom_domain
+    ? aws_acm_certificate.cloudfront[0].arn
+    : var.cloudfront_certificate_arn
+  )
+}
+
 # ── Networking ────────────────────────────────────────────────────────────────
 
 module "networking" {
@@ -108,6 +149,9 @@ module "ecr" {
   source      = "./modules/ecr"
   name_prefix = local.name_prefix
   environment = var.environment
+  # Repos are shared across environments, so they are named from the project
+  # alone rather than name_prefix. See the module for why.
+  project = var.project
 }
 
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
@@ -254,7 +298,7 @@ module "dashboard_hosting" {
   site_name       = "dashboard"
   environment     = var.environment
   domain_name     = local.dashboard_domain
-  certificate_arn = var.cloudfront_certificate_arn
+  certificate_arn = local.cloudfront_cert_arn
 
   # Serve the API under /api/* on this same distribution so the HTTPS frontend
   # can call the HTTP-only ALB without tripping browser mixed-content blocking.
@@ -269,7 +313,7 @@ module "admin_hosting" {
   site_name       = "admin"
   environment     = var.environment
   domain_name     = local.admin_domain
-  certificate_arn = var.cloudfront_certificate_arn
+  certificate_arn = local.cloudfront_cert_arn
 
   api_origin_domain_name = module.networking.alb_dns_name
 }
