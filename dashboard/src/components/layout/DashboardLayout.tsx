@@ -18,6 +18,7 @@ import {
 } from '@/contexts/DashboardContext'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { NotificationBell } from '@/components/ui/NotificationBell'
+import { HistoryNav } from '@/components/ui/HistoryNav'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -173,6 +174,8 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="lg:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
+
+          <HistoryNav />
 
           <div className="flex-1" />
 
