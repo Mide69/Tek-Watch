@@ -24,6 +24,8 @@ import {
   signOut,
   confirmSignIn,
   fetchAuthSession,
+  resetPassword,
+  confirmResetPassword,
   type SignInOutput,
   type ConfirmSignInOutput,
 } from 'aws-amplify/auth'
@@ -68,6 +70,10 @@ export type AdminAuthStep =
   | { kind: 'NEW_PASSWORD_REQUIRED' }
   | { kind: 'TOTP_SETUP'; secret: string; setupUri: string }
   | { kind: 'TOTP_CODE' }
+  // An operator ran admin-reset-user-password, so the account sits in
+  // RESET_REQUIRED. Cognito has already emailed a code; the caller should send
+  // the user to the forgot-password confirmation screen rather than error out.
+  | { kind: 'RESET_REQUIRED' }
 
 type AmplifySignInResult = SignInOutput | ConfirmSignInOutput
 
@@ -106,6 +112,9 @@ async function toStep(result: AmplifySignInResult): Promise<AdminAuthStep> {
     case 'CONFIRM_SIGN_IN_WITH_TOTP_CODE':
       return { kind: 'TOTP_CODE' }
 
+    case 'RESET_PASSWORD':
+      return { kind: 'RESET_REQUIRED' }
+
     default:
       throw new Error(`Unsupported auth step: ${next.signInStep}`)
   }
@@ -133,6 +142,35 @@ export async function adminSignIn(email: string, password: string): Promise<Admi
  */
 export async function adminRespond(challengeResponse: string): Promise<AdminAuthStep> {
   return toStep(await confirmSignIn({ challengeResponse }))
+}
+
+/**
+ * Start a forgot-password reset. Cognito emails a numeric CODE, not a link —
+ * the caller must collect that code and call adminConfirmForgotPassword.
+ *
+ * Deliberately does not reveal whether the account exists: Cognito throws
+ * UserNotFoundException, which we swallow so the UI can show the same
+ * "check your email" message either way and not leak valid admin addresses.
+ */
+export async function adminForgotPassword(email: string): Promise<void> {
+  if (isDemoMode()) return
+  try {
+    await resetPassword({ username: email })
+  } catch (err) {
+    const name = (err as { name?: string })?.name
+    if (name === 'UserNotFoundException' || name === 'InvalidParameterException') return
+    throw err
+  }
+}
+
+/** Complete the reset with the emailed code and a new password. */
+export async function adminConfirmForgotPassword(
+  email: string,
+  code: string,
+  newPassword: string
+): Promise<void> {
+  if (isDemoMode()) return
+  await confirmResetPassword({ username: email, confirmationCode: code, newPassword })
 }
 
 export async function adminSignOut(): Promise<void> {
