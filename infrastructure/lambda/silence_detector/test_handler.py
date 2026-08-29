@@ -55,6 +55,18 @@ class TestBuildAlert:
         alert = h.build_alert("TT-0042", _iso(30), 30.0)
         assert alert["alert_id"] == "SILENCE-TT-0042"
 
+    def test_includes_the_sk_range_key(self):
+        """Without SK, put_item fails with ValidationException.
+
+        The alerts table is customer_id (HASH) + SK (RANGE). The item shipped
+        without SK entirely; nothing caught it because upsert_alert is only
+        exercised against a MagicMock table and only writes when a real agent
+        goes silent, which had never happened.
+        """
+        alert = h.build_alert("TT-0042", _iso(30), 30.0)
+        assert alert["SK"] == "SILENCE-TT-0042"
+        assert alert["customer_id"] == "TT-0042"
+
     def test_threshold_value_matches_env(self):
         alert = h.build_alert("TT-0001", _iso(25), 25.0)
         assert alert["threshold_value"] == float(h.SILENCE_MIN)
@@ -97,6 +109,21 @@ class TestResolveAlert:
         table.update_item.return_value = {}
         h.resolve_alert(ddb, "TT-0001")
         assert table.update_item.called
+
+    def test_addresses_the_tables_real_composite_key(self):
+        """The alerts table is customer_id (HASH) + SK (RANGE).
+
+        This previously passed Key={"alert_id": ...}, which is not a key
+        attribute, so every resolve failed with ValidationException. A MagicMock
+        table accepts any shape, so only an explicit assertion catches it.
+        """
+        ddb   = MagicMock()
+        table = MagicMock()
+        ddb.Table.return_value = table
+        table.update_item.return_value = {}
+        h.resolve_alert(ddb, "TT-0001")
+        key = table.update_item.call_args.kwargs["Key"]
+        assert key == {"customer_id": "TT-0001", "SK": "SILENCE-TT-0001"}
 
     def test_handles_condition_check_failed(self):
         ddb   = MagicMock()

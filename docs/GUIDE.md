@@ -343,7 +343,7 @@ For each environment, go to **Settings → Environments → [env] → Add secret
 | `ANTHROPIC_API_KEY` | Your Anthropic API key |
 | `ACM_CERT_ARN_DEV` | ACM cert ARN from Phase 2 |
 | `ECS_CLUSTER_DEV` | `terraform output ecs_cluster_name` |
-| `ECS_SERVICE_API_DEV` | `tek-watch-dev-api` |
+| `ECS_SERVICE_API_DEV` | `api` (the service name is not prefixed — the cluster is) |
 | `COGNITO_CUSTOMER_USER_POOL_ID_DEV` | `terraform output cognito_customer_user_pool_id` |
 | `COGNITO_CUSTOMER_APP_CLIENT_ID_DEV` | `terraform output cognito_customer_app_client_id` |
 | `COGNITO_ADMIN_USER_POOL_ID_DEV` | `terraform output cognito_admin_user_pool_id` |
@@ -454,7 +454,7 @@ curl -sI https://admin-dev.tekwatch.io | head -1
 # 4. ECS services: running count == desired count
 aws ecs describe-services \
   --cluster tek-watch-dev \
-  --services tek-watch-dev-api tek-watch-dev-ingest-consumer \
+  --services api ingest-consumer \
   --query 'services[*].{Service:serviceName,Running:runningCount,Desired:desiredCount}' \
   --output table
 
@@ -548,7 +548,7 @@ curl -sI https://admin.tekwatch.io | head -1
 
 aws ecs describe-services \
   --cluster tek-watch-prod \
-  --services tek-watch-prod-api tek-watch-prod-ingest-consumer \
+  --services api ingest-consumer \
   --query 'services[*].{Service:serviceName,Running:runningCount,Desired:desiredCount}' \
   --output table
 ```
@@ -1042,6 +1042,7 @@ curl -I https://dev.tekwatch.io
 
 ```bash
 # List task definition revisions
+# Note: task-definition families ARE prefixed, unlike service names.
 aws ecs list-task-definitions --family-prefix tek-watch-dev-api
 
 # Roll back to a specific revision
