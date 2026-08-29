@@ -90,7 +90,10 @@ class TestOverviewEndpoint:
             app = create_app()
             c = TestClient(app, raise_server_exceptions=False)
             resp = c.get("/api/v1/overview")
-            assert resp.status_code == 403  # No auth header
+            # 401, not 403: absent credentials are unauthenticated, which is what
+            # the dependency documents. See auth/dependencies.py — HTTPBearer runs
+            # with auto_error=False so we own this status.
+            assert resp.status_code == 401  # No auth header
 
     def test_overview_returns_expected_shape(self, client):
         with patch("routers.overview.TimestreamQueryService") as mock_ts, \

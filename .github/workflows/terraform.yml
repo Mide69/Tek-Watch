@@ -121,11 +121,16 @@ jobs:
           path: ${{ env.TF_WORKING_DIR }}/tfplan-dev
           retention-days: 1
 
+  # Manual only, matching staging and prod. Previously this applied on every
+  # push to main, so a routine merge silently provisioned a whole second
+  # environment — VPC, NAT gateways, ALB, ECS — on top of prod. Run it
+  # deliberately via Actions -> Run workflow (environment: dev, action: apply).
   terraform-apply-dev:
-    name: Apply (dev)
-    needs: terraform-plan-dev
+    name: Apply (dev) — manual only
+    # No `needs:` — matches staging/prod. Depending on terraform-plan-dev would
+    # permanently skip this job, since that job only runs on PRs and pushes.
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'dev' && github.event.inputs.action == 'apply'
     environment: dev
     env:
       TF_VAR_environment: dev
