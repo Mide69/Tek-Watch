@@ -63,7 +63,11 @@ jobs:
   build-and-push:
     needs: test
     runs-on: ubuntu-latest
-    if: vars.ENABLE_CD == 'true' && (github.event_name == 'push')
+    # Also runs on workflow_dispatch. deploy-prod needs this job but only
+    # fires on dispatch, so gating this on push alone made the two mutually
+    # exclusive — a manual prod deploy skipped its own dependency and could
+    # therefore never run at all.
+    if: vars.ENABLE_CD == 'true' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
     outputs:
       image_uri: ${{ steps.build.outputs.image_uri }}
     steps:
