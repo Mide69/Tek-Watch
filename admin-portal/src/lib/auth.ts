@@ -83,7 +83,19 @@ function persistSession(token: string) {
 
 async function finishSession(): Promise<AdminAuthStep> {
   const session = await fetchAuthSession()
-  persistSession(session.tokens?.idToken?.toString() ?? '')
+  const idToken = session.tokens?.idToken?.toString()
+
+  // Fail loudly rather than storing "". An empty token was persisted, DONE was
+  // reported, the caller redirected to /customers, and useAdminAuth then read a
+  // falsy token and sent the user back to /login — a silent loop that looks
+  // like the password was wrong, with nothing in the UI to explain it.
+  if (!idToken) {
+    throw new Error(
+      'Signed in, but no session token was returned. Please try again.'
+    )
+  }
+
+  persistSession(idToken)
   return { kind: 'DONE' }
 }
 
