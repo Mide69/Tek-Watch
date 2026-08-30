@@ -92,6 +92,13 @@ jobs:
           echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       - name: Scan image for vulnerabilities (Trivy)
+        # Advisory, never blocking. exit-code '0' already meant findings do
+        # not fail the build, and the image is pushed BEFORE this runs — so
+        # the scan is informational either way. continue-on-error covers the
+        # step itself failing: the upstream installer broke on v0.65.0 and
+        # took the whole job with it, blocking a deploy of an image that had
+        # built and pushed cleanly.
+        continue-on-error: true
         # Tag is v-prefixed upstream — "@0.29.0" does not resolve, which
         # failed the job outright. v0.33.1 is current and stable; the
         # inputs used below are unchanged across these versions.
