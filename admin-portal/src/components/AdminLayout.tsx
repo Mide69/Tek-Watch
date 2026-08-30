@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import {
@@ -13,7 +13,7 @@ import {
   Shield,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { adminSignOut } from '@/lib/auth'
+import { adminSignOut, getAdminEmail } from '@/lib/auth'
 import adminApi from '@/lib/api'
 import { HistoryNav } from '@/components/HistoryNav'
 
@@ -25,6 +25,10 @@ const navigation = [
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  // Read after mount: the token lives in localStorage, so reading during
+  // render would not match the server-rendered markup of the static export.
+  const [adminEmail, setAdminEmail] = useState<string | null>(null)
+  useEffect(() => { setAdminEmail(getAdminEmail()) }, [])
   const pathname = usePathname()
   const router = useRouter()
 
@@ -86,7 +90,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="px-3 py-4">
         <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-3 py-2.5">
           <p className="text-[11px] text-faint-ink">Signed in as</p>
-          <p className="truncate text-xs font-medium text-ink">admin@tektribe.io</p>
+          <p className="truncate text-xs font-medium text-ink">{adminEmail ?? "—"}</p>
         </div>
         <button
           onClick={handleSignOut}
