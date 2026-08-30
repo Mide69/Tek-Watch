@@ -116,7 +116,10 @@ jobs:
   deploy-dev:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: vars.ENABLE_CD == 'true' && (github.ref == 'refs/heads/main' && github.event_name == 'push')
+    # Separate gate: no dev environment is provisioned, so this would fail on
+    # every push to main. Set ENABLE_DEV_DEPLOY=true only once terraform has
+    # actually created one.
+    if: vars.ENABLE_DEV_DEPLOY == 'true' && (github.ref == 'refs/heads/main' && github.event_name == 'push')
     environment: dev
     env:
       ECS_CLUSTER: tek-watch-dev
@@ -144,7 +147,8 @@ jobs:
   deploy-staging:
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: vars.ENABLE_CD == 'true' && (startsWith(github.ref, 'refs/tags/v'))
+    # Separate gate: staging.tfvars exists but has never been applied.
+    if: vars.ENABLE_STAGING_DEPLOY == 'true' && (startsWith(github.ref, 'refs/tags/v'))
     environment: staging
     env:
       ECS_CLUSTER: tek-watch-staging
