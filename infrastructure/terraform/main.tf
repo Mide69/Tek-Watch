@@ -242,8 +242,10 @@ module "ecs" {
 
   secrets_manager_arn = module.secrets.secret_arn
 
-  sqs_ingest_queue_arn = module.sqs.ingest_queue_arn
-  sqs_dlq_arn          = module.sqs.dlq_arn
+  sqs_ingest_queue_arn      = module.sqs.ingest_queue_arn
+  sqs_ingest_queue_url      = module.sqs.ingest_queue_url
+  self_hosted_agent_api_key = var.self_hosted_agent_api_key
+  sqs_dlq_arn               = module.sqs.dlq_arn
 
   dynamodb_table_arns = [
     module.dynamodb.customers_table_arn,
