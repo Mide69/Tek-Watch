@@ -26,6 +26,12 @@ variable "sqs_ingest_queue_url" {
   type        = string
 }
 
+variable "self_hosted_agent_customer_id" {
+  description = "Customer ID the self-hosted agent reports as. Must match a real customer record: the ingest consumer looks this up and drops every message for an unknown id. The API mints ids as TT-XXXX, so the old hardcoded TEK-WATCH-INTERNAL could never have matched one."
+  type        = string
+  default     = "TEK-WATCH-INTERNAL"
+}
+
 variable "self_hosted_agent_api_key" {
   description = "API key for the central account's own agent. Empty leaves TEK_WATCH_API_KEY unset, which the agent treats as fatal — keep enable_self_hosted_agent false until this is set."
   type        = string
@@ -583,7 +589,7 @@ resource "aws_ecs_task_definition" "agent" {
       { name = "AWS_REGION", value = var.aws_region },
       { name = "ENVIRONMENT", value = var.environment },
       { name = "LOG_LEVEL", value = "INFO" },
-      { name = "TEK_WATCH_CUSTOMER_ID", value = "TEK-WATCH-INTERNAL" },
+      { name = "TEK_WATCH_CUSTOMER_ID", value = var.self_hosted_agent_customer_id },
       # The URL, not the ARN. boto3's send_message takes a QueueUrl and
       # rejects an ARN, so the agent could never publish a single metric.
       { name = "TEK_WATCH_INGEST_QUEUE_URL", value = var.sqs_ingest_queue_url },

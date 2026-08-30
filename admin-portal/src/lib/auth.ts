@@ -190,6 +190,28 @@ export async function adminSignOut(): Promise<void> {
   localStorage.removeItem('tw_admin_token')
 }
 
+/**
+ * Email of the signed-in admin, read from the ID token.
+ *
+ * The sidebar previously hardcoded "admin@tektribe.io" — an address on an
+ * unregistered domain, shown regardless of who was actually signed in. Decoding
+ * the token is display-only; Cognito has already validated it, and the API
+ * re-verifies on every request, so nothing is trusted on the strength of this.
+ */
+export function getAdminEmail(): string | null {
+  const token = getAdminToken()
+  if (!token) return null
+  try {
+    const payload = token.split('.')[1]
+    if (!payload) return null
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    const claims = JSON.parse(json) as { email?: string }
+    return claims.email ?? null
+  } catch {
+    return null
+  }
+}
+
 export function getAdminToken(): string | null {
   if (typeof window === 'undefined') return null
   return localStorage.getItem('tw_admin_token')
