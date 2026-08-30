@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { isDemoMode } from '@/lib/demoMode'
+import { isDemoMode, isDemoSession } from '@/lib/demoMode'
 
 /**
  * useAuth — returns the current authenticated user.
@@ -9,6 +9,11 @@ import { isDemoMode } from '@/lib/demoMode'
  * Demo mode (no real Cognito): returns TT-DEMO immediately, no redirect.
  * Production mode (real Cognito pool): validates session and redirects to
  * /login when unauthenticated.
+ *
+ * A visitor-opted demo session (?demo=1) also skips the redirect, so the
+ * landing page's "Launch Live Demo" works against a real Cognito build. They
+ * get no token, so the API rejects every call and useData falls back to its
+ * mock data — which is exactly the sample dashboard we want to show them.
  */
 
 const IS_REAL_COGNITO = !isDemoMode()
@@ -19,6 +24,7 @@ export function useAuth() {
 
   useEffect(() => {
     if (!IS_REAL_COGNITO) return   // Demo / dev mode — skip Cognito entirely
+    if (isDemoSession()) return    // Browsing the demo — show samples, do not redirect
 
     let cancelled = false
     setLoading(true)

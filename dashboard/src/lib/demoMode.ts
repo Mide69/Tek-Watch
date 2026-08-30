@@ -16,3 +16,51 @@ export const isDemoMode = (): boolean => (
   COGNITO_POOL.toLowerCase().includes('placeholder') ||
   COGNITO_POOL === 'undefined'
 )
+
+/**
+ * A visitor-opted demo session, separate from the build-time flag above.
+ *
+ * isDemoMode() is decided at build time and is all-or-nothing: turning it off
+ * to enable real Cognito login also removed the "try it without signing up"
+ * experience, so every "Launch Live Demo" call to action on the landing page
+ * bounced straight to /login — while the page still promised "no signup or
+ * credit card needed".
+ *
+ * This lets both exist. A visitor arriving with ?demo=1 gets a session flag,
+ * useAuth skips the login redirect, and useData's existing behaviour does the
+ * rest: its apiFetch already falls back to mock data whenever a request fails,
+ * so the unauthenticated 401s render the sample dashboard with no extra work.
+ *
+ * Deliberately NOT a way around authentication: it grants no token and the API
+ * still rejects every call. It only decides whether we show mock data instead
+ * of redirecting.
+ */
+const DEMO_SESSION_KEY = 'tw_demo_session'
+
+export const isDemoSession = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    if (new URLSearchParams(window.location.search).has('demo')) {
+      window.localStorage.setItem(DEMO_SESSION_KEY, '1')
+      return true
+    }
+    return window.localStorage.getItem(DEMO_SESSION_KEY) === '1'
+  } catch {
+    // Private browsing or blocked storage — fall back to the URL alone so the
+    // demo still works for that visit.
+    try {
+      return new URLSearchParams(window.location.search).has('demo')
+    } catch {
+      return false
+    }
+  }
+}
+
+export const endDemoSession = (): void => {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.removeItem(DEMO_SESSION_KEY)
+  } catch {
+    /* nothing to clear */
+  }
+}

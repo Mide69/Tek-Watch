@@ -339,7 +339,7 @@ export default function LandingPage() {
               Sign in
             </Link>
             <Link
-              href="/overview"
+              href="/overview/?demo=1"
               className="flex items-center gap-1.5 px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-sm font-semibold rounded-md transition-colors"
             >
               Live Demo <ArrowRight className="w-3.5 h-3.5" />
@@ -386,7 +386,7 @@ export default function LandingPage() {
               style={{ animationDelay: '270ms' }}
             >
               <Link
-                href="/overview"
+                href="/overview/?demo=1"
                 className="flex items-center justify-center gap-2 px-6 py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
@@ -911,7 +911,7 @@ export default function LandingPage() {
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
-                href="/overview"
+                href="/overview/?demo=1"
                 className="flex items-center justify-center gap-2 px-8 py-3.5 bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded-md transition-colors"
               >
                 Launch Live Demo <ArrowRight className="w-4 h-4" />
@@ -968,7 +968,7 @@ export default function LandingPage() {
                   <li><a href="#features" className="hover:text-foreground transition-colors">Platform</a></li>
                   <li><a href="#how-it-works" className="hover:text-foreground transition-colors">How it works</a></li>
                   <li><a href="#pricing" className="hover:text-foreground transition-colors">Pricing</a></li>
-                  <li><Link href="/overview" className="hover:text-foreground transition-colors">Live demo</Link></li>
+                  <li><Link href="/overview/?demo=1" className="hover:text-foreground transition-colors">Live demo</Link></li>
                 </ul>
               </div>
 

@@ -92,14 +92,14 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
 export default function CostPage() {
   const { customerId }      = useAuth()
   const { timeRange }       = useDashboard()
-  const { data, isLoading } = useCost()
+  const { data } = useCost()
 
   const handleExport = () => {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
     window.open(`${base}/api/v1/cost/breakdown?format=csv`, '_blank')
   }
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">

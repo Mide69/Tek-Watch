@@ -11,7 +11,7 @@ import {
 } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
-import { isDemoMode } from '@/lib/demoMode'
+import { isDemoMode, isDemoSession, endDemoSession } from '@/lib/demoMode'
 import {
   useDashboard,
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
@@ -19,6 +19,7 @@ import {
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { NotificationBell } from '@/components/ui/NotificationBell'
 import { HistoryNav } from '@/components/ui/HistoryNav'
+import { DemoBadge } from '@/components/ui/DemoBadge'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -86,6 +87,9 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
   const handleSignOut = useCallback(async () => {
     if (DEMO_MODE) { router.push('/'); return }
+    // A visitor browsing the demo has no Cognito session to end — clear the
+    // demo flag instead, or they would be bounced straight back into it.
+    if (isDemoSession()) { endDemoSession(); router.push('/'); return }
     const { authSignOut } = await import('@/lib/auth')
     await authSignOut()
     router.push('/login')
@@ -176,6 +180,8 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           </button>
 
           <HistoryNav />
+
+          <DemoBadge />
 
           <div className="flex-1" />
 
