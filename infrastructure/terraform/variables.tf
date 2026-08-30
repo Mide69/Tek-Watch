@@ -219,3 +219,10 @@ variable "attach_custom_domain" {
   type        = bool
   default     = false
 }
+
+variable "self_hosted_agent_api_key" {
+  description = "API key issued to the central account's own monitoring agent. Set in a gitignored *.auto.tfvars — this repo is public."
+  type        = string
+  default     = ""
+  sensitive   = true
+}

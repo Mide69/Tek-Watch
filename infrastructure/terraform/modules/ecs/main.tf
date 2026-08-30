@@ -20,6 +20,18 @@ variable "consumer_memory" { type = number }
 variable "consumer_desired_count" { type = number }
 variable "secrets_manager_arn" { type = string }
 variable "sqs_ingest_queue_arn" { type = string }
+
+variable "sqs_ingest_queue_url" {
+  description = "Queue URL for the agent. Distinct from the ARN: boto3 send_message takes a QueueUrl, so passing the ARN made every publish fail."
+  type        = string
+}
+
+variable "self_hosted_agent_api_key" {
+  description = "API key for the central account's own agent. Empty leaves TEK_WATCH_API_KEY unset, which the agent treats as fatal — keep enable_self_hosted_agent false until this is set."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
 variable "sqs_dlq_arn" { type = string }
 variable "dynamodb_table_arns" { type = list(string) }
 
@@ -552,7 +564,13 @@ resource "aws_ecs_task_definition" "agent" {
       { name = "ENVIRONMENT", value = var.environment },
       { name = "LOG_LEVEL", value = "INFO" },
       { name = "TEK_WATCH_CUSTOMER_ID", value = "TEK-WATCH-INTERNAL" },
-      { name = "TEK_WATCH_INGEST_QUEUE_URL", value = var.sqs_ingest_queue_arn },
+      # The URL, not the ARN. boto3's send_message takes a QueueUrl and
+      # rejects an ARN, so the agent could never publish a single metric.
+      { name = "TEK_WATCH_INGEST_QUEUE_URL", value = var.sqs_ingest_queue_url },
+      # config.py treats a missing TEK_WATCH_API_KEY as fatal and exits.
+      # It was absent entirely, which is why every scheduled run logged
+      # "Missing required environment variables" and died.
+      { name = "TEK_WATCH_API_KEY", value = var.self_hosted_agent_api_key },
     ]
 
     logConfiguration = {
