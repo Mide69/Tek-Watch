@@ -226,3 +226,9 @@ variable "self_hosted_agent_api_key" {
   default     = ""
   sensitive   = true
 }
+
+variable "self_hosted_agent_customer_id" {
+  description = "Customer ID the self-hosted agent reports as. Must match a record created via the admin portal (TT-XXXX)."
+  type        = string
+  default     = "TEK-WATCH-INTERNAL"
+}
