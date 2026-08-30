@@ -364,6 +364,19 @@ resource "aws_ecs_service" "api" {
   }
 
   tags = { Name = "${var.name_prefix}-api-service" }
+
+  # CD owns the running revision now. GitHub Actions registers a new task
+  # definition and updates the service on every prod deploy, so terraform's
+  # remembered revision goes stale immediately — a later `terraform apply`
+  # would quietly roll the API back to an older image. Verified: after CI
+  # deployed :4, a plain plan wanted to revert the service to :3.
+  #
+  # desired_count is ignored for the same reason: aws_appautoscaling_target
+  # below owns it at runtime, and terraform would fight it back to
+  # api_desired_count on every apply.
+  lifecycle {
+    ignore_changes = [task_definition, desired_count]
+  }
 }
 
 # ── Ingest Consumer Task Definition ──────────────────────────────────────────
@@ -432,6 +445,13 @@ resource "aws_ecs_service" "consumer" {
   }
 
   tags = { Name = "${var.name_prefix}-consumer-service" }
+
+  # As above: CD updates the task definition, so terraform must not revert it.
+  # desired_count is NOT ignored here — there is no autoscaling on the consumer
+  # and consumer_desired_count is a deliberate cost control.
+  lifecycle {
+    ignore_changes = [task_definition]
+  }
 }
 
 # ── Auto Scaling — API ────────────────────────────────────────────────────────
