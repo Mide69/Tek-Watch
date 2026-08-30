@@ -115,8 +115,12 @@ jobs:
     if: vars.ENABLE_CD == 'true' && (github.ref == 'refs/heads/main' && github.event_name == 'push')
     environment: dev
     env:
+      # The name_prefix is on the CLUSTER, not the service — the ECS
+      # services are plain "api" / "ingest-consumer". These were set to
+      # tek-watch-<env>-<service>, which no service has ever been called,
+      # so every deploy would have failed with ServiceNotFoundException.
       ECS_CLUSTER: tek-watch-dev
-      ECS_SERVICE: tek-watch-dev-ingest-consumer
+      ECS_SERVICE: ingest-consumer
       TASK_FAMILY: tek-watch-dev-ingest-consumer
     steps:
       - name: Configure AWS credentials
@@ -148,7 +152,7 @@ jobs:
     environment: staging
     env:
       ECS_CLUSTER: tek-watch-staging
-      ECS_SERVICE: tek-watch-staging-ingest-consumer
+      ECS_SERVICE: ingest-consumer
       TASK_FAMILY: tek-watch-staging-ingest-consumer
     steps:
       - name: Configure AWS credentials
@@ -180,7 +184,7 @@ jobs:
     environment: prod
     env:
       ECS_CLUSTER: tek-watch-prod
-      ECS_SERVICE: tek-watch-prod-ingest-consumer
+      ECS_SERVICE: ingest-consumer
       TASK_FAMILY: tek-watch-prod-ingest-consumer
     steps:
       - name: Configure AWS credentials
