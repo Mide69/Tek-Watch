@@ -137,13 +137,29 @@ Live in production on AWS (eu-west-2), serving from `app.tekwatch.io`.
       10 admin portal, plus Playwright end-to-end suites
 
 ### Known gaps
-- [ ] CI/CD deploy jobs are gated off behind the `ENABLE_CD` repository
-      variable. Deploys are currently run manually. See `.github/workflows/`
-      for the two issues that must be fixed before re-enabling.
+- [ ] **No customer data has ever flowed through the platform.** The pipeline
+      (agent -> SQS -> consumer -> DynamoDB -> API -> dashboard) has never
+      carried a message end to end; dashboards render mock data. Onboarding the
+      first customer is the outstanding milestone.
 - [ ] The ALB serves HTTP; browsers reach the API over HTTPS via a CloudFront
       `/api/*` behaviour. A dedicated `api.tekwatch.io` certificate would let
       the frontends address it directly.
 - [ ] No staging environment provisioned. `staging.tfvars` is ready but unused.
+- [ ] `deploy-dev` and `deploy-staging` are gated behind `ENABLE_DEV_DEPLOY` /
+      `ENABLE_STAGING_DEPLOY`, both unset, because neither environment exists.
+- [ ] The GitHub Actions IAM role holds `AdministratorAccess`. The OIDC trust
+      condition limits it to this repository, but it should be scoped down.
+- [ ] Several pinned Actions still target Node 20, which GitHub has deprecated.
+      They run (forced onto Node 24) but should be bumped.
+
+### CI/CD
+Enabled via the `ENABLE_CD` repository variable. Pushes to `main` build and push
+images to ECR; production deploys are `workflow_dispatch` only. Verified
+deploying to prod on 30 Aug 2026.
+
+Terraform deliberately does **not** manage the running task definition revision
+(`ignore_changes`), because CD owns it — otherwise any `terraform apply` would
+roll the service back to whatever revision terraform last created.
 
 ## Deployment
 
