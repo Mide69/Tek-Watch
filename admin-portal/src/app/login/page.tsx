@@ -115,7 +115,7 @@ export default function AdminLoginPage() {
     setError('')
     setLoading(true)
     try {
-      await adminSignIn('demo@tektribe.io', 'demo')
+      await adminSignIn('demo@tekwatch.io', 'demo')
       complete()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not enter demo')
@@ -234,7 +234,7 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="input-glass"
-                  placeholder="admin@tektribe.io"
+                  placeholder="admin@tekwatch.io"
                   autoFocus
                 />
               </div>
@@ -367,7 +367,7 @@ export default function AdminLoginPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="input-glass"
-                    placeholder="admin@tektribe.io"
+                    placeholder="admin@tekwatch.io"
                   />
                 </div>
                 <div>
