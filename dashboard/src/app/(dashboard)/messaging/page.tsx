@@ -9,9 +9,9 @@ import { useMessaging } from '@/hooks/useData'
 
 export default function MessagingPage() {
   const { customerId }      = useAuth()
-  const { data, isLoading } = useMessaging()
+  const { data } = useMessaging()
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">

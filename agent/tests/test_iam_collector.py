@@ -2,9 +2,22 @@
 import csv
 import io
 import pytest
+from datetime import datetime, timedelta, timezone
 from unittest.mock import MagicMock, patch, call
 from botocore.exceptions import ClientError, EndpointResolutionError
 from collectors.iam import IAMCollector
+
+
+def rotated_days_ago(days: int) -> str:
+    """Key-rotation timestamp relative to now.
+
+    The collector compares against a rolling 90-day cutoff, so a hardcoded
+    "recent" date silently becomes an old one as time passes. This test file
+    previously pinned "recent" to 2026-05-01, which started failing once that
+    date drifted past 90 days ago — the collector was right and the test had
+    rotted. Mirrors the pattern already used in test_acm_collector.py.
+    """
+    return (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
 
 def make_credential_report(rows: list[dict]) -> bytes:
@@ -79,7 +92,7 @@ class TestIAMCollector:
                 "password_enabled": "true",
                 "mfa_active": "true",
                 "access_key_1_active": "true",
-                "access_key_1_last_rotated": "2024-01-01T00:00:00+00:00",  # > 90 days old
+                "access_key_1_last_rotated": rotated_days_ago(200),  # comfortably over 90
             },
         ])
         iam.get_account_summary.return_value = {"SummaryMap": {"Users": 1, "Roles": 0}}
@@ -96,7 +109,7 @@ class TestIAMCollector:
                 "password_enabled": "true",
                 "mfa_active": "true",
                 "access_key_1_active": "true",
-                "access_key_1_last_rotated": "2026-05-01T00:00:00+00:00",  # recent
+                "access_key_1_last_rotated": rotated_days_ago(10),  # comfortably under 90
             },
         ])
         iam.get_account_summary.return_value = {"SummaryMap": {"Users": 1, "Roles": 0}}

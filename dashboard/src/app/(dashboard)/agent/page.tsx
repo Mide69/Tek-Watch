@@ -75,9 +75,9 @@ function DeployAgentCard({ customerId }: { customerId: string }) {
 
 export default function AgentPage() {
   const { customerId }      = useAuth()
-  const { data: a, isLoading } = useAgent()
+  const { data: a } = useAgent()
 
-  if (isLoading || !a) {
+  if (!a) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">

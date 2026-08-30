@@ -51,8 +51,8 @@ tek-watch/
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/tektribe-ltd/tek-watch.git
-cd tek-watch
+git clone https://github.com/Mide69/Tek-Watch.git
+cd Tek-Watch
 ```
 
 2. **Set up environment variables**
@@ -118,33 +118,32 @@ uvicorn main:app --reload
 
 ## Project Status
 
-### ✅ Completed
-- [x] Agent framework with multi-region discovery
-- [x] Collectors: EC2, Lambda, RDS, SQS, GuardDuty, ACM, IAM, Cost Explorer, CloudWatch Alarms
-- [x] SQS publisher with batching
-- [x] Ingest consumer with validation and DynamoDB writer
-- [x] API framework with Cognito JWT authentication
-- [x] All API routers (overview, compute, databases, networking, storage, messaging, security, cost, alerts, agent, metrics)
-- [x] Admin routers (customers, thresholds, operations)
-- [x] DynamoDB service layer
-- [x] DynamoDB-backed metrics query service
-- [x] Threshold alerting engine
-- [x] AI anomaly detection with Claude
-- [x] Notification service (SNS)
-- [x] Dockerfiles for all services
-- [x] CloudFormation template for customer deployment
-- [x] GitHub Actions CI/CD workflows
-- [x] Docker Compose for local development
+Live in production on AWS (eu-west-2), serving from `app.tekwatch.io`.
 
-### 🚧 In Progress / TODO
-- [ ] Dashboard (Next.js customer-facing UI)
-- [ ] Admin Portal (Next.js admin UI)
-- [ ] Terraform modules for central infrastructure
-- [ ] Additional collectors (ECS, ElastiCache, VPC, ELB, CloudFront, Route53, SNS, DynamoDB, Security Hub, Config, Trusted Advisor)
-- [ ] Unit tests for all components
-- [ ] Integration tests
-- [ ] Agent silence detection Lambda
-- [ ] Complete documentation
+### Built and deployed
+- [x] Agent with multi-region discovery and **23 collectors** — EC2, RDS, Lambda,
+      ECS, EKS, S3, DynamoDB, ELB, VPC, Route53, CloudFront, ElastiCache, SNS,
+      SQS, ACM, IAM, GuardDuty, Security Hub, Config, CloudTrail, CloudWatch
+      Alarms, Cost Explorer, Trusted Advisor
+- [x] SQS publisher with batching; ingest consumer writing to DynamoDB
+- [x] FastAPI service with Cognito JWT auth and all customer/admin routers
+- [x] Threshold alerting engine and AI anomaly detection (Claude)
+- [x] Agent silence-detection Lambda on a 10-minute EventBridge schedule
+- [x] Customer dashboard and admin portal (Next.js static exports on
+      S3 + CloudFront), both with password reset and TOTP MFA enrolment
+- [x] Terraform for the whole central account; CloudFormation template for the
+      customer-side agent
+- [x] **370 automated tests** — 216 agent, 94 API, 22 Lambda, 28 dashboard,
+      10 admin portal, plus Playwright end-to-end suites
+
+### Known gaps
+- [ ] CI/CD deploy jobs are gated off behind the `ENABLE_CD` repository
+      variable. Deploys are currently run manually. See `.github/workflows/`
+      for the two issues that must be fixed before re-enabling.
+- [ ] The ALB serves HTTP; browsers reach the API over HTTPS via a CloudFront
+      `/api/*` behaviour. A dedicated `api.tekwatch.io` certificate would let
+      the frontends address it directly.
+- [ ] No staging environment provisioned. `staging.tfvars` is ready but unused.
 
 ## Deployment
 
@@ -273,17 +272,18 @@ cd dashboard && npm test
 
 ## Docs
 
-- [Requirements](.kiro/specs/requirements.md)
-- [System Design](.kiro/specs/design.md)
-- [User Stories](.kiro/specs/stories.md)
-- [Steering](.kiro/specs/steering.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Deployment & Testing Guide](docs/GUIDE.md)
+- [Runbook](docs/RUNBOOK.md)
+- [Zero-cost demo deployment](docs/DEMO_DEPLOYMENT.md)
 
 ## License
 
-Proprietary - Tek Tribe Ltd © 2026
+Proprietary. Copyright © 2026 Tek Tribe Ltd. All rights reserved.
+See [LICENSE](LICENSE).
 
 ## Support
 
 For issues or questions:
 - Internal: Slack #tek-watch
-- Customers: support@tektribe.io
+- Customers: support@tekwatch.io

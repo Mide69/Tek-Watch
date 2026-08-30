@@ -162,7 +162,7 @@ export default function LoginPage() {
                     className="text-indigo-400 hover:text-indigo-300 transition-colors">
                     Forgot password?
                   </button>
-                  <Link href="/overview" className="text-slate-500 hover:text-slate-300 transition-colors text-xs">
+                  <Link href="/overview/?demo=1" className="text-slate-500 hover:text-slate-300 transition-colors text-xs">
                     Try demo instead →
                   </Link>
                 </div>

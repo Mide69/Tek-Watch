@@ -9,9 +9,9 @@ import { useNetworking } from '@/hooks/useData'
 
 export default function NetworkingPage() {
   const { customerId }       = useAuth()
-  const { data, isLoading }  = useNetworking()
+  const { data }  = useNetworking()
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">
