@@ -18,11 +18,11 @@ import { cn } from '@/lib/utils'
 export default function OverviewPage() {
   const { customerId }  = useAuth()
   const { timeRange }   = useDashboard()
-  const { data, isLoading }   = useOverview()
+  const { data }   = useOverview()
   const { data: alertsData }  = useAlerts()
   const { data: ec2 }         = useEC2()
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <DashboardLayout customerId={customerId || 'TT-DEMO'}>
         <div className="space-y-6">

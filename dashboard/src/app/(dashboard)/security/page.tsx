@@ -42,9 +42,9 @@ function ComplianceBar({ label, score }: { label: string; score: number }) {
 export default function SecurityPage() {
   const { customerId }      = useAuth()
   const { timeRange }       = useDashboard()
-  const { data, isLoading } = useSecurity()
+  const { data } = useSecurity()
 
-  if (isLoading || !data) {
+  if (!data) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">

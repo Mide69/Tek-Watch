@@ -16,9 +16,9 @@ function fmtSize(bytes: number) {
 
 export default function StoragePage() {
   const { customerId }      = useAuth()
-  const { data: buckets, isLoading } = useStorage()
+  const { data: buckets } = useStorage()
 
-  if (isLoading || !buckets) {
+  if (!buckets) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">

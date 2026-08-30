@@ -1,0 +1,70 @@
+PROPRIETARY SOFTWARE LICENCE
+
+Tek Watch
+Copyright © 2026 Tek Tribe Ltd. All rights reserved.
+
+This software and its source code, documentation, configuration and
+associated materials (the "Software") are the confidential and proprietary
+property of Tek Tribe Ltd ("the Company").
+
+GRANT
+
+No licence, right, title or interest in the Software is granted to any
+person or entity except under a separate written agreement signed by the
+Company. Publication of this source code, including in a public source
+repository, does not place the Software in the public domain, dedicate it to
+public use, or grant any implied licence.
+
+RESTRICTIONS
+
+Without the Company's prior written permission, you may not:
+
+  1. copy, reproduce, publish or redistribute the Software, in whole or in
+     part, in source or compiled form;
+  2. modify, adapt, translate or create derivative works from it;
+  3. use it to provide a service to any third party, or for any commercial
+     purpose;
+  4. reverse engineer, decompile or disassemble any compiled portion of it,
+     except to the extent that such restriction is prohibited by applicable
+     law; or
+  5. remove or alter any copyright, trade mark or other proprietary notice.
+
+PERMITTED INSPECTION
+
+Viewing this repository for the purposes of evaluation, security research
+conducted in good faith, or assessment by a UK endorsing body or prospective
+investor is permitted. Such inspection grants no right to use, copy or deploy
+the Software.
+
+THIRD-PARTY COMPONENTS
+
+The Software incorporates third-party open-source components, each governed
+by its own licence. Those licences apply to those components and are not
+superseded by this one. Their terms are available in the dependency manifests
+of each service (package.json and requirements.txt) and in the corresponding
+package metadata.
+
+NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT.
+
+LIMITATION OF LIABILITY
+
+TO THE MAXIMUM EXTENT PERMITTED BY LAW, THE COMPANY SHALL NOT BE LIABLE FOR
+ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT OR
+OTHERWISE, ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+Nothing in this licence excludes or limits liability for death or personal
+injury caused by negligence, for fraud or fraudulent misrepresentation, or
+for any other liability that cannot lawfully be excluded or limited.
+
+GOVERNING LAW
+
+This licence is governed by the laws of England and Wales, and the courts of
+England and Wales shall have exclusive jurisdiction.
+
+CONTACT
+
+Tek Tribe Ltd — hello@tekwatch.io
