@@ -154,6 +154,7 @@ resource "aws_cognito_user_pool_client" "admins" {
 }
 
 output "customer_user_pool_id" { value = aws_cognito_user_pool.customers.id }
+output "customer_user_pool_arn" { value = aws_cognito_user_pool.customers.arn }
 output "customer_app_client_id" { value = aws_cognito_user_pool_client.customers.id }
 output "admin_user_pool_id" { value = aws_cognito_user_pool.admins.id }
 output "admin_app_client_id" { value = aws_cognito_user_pool_client.admins.id }
