@@ -3,14 +3,17 @@
 /**
  * Unified SWR data hooks for all dashboard pages.
  * Each hook:
- *  1. Tries the real API (with 4-second timeout)
- *  2. Falls back to time-range-aware mock data on any failure
+ *  1. Tries the real API, authenticated, with a 4-second timeout
+ *  2. Falls back to time-range-aware mock data on any failure, and records
+ *     that it did so (see lib/dataSource) so the UI can say as much
  *  3. Keyed on [endpoint, timeRange, region, refreshKey] so the chart
  *     re-renders when any filter changes
  */
 
 import useSWR from 'swr'
 import { useDashboard } from '@/contexts/DashboardContext'
+import apiClient from '@/lib/api'
+import { markDataSource } from '@/lib/dataSource'
 import {
   getMockOverview, getMockEC2WithMetrics, getMockLambdaWithMetrics,
   getMockRDSWithMetrics, getMockCostSummary, MOCK_COST_BREAKDOWN,
@@ -22,16 +25,36 @@ import {
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
-async function apiFetch<T>(path: string, fallback: T): Promise<T> {
+// Exported for tests: the two defects this guards against (missing auth header,
+// silent mock fallback) were both invisible from the outside.
+export async function apiFetch<T>(path: string, fallback: T): Promise<T> {
+  const sample = (): T => {
+    markDataSource(path, true)
+    return fallback
+  }
+
+  // Every one of these endpoints is behind get_current_customer on the API.
+  // This used to be a bare fetch() with no Authorization header, so every
+  // request came back 401 and the catch below quietly served mock data — a
+  // signed-in customer saw a dashboard of resources and costs that were not
+  // theirs, presented exactly as if they were.
+  const token = apiClient.getToken()
+  if (!token) return sample()
+
   try {
     const controller = new AbortController()
     const tid = setTimeout(() => controller.abort(), 4000)
-    const res = await fetch(`${API}${path}`, { signal: controller.signal })
+    const res = await fetch(`${API}${path}`, {
+      signal: controller.signal,
+      headers: { Authorization: `Bearer ${token}` },
+    })
     clearTimeout(tid)
-    if (!res.ok) return fallback
-    return res.json() as Promise<T>
+    if (!res.ok) return sample()
+    const data = (await res.json()) as T
+    markDataSource(path, false)
+    return data
   } catch {
-    return fallback
+    return sample()
   }
 }
 

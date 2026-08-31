@@ -15,3 +15,5 @@ limits==3.13.0
 pytest==8.2.2
 pytest-asyncio==0.23.7
 pytest-cov==5.0.0
+# Required by FastAPI's UploadFile — company logo upload on /api/v1/profile/logo.
+python-multipart==0.0.20

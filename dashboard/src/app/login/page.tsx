@@ -8,6 +8,7 @@ import { LogoMark } from '@/components/ui/Logo'
 import {
   configureAmplify,
   authSignIn,
+  authCompleteNewPassword,
   authForgotPassword,
   authConfirmForgotPassword,
 } from '@/lib/auth'
@@ -18,7 +19,10 @@ configureAmplify()
 // 'forgot-sent' collects the emailed code. Cognito sends a numeric CODE, not a
 // link, so without this step the reset email had nowhere to be used and anyone
 // who forgot their password was permanently locked out.
-type View = 'login' | 'forgot' | 'forgot-sent' | 'forgot-done'
+// 'new-password' is the first sign-in. Signup creates the Cognito user with a
+// temporary password, so the very first login is a two-step exchange: Cognito
+// issues no tokens until the customer has chosen their own password.
+type View = 'login' | 'new-password' | 'forgot' | 'forgot-sent' | 'forgot-done'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -36,12 +40,37 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      const user = await authSignIn(customerId.toUpperCase(), password)
-      apiClient.setToken(user.idToken)
-      localStorage.setItem('tek_watch_customer_id', user.customerId)
-      router.push('/overview')
+      const result = await authSignIn(customerId.toUpperCase(), password)
+      if (result.status === 'NEW_PASSWORD_REQUIRED') {
+        setNewPassword('')
+        setConfirmPassword('')
+        setView('new-password')
+        return
+      }
+      enterDashboard(result.user)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed. Check your credentials.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const enterDashboard = (user: { idToken: string; customerId: string }) => {
+    apiClient.setToken(user.idToken)
+    localStorage.setItem('tek_watch_customer_id', user.customerId)
+    router.push('/overview')
+  }
+
+  const handleNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      if (newPassword !== confirmPassword) throw new Error('Passwords do not match')
+      const user = await authCompleteNewPassword(customerId.toUpperCase(), newPassword)
+      enterDashboard(user)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not set your password')
     } finally {
       setLoading(false)
     }
@@ -137,7 +166,7 @@ export default function LoginPage() {
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
-                  <input type="text" required placeholder="TT-0001" value={customerId}
+                  <input type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())}
                     className={inputCls} />
                 </div>
@@ -174,6 +203,42 @@ export default function LoginPage() {
             </>
           )}
 
+          {view === 'new-password' && (
+            <>
+              <div className="mb-8">
+                <h1 className="text-2xl font-bold text-white">Choose your password</h1>
+                <p className="text-slate-400 mt-1.5 text-sm">
+                  Welcome to Tek Watch. Your temporary password worked — pick a
+                  permanent one to finish setting up {customerId}.
+                </p>
+              </div>
+              <form onSubmit={handleNewPassword} className="space-y-5">
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <input type="password" required minLength={7} autoComplete="new-password"
+                    placeholder="•••••••" value={newPassword} autoFocus
+                    onChange={e => setNewPassword(e.target.value)} className={inputCls} />
+                  <p className="mt-1.5 text-xs text-slate-500">
+                    At least 7 characters, with upper and lower case and a number.
+                  </p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <input type="password" required minLength={7} autoComplete="new-password"
+                    placeholder="•••••••" value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
+                </div>
+                {error && (
+                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                )}
+                <button type="submit" disabled={loading}
+                  className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {loading ? 'Setting password…' : 'Set password and continue'}
+                </button>
+              </form>
+            </>
+          )}
+
           {view === 'forgot' && (
             <>
               <button onClick={() => { setView('login'); setError('') }}
@@ -187,7 +252,7 @@ export default function LoginPage() {
               <form onSubmit={handleForgot} className="space-y-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
-                  <input type="text" required placeholder="TT-0001" value={customerId}
+                  <input type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())} className={inputCls} />
                 </div>
                 {error && (

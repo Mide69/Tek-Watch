@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Activity, AlertTriangle, Database, DollarSign, Globe,
   HardDrive, LayoutDashboard, LogOut, Mail, Menu, MessageSquare,
-  RefreshCw, Server, Shield, X, CheckCircle,
+  RefreshCw, Server, Settings, Shield, X, CheckCircle,
   AlertCircle, Info, XCircle,
 } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
@@ -20,6 +20,8 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { NotificationBell } from '@/components/ui/NotificationBell'
 import { HistoryNav } from '@/components/ui/HistoryNav'
 import { DemoBadge } from '@/components/ui/DemoBadge'
+import { SampleDataBanner } from '@/components/ui/SampleDataBanner'
+import { useProfile } from '@/hooks/useProfile'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -38,6 +40,7 @@ const navigation = [
   { name: 'Alerts',     href: '/alerts',     icon: AlertTriangle },
   { name: 'Agent',      href: '/agent',      icon: Activity },
   { name: 'Ask AI',     href: '/chat',       icon: MessageSquare },
+  { name: 'Settings',   href: '/settings',   icon: Settings },
 ]
 
 const DEMO_MODE = isDemoMode()
@@ -85,6 +88,10 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
     secondsToRefresh, refresh, isRefreshing, lastUpdated,
   } = useDashboard()
 
+  // Company identity for the sidebar. Returns null when there is no token yet
+  // (demo visitors, first paint), which just falls back to the Customer ID.
+  const { data: profile } = useProfile()
+
   const handleSignOut = useCallback(async () => {
     if (DEMO_MODE) { router.push('/'); return }
     // A visitor browsing the demo has no Cognito session to end — clear the
@@ -131,9 +138,33 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
       {/* Footer */}
       <div className="px-3 pb-4 border-t border-sidebar-border pt-4 space-y-3">
         {customerId && (
-          <div className="px-3 py-2 rounded-lg bg-muted border border-border">
-            <p className="text-xs text-muted-foreground mb-0.5">Customer ID</p>
-            <p className="text-sm font-mono font-semibold text-foreground">{customerId}</p>
+          <div className="flex items-center gap-2.5 px-3 py-2 rounded-lg bg-muted border border-border">
+            {profile?.logo_url && (
+              // Presigned, time-limited S3 url — plain <img>, since this is a
+              // static export with no image optimiser running.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={profile.logo_url}
+                alt=""
+                className="w-8 h-8 rounded-md object-contain flex-shrink-0 bg-background"
+              />
+            )}
+            <div className="min-w-0">
+              {/* Company name if they have set one, Customer ID otherwise. The
+                  ID stays on the second line either way: support asks for it,
+                  and hiding it entirely just moves the problem. */}
+              <p className="text-sm font-semibold text-foreground truncate">
+                {profile?.display_name || customerId}
+              </p>
+              {/* Only when it adds something. With no company name set,
+                  display_name IS the Customer ID, and printing it twice looks
+                  like a bug. */}
+              {profile?.display_name && profile.display_name !== customerId ? (
+                <p className="text-xs font-mono text-muted-foreground truncate">{customerId}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">Customer ID</p>
+              )}
+            </div>
           </div>
         )}
         <div className="px-3 py-1.5 text-xs text-muted-foreground/60" suppressHydrationWarning>
@@ -261,6 +292,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
         {/* Page content — theme-page enables CSS cascade for page internals */}
         <main className="flex-1 p-4 lg:p-6 theme-page">
+          <SampleDataBanner />
           {children}
         </main>
       </div>
