@@ -6,6 +6,7 @@
 import { Amplify } from 'aws-amplify'
 import {
   signIn,
+  confirmSignIn,
   signOut,
   getCurrentUser,
   fetchAuthSession,
@@ -43,36 +44,84 @@ export interface AuthUser {
 }
 
 /**
- * Sign in with Customer ID (username) and password.
- * Returns the authenticated user with JWT id token.
+ * Result of a sign-in attempt.
+ *
+ * Cognito sign-in is a state machine, not a single call. A customer created by
+ * signup arrives in FORCE_CHANGE_PASSWORD and must choose their own password
+ * before any token is issued, so the first sign-in takes two steps.
+ *
+ * This previously threw "Unexpected auth step" on anything but DONE, which
+ * meant every newly signed-up customer received an invite email, entered the
+ * right credentials, and was told something had gone wrong.
  */
-export async function authSignIn(customerId: string, password: string): Promise<AuthUser> {
+export type AuthResult =
+  | { status: 'DONE'; user: AuthUser }
+  | { status: 'NEW_PASSWORD_REQUIRED' }
+
+/**
+ * Sign in with Customer ID (username) and password.
+ * Returns either the authenticated user or the next step Cognito requires.
+ */
+export async function authSignIn(customerId: string, password: string): Promise<AuthResult> {
   const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || ''
 
   // Dev mode — mock auth when Cognito is not configured
   if (!userPoolId) {
-    if (!customerId.match(/^TT-\d{4}$/)) {
-      throw new Error('Invalid Customer ID format. Expected: TT-XXXX')
+    // Ids are random base32 now (TT-9F4KQ7M2), not a 4-digit counter. The old
+    // /^TT-\d{4}$/ would reject every id the platform currently mints.
+    if (!customerId.match(/^TT-[0-9A-Z]{4,}$/i)) {
+      throw new Error('Invalid Customer ID format. Expected: TT-XXXXXXXX')
     }
     if (!password) throw new Error('Password is required')
     // Return a mock token for local development
     const mockToken = btoa(JSON.stringify({ sub: customerId, 'cognito:username': customerId, email: '' }))
-    return { customerId, email: '', idToken: `mock.${mockToken}.sig` }
+    return { status: 'DONE', user: { customerId, email: '', idToken: `mock.${mockToken}.sig` } }
   }
 
   const input: SignInInput = { username: customerId, password }
   const result = await signIn(input)
+  const step = result.nextStep?.signInStep
 
-  if (result.nextStep?.signInStep !== 'DONE') {
-    throw new Error(`Unexpected auth step: ${result.nextStep?.signInStep}`)
+  if (step === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
+    return { status: 'NEW_PASSWORD_REQUIRED' }
+  }
+  if (step !== 'DONE') {
+    throw new Error(`Unsupported auth step: ${step}`)
   }
 
-  const session = await fetchAuthSession()
-  const idToken = session.tokens?.idToken?.toString() ?? ''
-  const payload = session.tokens?.idToken?.payload ?? {}
+  return { status: 'DONE', user: await currentUserFromSession(customerId) }
+}
 
+/**
+ * Complete a first sign-in by setting the customer's own password.
+ * Cognito distinguishes this by the pending challenge, so no extra context
+ * needs carrying between the two calls.
+ */
+export async function authCompleteNewPassword(
+  customerId: string,
+  newPassword: string
+): Promise<AuthUser> {
+  const result = await confirmSignIn({ challengeResponse: newPassword })
+  if (result.nextStep?.signInStep !== 'DONE') {
+    throw new Error(`Unsupported step after setting password: ${result.nextStep?.signInStep}`)
+  }
+  return currentUserFromSession(customerId)
+}
+
+async function currentUserFromSession(fallbackId: string): Promise<AuthUser> {
+  const session = await fetchAuthSession()
+  const idToken = session.tokens?.idToken?.toString()
+
+  // Fail loudly rather than returning an empty token. An empty string reads as
+  // a successful sign-in to callers, which then store it and bounce the user
+  // back to /login with no explanation.
+  if (!idToken) {
+    throw new Error('Signed in, but no session token was returned. Please try again.')
+  }
+
+  const payload = session.tokens?.idToken?.payload ?? {}
   return {
-    customerId: (payload['cognito:username'] as string) || customerId,
+    customerId: (payload['cognito:username'] as string) || fallbackId,
     email: (payload['email'] as string) || '',
     idToken,
   }
