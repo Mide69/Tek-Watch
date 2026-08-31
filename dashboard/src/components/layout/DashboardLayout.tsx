@@ -20,6 +20,7 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { NotificationBell } from '@/components/ui/NotificationBell'
 import { HistoryNav } from '@/components/ui/HistoryNav'
 import { DemoBadge } from '@/components/ui/DemoBadge'
+import { SampleDataBanner } from '@/components/ui/SampleDataBanner'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -261,6 +262,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
         {/* Page content — theme-page enables CSS cascade for page internals */}
         <main className="flex-1 p-4 lg:p-6 theme-page">
+          <SampleDataBanner />
           {children}
         </main>
       </div>
