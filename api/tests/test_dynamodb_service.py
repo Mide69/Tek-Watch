@@ -54,23 +54,26 @@ class TestDynamoDBServiceCustomers:
         result = svc.get_customer("TT-9999")
         assert result is None
 
-    def test_create_customer_generates_tt_id(self, db_service):
+    def test_create_customer_returns_a_tt_id_and_api_key(self, db_service):
         svc, customers, _, _ = db_service
-        customers.scan.return_value = {"Items": []}
         customers.put_item.return_value = {}
         result = svc.create_customer("Acme", "admin@acme.com", "foundation", [])
-        assert result["customer_id"] == "TT-0001"
+        assert result["customer_id"].startswith("TT-")
         assert "api_key" in result
         assert len(result["api_key"]) > 20
 
-    def test_create_customer_increments_id(self, db_service):
+    def test_create_customer_does_not_scan_to_pick_an_id(self, db_service):
+        """Ids are random, so allocating one must not read the table.
+
+        The old implementation scanned every customer to find the highest
+        number, which is both the race that allowed overwrites and a full table
+        scan on every signup.
+        """
         svc, customers, _, _ = db_service
-        customers.scan.return_value = {
-            "Items": [{"customer_id": "TT-0003", "SK": "PROFILE"}]
-        }
         customers.put_item.return_value = {}
-        result = svc.create_customer("Beta", "b@b.com", "growth", [])
-        assert result["customer_id"] == "TT-0004"
+        customers.scan.reset_mock()
+        svc.create_customer("Beta", "b@b.com", "growth", [])
+        customers.scan.assert_not_called()
 
     def test_create_customer_api_key_is_hashed(self, db_service):
         svc, customers, _, _ = db_service
@@ -203,3 +206,49 @@ class TestCreateAlertDedupe:
         alert_id = svc.create_alert("TT-0001", {"type": "manual"})
         assert not alert_id.startswith("THRESHOLD#")
         assert "ConditionExpression" not in alerts.put_item.call_args.kwargs
+
+
+class TestCustomerIdGeneration:
+    """IDs must be unpredictable, and a collision must never overwrite anyone.
+
+    They were sequential (TT-0001, TT-0002), derived by scanning every customer
+    and adding one, then written unconditionally. Two concurrent signups would
+    produce the same id and the second would silently overwrite the first —
+    destroying that customer's record and api_key_hash while both callers saw
+    success. The id is also the Cognito username, so sequential values could be
+    walked to discover accounts.
+    """
+
+    def test_ids_are_not_sequential_and_are_unique(self, db_service):
+        svc, _, _, _ = db_service
+        ids = {svc._generate_customer_id() for _ in range(200)}
+        assert len(ids) == 200, "generated ids collided"
+        assert all(i.startswith("TT-") and len(i) == 11 for i in ids)
+
+    def test_ids_avoid_ambiguous_characters(self, db_service):
+        svc, _, _, _ = db_service
+        # The id doubles as a username people type, so I/L/O/U are excluded to
+        # stop them being misread as 1 or 0.
+        joined = "".join(svc._generate_customer_id()[3:] for _ in range(100))
+        assert not (set("ILOU") & set(joined))
+
+    def test_write_is_conditional_so_a_collision_cannot_overwrite(self, db_service):
+        svc, customers, _, _ = db_service
+        customers.put_item.return_value = {}
+        svc.create_customer("Acme", "a@b.co", "starter", [])
+        kwargs = customers.put_item.call_args.kwargs
+        assert kwargs["ConditionExpression"] == "attribute_not_exists(customer_id)"
+
+    def test_collision_retries_with_a_fresh_id(self, db_service):
+        svc, customers, _, _ = db_service
+        customers.put_item.side_effect = [
+            ClientError({"Error": {"Code": "ConditionalCheckFailedException", "Message": "x"}}, "PutItem"),
+            {},
+        ]
+        result = svc.create_customer("Acme", "a@b.co", "starter", [])
+        assert customers.put_item.call_count == 2
+        # Second attempt must use a different id, not retry the colliding one.
+        first = customers.put_item.call_args_list[0].kwargs["Item"]["customer_id"]
+        second = customers.put_item.call_args_list[1].kwargs["Item"]["customer_id"]
+        assert first != second
+        assert result["customer_id"] == second
