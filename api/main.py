@@ -38,6 +38,7 @@ from routers import (
     networking,
     notifications,
     overview,
+    profile,
     security,
     signup,
     storage,
@@ -175,6 +176,7 @@ def create_app() -> FastAPI:
 
     # ── Customer dashboard routers ────────────────────────────────────────────
     app.include_router(overview.router,       prefix="/api/v1",              tags=["Overview"])
+    app.include_router(profile.router,        prefix="/api/v1/profile",       tags=["Profile"])
     app.include_router(compute.router,        prefix="/api/v1/compute",       tags=["Compute"])
     app.include_router(databases.router,      prefix="/api/v1/databases",     tags=["Databases"])
     app.include_router(networking.router,     prefix="/api/v1/networking",    tags=["Networking"])

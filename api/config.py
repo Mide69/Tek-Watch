@@ -41,6 +41,10 @@ class APIConfig:
     slack_webhook_url: str
     # SQS
     sqs_ingest_queue_url: str
+    # Private bucket holding customer-uploaded company logos. Served through
+    # short-lived presigned GET urls, never public.
+    s3_uploads_bucket: str
+
     # CORS — comma-separated allowed origins
     allowed_origins: str
 
@@ -78,6 +82,7 @@ def load_config() -> APIConfig:
             "cognito_admin_user_pool_id", "cognito_admin_app_client_id",
             "anthropic_api_key", "sns_ops_alerts_topic_arn", "ses_from_email",
             "slack_webhook_url", "sqs_ingest_queue_url", "allowed_origins",
+            "s3_uploads_bucket",
         ]}
         # Sensible local defaults
         secrets.setdefault("dynamodb_customers_table", "tek_watch_customers")
@@ -108,6 +113,7 @@ def load_config() -> APIConfig:
         ses_from_email=secrets.get("ses_from_email", ""),
         slack_webhook_url=secrets.get("slack_webhook_url", ""),
         sqs_ingest_queue_url=secrets.get("sqs_ingest_queue_url", ""),
+        s3_uploads_bucket=secrets.get("s3_uploads_bucket", "") or os.environ.get("S3_UPLOADS_BUCKET", ""),
         allowed_origins=secrets.get(
             "allowed_origins",
             "http://localhost:3000,http://localhost:3001,"

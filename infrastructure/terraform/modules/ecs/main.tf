@@ -46,6 +46,18 @@ variable "self_hosted_agent_api_key" {
 variable "sqs_dlq_arn" { type = string }
 variable "dynamodb_table_arns" { type = list(string) }
 
+# Private bucket holding customer-uploaded company logos. Empty disables the
+# upload endpoint rather than failing at runtime.
+variable "uploads_bucket_name" {
+  type    = string
+  default = ""
+}
+
+variable "uploads_bucket_arn" {
+  type    = string
+  default = ""
+}
+
 # ── Agent (self-hosted — dogfoods Tek Watch's own AWS account) ────────────────
 variable "agent_image_uri" { type = string }
 variable "agent_cpu" { type = number }
@@ -166,7 +178,7 @@ resource "aws_iam_role_policy" "api_task" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
+    Statement = concat([
       {
         Effect   = "Allow"
         Action   = ["secretsmanager:GetSecretValue"]
@@ -206,8 +218,21 @@ resource "aws_iam_role_policy" "api_task" {
         # Scoped to the customer pool: the API has no business provisioning
         # users in the admin pool.
         Resource = [var.cognito_customer_pool_arn]
+      },
+      # Company logo upload. Scoped to the logos/ prefix rather than the whole
+      # bucket, so a bug in the key-building code cannot reach anything else
+      # that ever gets stored here.
+      ], var.uploads_bucket_arn == "" ? [] : [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:PutObject",
+          "s3:GetObject",
+          "s3:DeleteObject",
+        ]
+        Resource = ["${var.uploads_bucket_arn}/logos/*"]
       }
-    ]
+    ])
   })
 }
 
@@ -314,7 +339,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "AWS_REGION", value = var.aws_region },
       { name = "ENVIRONMENT", value = var.environment },
       { name = "LOG_LEVEL", value = "INFO" },
-      { name = "SECRETS_MANAGER_SECRET_ARN", value = var.secrets_manager_arn }
+      { name = "SECRETS_MANAGER_SECRET_ARN", value = var.secrets_manager_arn },
+      { name = "S3_UPLOADS_BUCKET", value = var.uploads_bucket_name }
     ]
 
     logConfiguration = {
