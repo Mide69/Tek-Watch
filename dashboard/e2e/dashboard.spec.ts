@@ -14,6 +14,7 @@ const DASHBOARD_PAGES = [
   { path: '/cost',       heading: /cost/i        },
   { path: '/alerts',     heading: /alert/i       },
   { path: '/agent',      heading: /agent/i       },
+  { path: '/settings',   heading: /company profile/i },
 ]
 
 test.describe('Dashboard pages (demo mode)', () => {
