@@ -19,6 +19,11 @@ variable "consumer_cpu" { type = number }
 variable "consumer_memory" { type = number }
 variable "consumer_desired_count" { type = number }
 variable "secrets_manager_arn" { type = string }
+
+variable "cognito_customer_pool_arn" {
+  description = "Customer pool ARN. Scopes the API's user-provisioning grant to that one pool rather than every pool in the account."
+  type        = string
+}
 variable "sqs_ingest_queue_arn" { type = string }
 
 variable "sqs_ingest_queue_url" {
@@ -185,6 +190,22 @@ resource "aws_iam_role_policy" "api_task" {
         Effect   = "Allow"
         Action   = ["cognito-idp:AdminGetUser", "cognito-idp:ListUsers"]
         Resource = ["*"]
+      },
+      {
+        # Self-service signup provisions the customer's Cognito login itself
+        # (the pool stays AllowAdminCreateUserOnly, so there is no public
+        # signup surface). Without these the endpoint fails with AccessDenied,
+        # which the handler reports as a 503 — every signup attempt died there.
+        # AdminDeleteUser is the rollback path when provisioning fails partway.
+        Effect = "Allow"
+        Action = [
+          "cognito-idp:AdminCreateUser",
+          "cognito-idp:AdminSetUserPassword",
+          "cognito-idp:AdminDeleteUser",
+        ]
+        # Scoped to the customer pool: the API has no business provisioning
+        # users in the admin pool.
+        Resource = [var.cognito_customer_pool_arn]
       }
     ]
   })
