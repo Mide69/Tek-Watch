@@ -102,8 +102,11 @@ class TestSignup:
             assert resp.status_code == 201
             data = resp.json()
             assert data["customer_id"] == "TT-0002"
-            # The password must never appear in the API response, only the email.
-            assert "password" not in resp.text.lower()
+            # The generated password must never reach the API response. Asserts
+            # the VALUE is absent, not the word: the response now tells the user
+            # a temporary password was emailed, which is wording, not a leak.
+            sent_password = mock_provision.call_args.kwargs["password"]
+            assert sent_password not in resp.text
 
             mock_provision.assert_called_once()
             assert mock_provision.call_args.kwargs["customer_id"] == "TT-0002"
@@ -162,3 +165,44 @@ class TestSignup:
 
             assert resp.status_code == 201
             mock_provision.assert_not_called()
+
+
+class TestSignupEmailDelivery:
+    """Cognito must be the one emailing the credentials.
+
+    The app previously suppressed Cognito's invite and sent its own SES email
+    instead. SES was never configured, and send_customer_email returns silently
+    when it isn't — so signup reported success having delivered nothing, leaving
+    the customer with an account they could not learn about.
+
+    Asserts the call boto3 actually receives, not the source text: an earlier
+    version of this test grepped for "SUPPRESS" and failed on the comment
+    explaining why it was removed.
+    """
+
+    def _provision(self):
+        from unittest.mock import patch, MagicMock
+        from services.cognito_admin import provision_customer_login
+        with patch("services.cognito_admin.boto3") as mock_boto3:
+            client = MagicMock()
+            mock_boto3.client.return_value = client
+            provision_customer_login(
+                user_pool_id="eu-west-2_test",
+                region="eu-west-2",
+                customer_id="TT-0009",
+                email="new@example.com",
+                password="Sup3rSecret!",
+            )
+            return client
+
+    def test_cognito_sends_the_invite_email(self):
+        client = self._provision()
+        kwargs = client.admin_create_user.call_args.kwargs
+        assert kwargs.get("MessageAction") != "SUPPRESS"
+        assert kwargs.get("DesiredDeliveryMediums") == ["EMAIL"]
+
+    def test_no_permanent_password_is_set(self):
+        # The customer lands in FORCE_CHANGE_PASSWORD and chooses their own, so
+        # no password we generated is ever a working credential.
+        client = self._provision()
+        client.admin_set_user_password.assert_not_called()
