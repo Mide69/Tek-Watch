@@ -44,6 +44,48 @@ export interface AuthUser {
 }
 
 /**
+ * True when Cognito refused a sign-in because a session already exists.
+ *
+ * Amplify keeps its own tokens in local storage, separate from the id token
+ * this app stores. They fall out of step easily: a half-finished first login,
+ * a cleared app token, an expired dashboard session, or simply opening the
+ * login page while still signed in. In every one of those cases signIn throws
+ * "There is already a signed in user" before it ever reaches Cognito, which
+ * reads to the customer as a rejected password on a password they typed
+ * correctly.
+ */
+function isAlreadySignedIn(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false
+  const { name, message } = error as { name?: string; message?: string }
+  return (
+    name === 'UserAlreadyAuthenticatedException' ||
+    (message ?? '').toLowerCase().includes('already a signed in user')
+  )
+}
+
+/**
+ * Sign in, clearing any stale Amplify session first if one is in the way.
+ *
+ * Signing out and retrying is the right call rather than reusing the existing
+ * session: the customer has just typed a username and password, so they mean
+ * to start a fresh session as that user, who may not be the one still signed in.
+ */
+async function signInFresh(input: SignInInput) {
+  try {
+    return await signIn(input)
+  } catch (error) {
+    if (!isAlreadySignedIn(error)) throw error
+    try {
+      await signOut()
+    } catch {
+      // Best effort: if the stale session cannot be cleared cleanly, the retry
+      // below will surface the real problem rather than this one.
+    }
+    return signIn(input)
+  }
+}
+
+/**
  * Result of a sign-in attempt.
  *
  * Cognito sign-in is a state machine, not a single call. A customer created by
@@ -79,7 +121,7 @@ export async function authSignIn(customerId: string, password: string): Promise<
   }
 
   const input: SignInInput = { username: customerId, password }
-  const result = await signIn(input)
+  const result = await signInFresh(input)
   const step = result.nextStep?.signInStep
 
   if (step === 'CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED') {
