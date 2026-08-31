@@ -65,13 +65,16 @@ class DynamoDBService:
         Returns:
             Dict with customer_id, api_key (plaintext, shown once), and profile.
         """
-        # Generate sequential Customer ID
+        # Random, non-sequential — see _generate_customer_id for why.
         customer_id = self._generate_customer_id()
         api_key = secrets.token_urlsafe(32)
         api_key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
-        item = {
-            "customer_id": customer_id,
+        def _build(cid: str) -> Dict[str, Any]:
+            # Rebuilt per attempt rather than mutated: aliasing one dict across
+            # retries makes the retry invisible to anything holding a reference.
+            return {
+            "customer_id": cid,
             "SK": "PROFILE",
             "name": name,
             "email": email,
@@ -82,11 +85,28 @@ class DynamoDBService:
             "agent_status": "unknown",
             "created_at": _now_iso(),
             "last_agent_seen": None,
-        }
+            }
 
-        self._customers.put_item(Item=item)
-        logger.info("Customer created: %s", customer_id)
-        return {"customer_id": customer_id, "api_key": api_key, "profile": item}
+        # Conditional: a generated id colliding with an existing customer must
+        # fail rather than overwrite them. Retried with a fresh id — at ~10^12
+        # combinations this should never fire, but "should never" is exactly how
+        # the previous overwrite went unnoticed.
+        for attempt in range(5):
+            item = _build(customer_id)
+            try:
+                self._customers.put_item(
+                    Item=item,
+                    ConditionExpression="attribute_not_exists(customer_id)",
+                )
+                logger.info("Customer created: %s", customer_id)
+                return {"customer_id": customer_id, "api_key": api_key, "profile": item}
+            except ClientError as exc:
+                if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                    raise
+                logger.warning("Customer id collision on %s, retrying", customer_id)
+                customer_id = self._generate_customer_id()
+
+        raise RuntimeError(f"Could not allocate a unique customer id after {attempt + 1} attempts")
 
     def update_customer(self, customer_id: str, updates: Dict[str, Any]) -> bool:
         """Update allowed customer fields."""
@@ -148,18 +168,32 @@ class DynamoDBService:
         except ClientError as exc:
             logger.warning("update_agent_heartbeat failed for %s: %s", customer_id, exc)
 
+    # Crockford base32: no I, L, O or U, so nothing is misread as 1 or 0 when a
+    # customer types their ID — it doubles as their Cognito username.
+    _ID_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
+    _ID_LENGTH = 8
+
     def _generate_customer_id(self) -> str:
-        """Generate next sequential Customer ID in TT-XXXX format."""
-        customers = self.list_customers()
-        if not customers:
-            return "TT-0001"
-        existing_ids = [c.get("customer_id", "") for c in customers]
-        numbers = []
-        for cid in existing_ids:
-            if cid.startswith("TT-") and cid[3:].isdigit():
-                numbers.append(int(cid[3:]))
-        next_num = max(numbers, default=0) + 1
-        return f"TT-{next_num:04d}"
+        """Generate a random, non-sequential Customer ID (TT-XXXXXXXX).
+
+        Deliberately not sequential. The previous implementation scanned every
+        customer, took the highest number and added one, which was wrong three
+        ways:
+
+        - Race: two concurrent signups both read the same maximum and both
+          produced the same id. The write was unconditional, so the second
+          silently overwrote the first, destroying that customer's record and
+          api_key_hash while reporting success to both.
+        - Enumerable: the id is also the Cognito username, so TT-0001, TT-0002
+          and so on could be walked to discover accounts.
+        - Disclosive: TT-0042 tells anyone roughly how many customers exist.
+
+        8 characters from a 32-symbol alphabet is about 10^12 combinations, so
+        collisions are vanishingly rare — and create_customer now writes
+        conditionally, so even one cannot overwrite an existing customer.
+        """
+        suffix = "".join(secrets.choice(self._ID_ALPHABET) for _ in range(self._ID_LENGTH))
+        return f"TT-{suffix}"
 
     # ── Alerts ────────────────────────────────────────────────────────────────
 
