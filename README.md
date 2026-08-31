@@ -199,6 +199,10 @@ See `infrastructure/terraform/README.md` for Terraform deployment instructions.
 - `GET /api/v1/cost/summary` - Cost overview
 - `GET /api/v1/alerts` - Active alerts
 - `GET /api/v1/metrics/{resource_id}` - Time-series data
+- `GET /api/v1/profile` - Company profile (name, address, logo)
+- `PUT /api/v1/profile` - Update company profile
+- `POST /api/v1/profile/logo` - Upload a company logo (PNG/JPEG/GIF, max 2 MB)
+- `DELETE /api/v1/profile/logo` - Remove the company logo
 
 ### Admin Endpoints (Admin JWT Required)
 - `GET /api/v1/admin/customers` - List all customers

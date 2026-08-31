@@ -243,6 +243,9 @@ module "ecs" {
   secrets_manager_arn       = module.secrets.secret_arn
   cognito_customer_pool_arn = module.cognito.customer_user_pool_arn
 
+  uploads_bucket_name = aws_s3_bucket.uploads.bucket
+  uploads_bucket_arn  = aws_s3_bucket.uploads.arn
+
   sqs_ingest_queue_arn          = module.sqs.ingest_queue_arn
   sqs_ingest_queue_url          = module.sqs.ingest_queue_url
   self_hosted_agent_api_key     = var.self_hosted_agent_api_key

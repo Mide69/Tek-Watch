@@ -53,6 +53,7 @@ async def signup(request: Request, body: SignupRequest):
         email=body.email,
         subscription_tier=DEFAULT_SIGNUP_TIER,
         aws_account_ids=[],
+        company=body.company,
     )
     customer_id = result["customer_id"]
 
