@@ -240,7 +240,8 @@ module "ecs" {
   enable_container_insights = var.enable_container_insights
   api_use_spot              = var.api_use_spot
 
-  secrets_manager_arn = module.secrets.secret_arn
+  secrets_manager_arn       = module.secrets.secret_arn
+  cognito_customer_pool_arn = module.cognito.customer_user_pool_arn
 
   sqs_ingest_queue_arn          = module.sqs.ingest_queue_arn
   sqs_ingest_queue_url          = module.sqs.ingest_queue_url
