@@ -11,12 +11,16 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useProfile } from '@/hooks/useProfile'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useOverview, useAlerts, useEC2 } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
 
 export default function OverviewPage() {
   const { customerId }  = useAuth()
+  // Company name where they have set one; the raw Customer ID is a poor
+  // thing to greet someone with on their own dashboard.
+  const { data: profile } = useProfile()
   const { timeRange }   = useDashboard()
   const { data }   = useOverview()
   const { data: alertsData }  = useAlerts()
@@ -52,7 +56,7 @@ export default function OverviewPage() {
           <div>
             <h1 className="text-2xl font-bold text-foreground">Overview</h1>
             <p className="text-muted-foreground text-sm mt-0.5">
-              {customerId ?? 'Demo'} · {TIME_RANGE_LABELS[timeRange]}
+              {profile?.display_name || customerId || 'Demo'} · {TIME_RANGE_LABELS[timeRange]}
             </p>
           </div>
           <div className={cn(

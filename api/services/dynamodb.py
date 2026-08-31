@@ -59,6 +59,7 @@ class DynamoDBService:
         email: str,
         subscription_tier: str,
         aws_account_ids: List[str],
+        company: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Create a new customer. Generates Customer ID and API key.
 
@@ -78,6 +79,17 @@ class DynamoDBService:
             "SK": "PROFILE",
             "name": name,
             "email": email,
+            # Collected on the signup form since day one but never stored, so
+            # every dashboard fell back to showing the raw Customer ID.
+            "company_name": company or "",
+            "phone": "",
+            "website": "",
+            "address_line1": "",
+            "address_line2": "",
+            "city": "",
+            "postcode": "",
+            "country": "",
+            "logo_key": "",
             "subscription_tier": subscription_tier,
             "aws_account_ids": aws_account_ids,
             "api_key_hash": api_key_hash,
@@ -110,7 +122,12 @@ class DynamoDBService:
 
     def update_customer(self, customer_id: str, updates: Dict[str, Any]) -> bool:
         """Update allowed customer fields."""
-        allowed = {"name", "email", "subscription_tier", "aws_account_ids", "status"}
+        allowed = {
+            "name", "email", "subscription_tier", "aws_account_ids", "status",
+            # Company profile, editable by the customer via PUT /api/v1/profile.
+            "company_name", "phone", "website", "address_line1", "address_line2",
+            "city", "postcode", "country", "logo_key",
+        }
         safe_updates = {k: v for k, v in updates.items() if k in allowed}
         if not safe_updates:
             return False
