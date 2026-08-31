@@ -82,39 +82,45 @@ async def signup(request: Request, body: SignupRequest):
             detail="Could not create your account right now. Please try again shortly.",
         ) from exc
 
+    # Cognito has already emailed the Customer ID and temporary password via the
+    # pool's invite template. This is a best-effort welcome note with next steps
+    # and deliberately carries NO credentials, so it is safe for it to fail.
+    # It silently no-ops until SES is configured; the account is still usable
+    # because the credential email does not depend on it.
     notifications = NotificationService()
     await notifications.send_customer_email(
         to_address=body.email,
-        subject="Welcome to TekWatch: your account is ready",
-        text_body=_welcome_email_text(customer_id, password, body.name),
-        html_body=_welcome_email_html(customer_id, password, body.name),
+        subject="Welcome to TekWatch",
+        text_body=_welcome_email_text(customer_id, body.name),
+        html_body=_welcome_email_html(customer_id, body.name),
     )
 
     logger.info("Self-service signup complete: %s (%s)", customer_id, body.email)
 
     return {
         "customer_id": customer_id,
-        "message": "Account created. Check your email for your login details.",
+        "message": "Account created. Check your email for your Customer ID and temporary password.",
     }
 
 
-def _welcome_email_text(customer_id: str, password: str, name: str) -> str:
+def _welcome_email_text(customer_id: str, name: str) -> str:
     return (
         f"Hi {name},\n\n"
         f"Your TekWatch account is ready.\n\n"
         f"Customer ID: {customer_id}\n"
-        f"Password: {password}\n\n"
+        f"Your temporary password has been emailed to you separately by AWS Cognito.\n"
+        f"You will be asked to choose your own password on first sign-in.\n\n"
         f"Sign in at https://app.tekwatch.io/login\n\n"
         f"Once you're in, head to the Agent page to download your CloudFormation "
         f"template and deploy the read-only monitoring agent into your AWS account. "
         f"It takes about 30 minutes and needs no inbound firewall changes.\n\n"
         f"Want to change your password? Use the forgot-password link on the sign-in page.\n\n"
-        f"Questions? Just reply to this email or reach us at hello@tekwatch.co.uk.\n\n"
+        f"Questions? Just reply to this email or reach us at hello@tekwatch.io.\n\n"
         f"The TekWatch team\n"
     )
 
 
-def _welcome_email_html(customer_id: str, password: str, name: str) -> str:
+def _welcome_email_html(customer_id: str, name: str) -> str:
     return f"""
     <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
       <div style="background: #4f46e5; padding: 16px 24px; border-radius: 8px 8px 0 0;">
@@ -125,7 +131,7 @@ def _welcome_email_html(customer_id: str, password: str, name: str) -> str:
         <p>Here are your sign-in details:</p>
         <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
           <tr><td style="padding: 6px 0; color: #6b7280; width: 120px;">Customer ID</td><td style="padding: 6px 0; font-weight: 600; font-family: monospace;">{customer_id}</td></tr>
-          <tr><td style="padding: 6px 0; color: #6b7280;">Password</td><td style="padding: 6px 0; font-weight: 600; font-family: monospace;">{password}</td></tr>
+          <tr><td style="padding: 6px 0; color: #6b7280;">Password</td><td style="padding: 6px 0;">Sent separately by email</td></tr>
         </table>
         <div style="margin: 20px 0;">
           <a href="https://app.tekwatch.io/login" style="background: #4f46e5; color: white; padding: 10px 20px; border-radius: 6px; text-decoration: none; font-weight: 600;">
@@ -135,7 +141,7 @@ def _welcome_email_html(customer_id: str, password: str, name: str) -> str:
         <p>Once you're in, head to the Agent page to download your CloudFormation template and deploy the read-only monitoring agent into your AWS account. It takes about 30 minutes and needs no inbound firewall changes.</p>
         <p>Want to change your password? Use the forgot-password link on the sign-in page.</p>
         <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">
-          Questions? Reply to this email or reach us at hello@tekwatch.co.uk.<br>
+          Questions? Reply to this email or reach us at hello@tekwatch.io.<br>
           Sent by TekWatch, powered by Tek Tribe Ltd.
         </p>
       </div>

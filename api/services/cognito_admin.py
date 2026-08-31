@@ -47,6 +47,19 @@ def provision_customer_login(
     """
     client = boto3.client("cognito-idp", region_name=region)
 
+    # Let Cognito send the invite. The pool's admin_create_user_config already
+    # carries a template for exactly this ("Your Customer ID is {username} and
+    # temporary password is {####}"), and Cognito's own delivery is proven in
+    # this account.
+    #
+    # This previously passed MessageAction="SUPPRESS" and then set a permanent
+    # password, so the app had to deliver the credentials itself over SES — a
+    # path that was never configured, failed silently, and left customers with
+    # an account and no way to learn about it.
+    #
+    # Not setting a permanent password is deliberate: the customer arrives in
+    # FORCE_CHANGE_PASSWORD and chooses their own on first sign-in, so no
+    # password we generated is ever transmitted or stored by us.
     client.admin_create_user(
         UserPoolId=user_pool_id,
         Username=customer_id,
@@ -55,13 +68,7 @@ def provision_customer_login(
             {"Name": "email_verified", "Value": "true"},
         ],
         TemporaryPassword=password,
-        MessageAction="SUPPRESS",
-    )
-    client.admin_set_user_password(
-        UserPoolId=user_pool_id,
-        Username=customer_id,
-        Password=password,
-        Permanent=True,
+        DesiredDeliveryMediums=["EMAIL"],
     )
     logger.info("Cognito login provisioned for %s", customer_id)
 
