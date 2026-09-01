@@ -232,3 +232,64 @@ describe('what a real account sees before connecting anything', () => {
       .resolves.toEqual({ total_resources: 847 })
   })
 })
+
+describe('keys the API does not send', () => {
+  beforeEach(() => {
+    resetDataSource()
+    apiClient.setToken('good')
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    apiClient.clearToken()
+  })
+
+  const respond = (body: unknown) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => body,
+    }) as unknown as typeof fetch
+  }
+
+  it('fills a missing key with empty, not with the fixture value', async () => {
+    // The live crash: /overview returns no cost_trend, the page read
+    // data.cost_trend[0], and "Cannot read properties of undefined" replaced
+    // the dashboard. Filling from the fixture would have shown a stranger's
+    // cost history instead, which is worse.
+    respond({ total_resources: 4 })
+
+    const result = await apiFetch('/api/v1/overview', {
+      total_resources: 847,
+      cost_trend: [{ cost: 1, label: 'a' }],
+    })
+
+    expect(result).toEqual({ total_resources: 4, cost_trend: [] })
+  })
+
+  it('lets real values win over the defaults', async () => {
+    respond({ total_resources: 4, cost_trend: [{ cost: 9, label: 'b' }] })
+
+    const result = await apiFetch('/api/v1/overview', {
+      total_resources: 847,
+      cost_trend: [{ cost: 1, label: 'a' }],
+    })
+
+    expect(result).toEqual({ total_resources: 4, cost_trend: [{ cost: 9, label: 'b' }] })
+  })
+
+  it('keeps an explicit null from the API rather than overriding it', async () => {
+    respond({ total_resources: 4, agent_status: null })
+
+    const result = await apiFetch('/api/v1/overview', {
+      total_resources: 847,
+      agent_status: { status: 'healthy' },
+    })
+
+    expect(result).toEqual({ total_resources: 4, agent_status: null })
+  })
+
+  it('does not touch array payloads', async () => {
+    respond({ instances: [{ id: 'i-1' }] })
+    await expect(apiFetch('/api/v1/compute/ec2', [{ id: 'mock' }], 'instances'))
+      .resolves.toEqual([{ id: 'i-1' }])
+  })
+})
