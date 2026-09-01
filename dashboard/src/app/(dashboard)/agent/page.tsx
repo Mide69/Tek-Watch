@@ -90,8 +90,12 @@ export default function AgentPage() {
     )
   }
 
-  const okCollectors   = a.collectors.filter(c => c.status === 'ok').length
-  const warnCollectors = a.collectors.length - okCollectors
+  // Read once, guarded: the API returns collectors_enabled/regions_monitored,
+  // and useAgent reshapes them, but a null here must not blank the page.
+  const collectors = a.collectors ?? []
+  const regions    = a.regions ?? []
+  const okCollectors   = collectors.filter(c => c.status === 'ok').length
+  const warnCollectors = collectors.length - okCollectors
 
   return (
     <DashboardLayout customerId={customerId || undefined}>
@@ -138,8 +142,8 @@ export default function AgentPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: 'Metrics Collected',  value: a.metrics_collected_total.toLocaleString(), icon: Activity,    color: 'text-indigo-400' },
-            { label: 'Regions Covered',    value: a.regions.length.toString(),                icon: Radio,       color: 'text-blue-400'   },
-            { label: 'Active Collectors',  value: `${okCollectors}/${a.collectors.length}`,   icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' },
+            { label: 'Regions Covered',    value: regions.length.toString(),                icon: Radio,       color: 'text-blue-400'   },
+            { label: 'Active Collectors',  value: `${okCollectors}/${collectors.length}`,   icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' },
             { label: 'Collection Interval',value: `${a.collection_interval_s}s`,              icon: Clock,       color: 'text-amber-500 dark:text-amber-400'  },
           ].map(s => (
             <Card key={s.label}>
@@ -159,7 +163,7 @@ export default function AgentPage() {
           <CardContent className="p-5">
             <h3 className="font-semibold text-foreground mb-3">Regions Monitored</h3>
             <div className="flex flex-wrap gap-2">
-              {a.regions.map(r => (
+              {regions.map(r => (
                 <div key={r} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 border border-white/[0.08]">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   <span className="text-sm font-mono text-foreground">{r}</span>
@@ -175,7 +179,7 @@ export default function AgentPage() {
             <div className="px-5 pt-5 pb-3 flex items-center justify-between">
               <div>
                 <h3 className="font-semibold text-foreground">Collectors</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{a.collectors.length} collectors</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{collectors.length} collectors</p>
               </div>
               {warnCollectors > 0
                 ? <Badge variant="warning">{warnCollectors} degraded</Badge>
@@ -191,7 +195,7 @@ export default function AgentPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {a.collectors.map((c, idx) => (
+                  {collectors.map((c, idx) => (
                     <tr key={c.name} className={`border-b border-border/40 hover:bg-muted/30 ${idx % 2 ? 'bg-muted/10' : ''}`}>
                       <td className="px-4 py-3 font-medium text-foreground">{c.name}</td>
                       <td className="px-4 py-3">
@@ -200,8 +204,8 @@ export default function AgentPage() {
                           : <Badge variant="error">{c.status}</Badge>}
                       </td>
                       <td className="px-4 py-3 text-xs text-muted-foreground">{formatRelativeTime(c.last_run)}</td>
-                      <td className="px-4 py-3 text-foreground">{c.resources}</td>
-                      <td className="px-4 py-3 text-foreground">{c.metrics_sent}</td>
+                      <td className="px-4 py-3 text-foreground">{c.resources ?? '—'}</td>
+                      <td className="px-4 py-3 text-foreground">{c.metrics_sent ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>

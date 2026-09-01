@@ -45,7 +45,11 @@ export default function OverviewPage() {
   const runningEC2 = (ec2 || []).filter(i => i.state === 'running')
     .sort((a, b) => b.cpu - a.cpu).slice(0, 6)
 
-  const costBars = data.cost_trend.map(d => ({ value: d.cost, label: d.label }))
+  // The API's overview does not return cost_trend — only the mock has it — so
+  // this threw before the page could paint once real data started arriving.
+  // An empty sparkline is the honest rendering of a series we do not have.
+  const trend: { cost: number; label: string }[] = Array.isArray(data.cost_trend) ? data.cost_trend : []
+  const costBars = trend.map(d => ({ value: d.cost, label: d.label }))
 
   return (
     <DashboardLayout customerId={customerId || 'TT-DEMO'}>
@@ -87,7 +91,7 @@ export default function OverviewPage() {
               icon: Server,
               colorClass: 'text-blue-500 dark:text-blue-400',
               iconBg: 'bg-blue-500/10 border-blue-500/20',
-              spark: data.cost_trend.map((_, i) => ({ value: 820 + i * 1.5 })),
+              spark: trend.map((_, i) => ({ value: 820 + i * 1.5 })),
               sparkColor: '#3b82f6',
             },
             {
@@ -98,7 +102,7 @@ export default function OverviewPage() {
               icon: AlertTriangle,
               colorClass: 'text-red-500 dark:text-red-400',
               iconBg: 'bg-red-500/10 border-red-500/20',
-              spark: data.cost_trend.map((_, i) => ({ value: i < 4 ? 1 : i < 8 ? 2 : 3 })),
+              spark: trend.map((_, i) => ({ value: i < 4 ? 1 : i < 8 ? 2 : 3 })),
               sparkColor: '#ef4444',
             },
             {
@@ -109,7 +113,7 @@ export default function OverviewPage() {
               icon: Activity,
               colorClass: 'text-amber-500 dark:text-amber-400',
               iconBg: 'bg-amber-500/10 border-amber-500/20',
-              spark: data.cost_trend.map((_, i) => ({ value: i < 6 ? 1 : 2 })),
+              spark: trend.map((_, i) => ({ value: i < 6 ? 1 : 2 })),
               sparkColor: '#f59e0b',
             },
             {
