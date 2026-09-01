@@ -126,10 +126,3 @@ export const endDemoSession = (): void => {
  * inside it, which is the property the whole module exists to guarantee.
  */
 export const isFixtureView = (): boolean => isDemoBuild() || isDemoSession()
-
-/**
- * Retained under its old name because several components still ask it, and it
- * still means the same thing to them: "is this the sample estate rather than
- * a real account?"
- */
-export const isDemoMode = (): boolean => isFixtureView()
