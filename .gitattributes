@@ -1,0 +1,27 @@
+# Normalise line endings across the repository.
+#
+# Without this a Windows checkout writes CRLF into every file, and Terraform
+# then compares a CRLF-terminated local heredoc against the LF copy AWS stores.
+# Both CloudFront rewrite functions therefore showed as changed on every plan,
+# every line removed and re-added identically. It is only noise — but it is
+# noise on the one output meant to tell you what is about to change in
+# production, and a plan that always shows phantom edits is a plan nobody reads
+# carefully.
+*               text=auto
+
+# Anything compared byte-for-byte, or executed by a Linux runner, stays LF
+# whatever platform it was checked out on.
+*.tf            text eol=lf
+*.tfvars        text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.sh            text eol=lf
+*.py            text eol=lf
+Dockerfile      text eol=lf
+
+*.png           binary
+*.jpg           binary
+*.jpeg          binary
+*.gif           binary
+*.ico           binary
+*.zip           binary
