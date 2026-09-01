@@ -1,6 +1,19 @@
 variable "name_prefix" { type = string }
 variable "environment" { type = string }
 
+# SES identity to send from. Empty keeps Cognito's built-in sender, which is
+# capped at 50 messages a day and arrives from verificationemail.com — a domain
+# the customer has never heard of, which is most of why these land in spam.
+variable "ses_source_arn" {
+  type    = string
+  default = ""
+}
+
+variable "ses_from_email" {
+  type    = string
+  default = ""
+}
+
 variable "admin_google_client_id" {
   type    = string
   default = ""
@@ -65,6 +78,20 @@ resource "aws_cognito_user_pool" "customers" {
     }
   }
 
+
+  # DEVELOPER hands sending to SES so mail is DKIM-signed by our own domain and
+  # is not subject to Cognito's 50/day default cap. Guarded by the variable so
+  # a region or environment without a verified identity still applies cleanly
+  # rather than failing on a missing ARN.
+  dynamic "email_configuration" {
+    for_each = var.ses_source_arn == "" ? [] : [1]
+    content {
+      email_sending_account = "DEVELOPER"
+      source_arn            = var.ses_source_arn
+      from_email_address    = var.ses_from_email
+    }
+  }
+
   tags = { Name = "${var.name_prefix}-customers" }
 }
 
@@ -122,6 +149,20 @@ resource "aws_cognito_user_pool" "admins" {
 
   admin_create_user_config {
     allow_admin_create_user_only = true
+  }
+
+
+  # DEVELOPER hands sending to SES so mail is DKIM-signed by our own domain and
+  # is not subject to Cognito's 50/day default cap. Guarded by the variable so
+  # a region or environment without a verified identity still applies cleanly
+  # rather than failing on a missing ARN.
+  dynamic "email_configuration" {
+    for_each = var.ses_source_arn == "" ? [] : [1]
+    content {
+      email_sending_account = "DEVELOPER"
+      source_arn            = var.ses_source_arn
+      from_email_address    = var.ses_from_email
+    }
   }
 
   tags = { Name = "${var.name_prefix}-admins" }
