@@ -74,3 +74,9 @@ enable_custom_domain = true
 attach_custom_domain = true
 
 acm_certificate_arn = "" # ALB HTTPS listener; API is served via the CloudFront /api/* proxy for now
+
+# Signup invites and password resets go out through SES, DKIM-signed by
+# tekwatch.io, rather than Cognito's built-in sender at verificationemail.com.
+# Production access was granted on 2026-08-31 (50,000/day, enforcement HEALTHY).
+cognito_ses_source_arn = "arn:aws:ses:eu-west-2:409415530028:identity/tekwatch.io"
+cognito_ses_from_email = "no-reply@tekwatch.io"

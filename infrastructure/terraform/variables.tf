@@ -232,3 +232,16 @@ variable "self_hosted_agent_customer_id" {
   type        = string
   default     = "TEK-WATCH-INTERNAL"
 }
+
+# ── Cognito outbound email ────────────────────────────────────────────────────
+# Empty leaves Cognito on its built-in sender. Set both to move signup invites
+# and password resets onto SES from our own domain.
+variable "cognito_ses_source_arn" {
+  type    = string
+  default = ""
+}
+
+variable "cognito_ses_from_email" {
+  type    = string
+  default = ""
+}
