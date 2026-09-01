@@ -4,7 +4,7 @@
  *   1. apiFetch sent no Authorization header, so every call 401'd.
  *   2. The mock fallback was silent, so the 401s looked like real data.
  */
-import { apiFetch } from '@/hooks/useData'
+import { apiFetch, normaliseAgent } from '@/hooks/useData'
 import { markDataSource, isShowingSampleData, resetDataSource } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
@@ -86,5 +86,89 @@ describe('markDataSource', () => {
 
     markDataSource('/b', false)
     expect(isShowingSampleData()).toBe(false)
+  })
+})
+
+describe('response envelopes', () => {
+  beforeEach(() => {
+    resetDataSource()
+    apiClient.setToken('good')
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    apiClient.clearToken()
+  })
+
+  const respond = (body: unknown) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => body,
+    }) as unknown as typeof fetch
+  }
+
+  it('lifts the array out of the envelope the API actually sends', async () => {
+    // /compute/ec2 answers {"instances": [...]}, the pages expect a bare array.
+    // Without this the page ran (ec2 || []).filter on an object and threw
+    // "filter is not a function" over the whole dashboard.
+    respond({ instances: [{ id: 'i-1' }] })
+
+    const result = await apiFetch('/api/v1/compute/ec2', [] as unknown[], 'instances')
+
+    expect(result).toEqual([{ id: 'i-1' }])
+    expect(isShowingSampleData()).toBe(false)
+  })
+
+  it('falls back to sample data when the shape is not what the page expects', async () => {
+    // A wrong shape must degrade to the labelled sample view, never reach a
+    // component that will call .filter on it.
+    respond({ unexpected: 'shape' })
+
+    const result = await apiFetch('/api/v1/compute/ec2', ['sample'], 'instances')
+
+    expect(result).toEqual(['sample'])
+    expect(isShowingSampleData()).toBe(true)
+  })
+
+  it('passes through a bare array unchanged', async () => {
+    respond([{ id: 'i-1' }])
+    await expect(apiFetch('/api/v1/compute/ec2', [] as unknown[], 'instances'))
+      .resolves.toEqual([{ id: 'i-1' }])
+  })
+})
+
+describe('normaliseAgent', () => {
+  const FALLBACK = { collectors: [], regions: [] } as never
+
+  it('maps the API field names onto what the page renders', () => {
+    const result = normaliseAgent({
+      status: 'healthy',
+      regions_monitored: ['eu-west-2'],
+      collectors_enabled: ['ec2', 'cost_explorer'],
+      last_collection_time: '2026-09-01T00:00:00Z',
+    }, FALLBACK) as never as { regions: string[]; collectors: { name: string; status: string }[] }
+
+    expect(result.regions).toEqual(['eu-west-2'])
+    expect(result.collectors.map(c => c.name)).toEqual(['EC2', 'COST EXPLORER'])
+    expect(result.collectors.every(c => c.status === 'ok')).toBe(true)
+  })
+
+  it('does not invent counts the API never reported', () => {
+    const result = normaliseAgent({
+      status: 'healthy',
+      collectors_enabled: ['ec2'],
+    }, FALLBACK) as never as { collectors: { resources: null; metrics_sent: null }[] }
+
+    expect(result.collectors[0].resources).toBeNull()
+    expect(result.collectors[0].metrics_sent).toBeNull()
+  })
+
+  it('leaves an already-correct shape alone', () => {
+    const shaped = { collectors: [{ name: 'EC2' }], regions: ['eu-west-2'] }
+    expect(normaliseAgent(shaped, FALLBACK)).toBe(shaped)
+  })
+
+  it('returns null for a non-object so the caller can fall back', () => {
+    expect(normaliseAgent('nonsense', FALLBACK)).toBeNull()
+    expect(normaliseAgent(null, FALLBACK)).toBeNull()
   })
 })
