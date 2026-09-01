@@ -10,7 +10,6 @@
 let fixtureView = true
 jest.mock('../demoMode', () => ({
   isFixtureView: () => fixtureView,
-  isDemoMode: () => fixtureView,
   isDemoSession: () => false,
 }))
 

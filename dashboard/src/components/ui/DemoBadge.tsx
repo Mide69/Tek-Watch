@@ -1,9 +1,8 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Sparkles } from 'lucide-react'
-import { isDemoSession } from '@/lib/demoMode'
+import { useFixtureView } from '@/hooks/useFixtureView'
 
 /**
  * Tells a visitor they are looking at sample data, and gives them a way in.
@@ -19,11 +18,7 @@ import { isDemoSession } from '@/lib/demoMode'
  * server's and trigger a hydration mismatch.
  */
 export function DemoBadge() {
-  const [isDemo, setIsDemo] = useState(false)
-
-  useEffect(() => {
-    setIsDemo(isDemoSession())
-  }, [])
+  const isDemo = useFixtureView()
 
   if (!isDemo) return null
 

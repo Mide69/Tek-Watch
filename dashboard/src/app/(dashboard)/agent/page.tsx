@@ -10,7 +10,7 @@ import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lu
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
-import { isDemoMode, isFixtureView } from '@/lib/demoMode'
+import { useFixtureView } from '@/hooks/useFixtureView'
 import { useShowingSampleData } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
@@ -19,6 +19,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8
 function DeployAgentCard({ customerId }: { customerId: string }) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
+  const fixtureView = useFixtureView()
 
   async function handleDownload() {
     setError('')
@@ -54,7 +55,7 @@ function DeployAgentCard({ customerId }: { customerId: string }) {
             </p>
             {error && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{error}</p>}
           </div>
-          {isDemoMode() ? (
+          {fixtureView ? (
             <span className="text-xs text-muted-foreground px-3 py-2">
               Available on a real account, not this demo
             </span>
@@ -89,9 +90,8 @@ export default function AgentPage() {
   // Demo visitors still get the full sample view — that is the point of the
   // demo, and DemoBadge says so.
   const showingSample = useShowingSampleData()
-  const [isDemo, setIsDemo] = useState(true) // assume demo until the browser says otherwise
-  useEffect(() => { setIsDemo(isFixtureView()) }, [])
-  const notConnected = showingSample && !isDemo
+  const isDemo = useFixtureView()
+  const notConnected = showingSample && isDemo === false
 
   if (!a) {
     return (

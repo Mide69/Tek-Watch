@@ -86,6 +86,17 @@ async function signInFresh(input: SignInInput) {
 }
 
 /**
+ * True only on a developer's own machine, or in a build that has explicitly
+ * asked to be a demo. Everything else must have real Cognito configuration.
+ */
+function isLocalDevelopment(): boolean {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') return true
+  if (typeof window === 'undefined') return true // build-time prerender, never a user
+  const { hostname } = window.location
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local')
+}
+
+/**
  * Result of a sign-in attempt.
  *
  * Cognito sign-in is a state machine, not a single call. A customer created by
@@ -107,8 +118,24 @@ export type AuthResult =
 export async function authSignIn(customerId: string, password: string): Promise<AuthResult> {
   const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID || ''
 
-  // Dev mode — mock auth when Cognito is not configured
+  // Mock auth for local development only.
+  //
+  // This used to trigger on "no pool id configured", full stop. A production
+  // build made with an empty COGNITO_CUSTOMER_USER_POOL_ID_PROD secret
+  // therefore shipped an open front door: any well-formed Customer ID and any
+  // non-empty password returned a token and opened the dashboard. The API
+  // still refused that token, so no customer data was reachable, but the login
+  // gate was decorative — and real customers could not sign in at all, because
+  // Amplify was never configured.
+  //
+  // A missing pool id in a deployed build is now a failure, not a mode.
   if (!userPoolId) {
+    if (!isLocalDevelopment()) {
+      throw new Error(
+        'Sign-in is unavailable: this deployment is missing its Cognito configuration. ' +
+        'Please contact support@tekwatch.io.'
+      )
+    }
     // Ids are random base32 now (TT-9F4KQ7M2), not a 4-digit counter. The old
     // /^TT-\d{4}$/ would reject every id the platform currently mints.
     if (!customerId.match(/^TT-[0-9A-Z]{4,}$/i)) {

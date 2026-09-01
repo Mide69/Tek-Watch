@@ -13,6 +13,7 @@ import {
   authConfirmForgotPassword,
 } from '@/lib/auth'
 import apiClient from '@/lib/api'
+import { endDemoSession } from '@/lib/demoMode'
 
 configureAmplify()
 
@@ -56,6 +57,10 @@ export default function LoginPage() {
   }
 
   const enterDashboard = (user: { idToken: string; customerId: string }) => {
+    // Ending any demo here is what keeps the two apart. Someone who explored
+    // the sample estate and then signed up would otherwise carry the demo flag
+    // into their own account and keep seeing a stranger's infrastructure.
+    endDemoSession()
     apiClient.setToken(user.idToken)
     localStorage.setItem('tek_watch_customer_id', user.customerId)
     router.push('/overview')
