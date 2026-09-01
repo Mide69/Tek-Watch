@@ -38,6 +38,11 @@ playwright/.cache/
 *.tfstate
 *.tfstate.*
 *.tfplan
+# The workflows and the runbook both write plan files as "tfplan-prod" /
+# "tfplan-dev", with no extension, so *.tfplan above does not cover them. A
+# plan is a full snapshot of the resource graph with attribute values, and
+# this repo is public.
+tfplan-*
 .terraform.lock.hcl
 **/silence_detector.zip
 
