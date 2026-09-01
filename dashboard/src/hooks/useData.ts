@@ -14,6 +14,7 @@ import useSWR from 'swr'
 import { useDashboard } from '@/contexts/DashboardContext'
 import apiClient from '@/lib/api'
 import { markDataSource } from '@/lib/dataSource'
+import { isFixtureView } from '@/lib/demoMode'
 import {
   getMockOverview, getMockEC2WithMetrics, getMockLambdaWithMetrics,
   getMockRDSWithMetrics, getMockCostSummary, MOCK_COST_BREAKDOWN,
@@ -24,6 +25,34 @@ import {
 } from '@/lib/mockData'
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
+
+/**
+ * The same shape, emptied out: arrays cleared, numbers zeroed, strings blanked.
+ *
+ * What a real customer sees before they have connected anything. Serving them
+ * the mock fixtures instead meant a brand new account opened on 847 resources,
+ * three active alarms and £4,247 of monthly spend belonging to nobody. A
+ * labelled banner above invented figures is still invented figures; zero is
+ * the true answer to "what is in your AWS account" when the answer is nothing.
+ *
+ * The demo keeps the fixtures. Showing what a populated dashboard looks like
+ * is the entire job of the demo, and it is labelled as such.
+ */
+function emptyLike<T>(value: T): T {
+  if (Array.isArray(value)) return [] as unknown as T
+  if (value === null || value === undefined) return value
+  if (typeof value === 'number') return 0 as unknown as T
+  if (typeof value === 'string') return '' as unknown as T
+  if (typeof value === 'boolean') return false as unknown as T
+  if (typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      out[k] = emptyLike(v)
+    }
+    return out as unknown as T
+  }
+  return value
+}
 
 /**
  * Lift the payload out of the envelope the API actually returns.
@@ -56,9 +85,11 @@ function unwrap<T>(payload: unknown, fallback: T, pick?: string): T | null {
 // Exported for tests: the defects this guards against (missing auth header,
 // silent mock fallback, envelope mismatch) were all invisible from the outside.
 export async function apiFetch<T>(path: string, fallback: T, pick?: string): Promise<T> {
+  // A visitor who opted into the demo, or a build with no Cognito at all,
+  // gets the fixtures. A signed-in customer gets zeros.
   const sample = (): T => {
     markDataSource(path, true)
-    return fallback
+    return isFixtureView() ? fallback : emptyLike(fallback)
   }
 
   // Every one of these endpoints is behind get_current_customer on the API.
