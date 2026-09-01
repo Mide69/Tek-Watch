@@ -134,6 +134,17 @@ async function toStep(result: AmplifySignInResult): Promise<AdminAuthStep> {
 
 /** Step 1: email + password. Returns whatever Cognito wants next. */
 /**
+ * True only on a developer's own machine, or a build that explicitly declared
+ * itself a demo. A deployed build must have real Cognito configuration.
+ */
+function isLocalDevelopment(): boolean {
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') return true
+  if (typeof window === 'undefined') return true // build-time prerender, never a user
+  const { hostname } = window.location
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname.endsWith('.local')
+}
+
+/**
  * True when Cognito refused a sign-in because a session already exists.
  *
  * Amplify keeps its own tokens in local storage, separate from the id token
@@ -179,6 +190,17 @@ export async function adminSignIn(email: string, password: string): Promise<Admi
   // demo is explorable; the placeholder pool id also routes here (not just an
   // empty one), matching isDemoMode()'s logic.
   if (isDemoMode()) {
+    // Same guard as the customer dashboard, and it matters more here: this
+    // console has account-wide reach. isDemoMode() is true whenever the pool id
+    // is missing or a placeholder, so an admin build shipped without its
+    // secrets would accept any email and any password. The pool is configured
+    // today; this makes a future missing secret a locked door rather than an
+    // open one.
+    if (!isLocalDevelopment()) {
+      throw new Error(
+        'Sign-in is unavailable: this deployment is missing its Cognito configuration.'
+      )
+    }
     if (!email || !password) throw new Error('Email and password are required')
     persistSession(`mock.${btoa(email)}.sig`)
     return { kind: 'DONE' }

@@ -21,6 +21,7 @@ import { NotificationBell } from '@/components/ui/NotificationBell'
 import { HistoryNav } from '@/components/ui/HistoryNav'
 import { DemoBadge } from '@/components/ui/DemoBadge'
 import { SampleDataBanner } from '@/components/ui/SampleDataBanner'
+import { ConfigErrorBanner } from '@/components/ui/ConfigErrorBanner'
 import { useProfile } from '@/hooks/useProfile'
 
 interface DashboardLayoutProps {
@@ -292,6 +293,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
         {/* Page content — theme-page enables CSS cascade for page internals */}
         <main className="flex-1 p-4 lg:p-6 theme-page">
+          <ConfigErrorBanner />
           <SampleDataBanner />
           {children}
         </main>
