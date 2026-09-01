@@ -4,10 +4,10 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
 import { useShowingSampleData } from '@/lib/dataSource'
-import { isDemoSession } from '@/lib/demoMode'
+import { isFixtureView } from '@/lib/demoMode'
 
 /**
- * Says, unmistakably, when the figures on screen are not the customer's own.
+ * Says, unmistakably, when nothing on screen came from the customer's account.
  *
  * A dashboard that invents plausible numbers is worse than one that shows
  * nothing: nothing is obviously broken, whereas $4,247.80 of estimated spend
@@ -23,7 +23,7 @@ export function SampleDataBanner() {
   const [isDemo, setIsDemo] = useState(true) // assume demo until the browser says otherwise
 
   useEffect(() => {
-    setIsDemo(isDemoSession())
+    setIsDemo(isFixtureView())
   }, [])
 
   if (isDemo || !showingSample) return null
@@ -34,11 +34,11 @@ export function SampleDataBanner() {
         <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-500" />
         <div className="text-sm">
           <p className="font-semibold text-amber-600 dark:text-amber-300">
-            Showing sample data, not your AWS account
+            No data yet from your AWS account
           </p>
           <p className="mt-0.5 text-amber-700/80 dark:text-amber-200/70">
-            Connect the Tek Watch agent to see your own resources, alarms and costs.
-            Every figure below is example data until then.
+            Nothing is reporting in, so every figure below reads zero. Connect the
+            Tek Watch agent and this dashboard fills in on its own.
           </p>
         </div>
       </div>
