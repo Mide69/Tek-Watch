@@ -163,6 +163,10 @@ module "ecr" {
   # Repos are shared across environments, so they are named from the project
   # alone rather than name_prefix. See the module for why.
   project = var.project
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
+  }
 }
 
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
@@ -259,6 +263,10 @@ module "ecs" {
 
   uploads_bucket_name = aws_s3_bucket.uploads.bucket
   uploads_bucket_arn  = aws_s3_bucket.uploads.arn
+
+  # Baked into the CloudFormation template customers download, so it has to be
+  # the real registry rather than the placeholder that shipped before.
+  agent_public_image_uri = "${module.ecr.agent_public_repository_uri}:latest"
 
   sqs_ingest_queue_arn          = module.sqs.ingest_queue_arn
   sqs_ingest_queue_url          = module.sqs.ingest_queue_url
