@@ -10,7 +10,7 @@ import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lu
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
-import { isDemoMode, isDemoSession } from '@/lib/demoMode'
+import { isDemoMode, isFixtureView } from '@/lib/demoMode'
 import { useShowingSampleData } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
@@ -90,7 +90,7 @@ export default function AgentPage() {
   // demo, and DemoBadge says so.
   const showingSample = useShowingSampleData()
   const [isDemo, setIsDemo] = useState(true) // assume demo until the browser says otherwise
-  useEffect(() => { setIsDemo(isDemoSession()) }, [])
+  useEffect(() => { setIsDemo(isFixtureView()) }, [])
   const notConnected = showingSample && !isDemo
 
   if (!a) {

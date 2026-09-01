@@ -19,7 +19,13 @@ import { isDemoMode, isDemoSession } from '@/lib/demoMode'
 const IS_REAL_COGNITO = !isDemoMode()
 
 export function useAuth() {
-  const [customerId, setCustomerId] = useState<string | null>('TT-DEMO')
+  // Only a demo build starts as TT-DEMO. A real one starts as null and stays
+  // null until Cognito answers, because seeding it with the demo id meant a
+  // customer who had just signed in was greeted as the demo user — and stayed
+  // that way for good if the lookup ever came back without a username.
+  const [customerId, setCustomerId] = useState<string | null>(
+    IS_REAL_COGNITO ? null : 'TT-DEMO'
+  )
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -42,7 +48,9 @@ export function useAuth() {
           return
         }
         apiClient.setToken(user.idToken)
-        setCustomerId(user.customerId)
+        // Empty is not a customer id. Left as-is it is falsy, and every
+        // `customerId || 'TT-DEMO'` downstream quietly resolved to the demo.
+        setCustomerId(user.customerId || null)
       } catch {
         if (!cancelled) window.location.replace('/login')
       } finally {

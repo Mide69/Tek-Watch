@@ -64,3 +64,16 @@ export const endDemoSession = (): void => {
     /* nothing to clear */
   }
 }
+
+/**
+ * True when this view is meant to show the sample fixtures rather than the
+ * customer's own data — a build with no Cognito at all, or a visitor who
+ * opted into the demo.
+ *
+ * Everything that has to tell "demo" from "a real account with nothing yet"
+ * asks this one function. They were briefly asking different questions:
+ * apiFetch checked both conditions while the agent page checked only the
+ * session, so a dev build served fixtures on every page and "no agent
+ * connected" on one.
+ */
+export const isFixtureView = (): boolean => isDemoMode() || isDemoSession()
