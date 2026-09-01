@@ -180,6 +180,9 @@ module "cognito" {
   environment                = var.environment
   admin_google_client_id     = var.admin_google_client_id
   admin_google_client_secret = var.admin_google_client_secret
+
+  ses_source_arn = var.cognito_ses_source_arn
+  ses_from_email = var.cognito_ses_from_email
 }
 
 # ── Secrets Manager ───────────────────────────────────────────────────────────
