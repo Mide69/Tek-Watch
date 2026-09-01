@@ -1,10 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Info } from 'lucide-react'
 import { useShowingSampleData } from '@/lib/dataSource'
-import { isFixtureView } from '@/lib/demoMode'
+import { useFixtureView } from '@/hooks/useFixtureView'
 
 /**
  * Says, unmistakably, when nothing on screen came from the customer's account.
@@ -20,13 +19,10 @@ import { isFixtureView } from '@/lib/demoMode'
  */
 export function SampleDataBanner() {
   const showingSample = useShowingSampleData()
-  const [isDemo, setIsDemo] = useState(true) // assume demo until the browser says otherwise
+  const isDemo = useFixtureView()
 
-  useEffect(() => {
-    setIsDemo(isFixtureView())
-  }, [])
-
-  if (isDemo || !showingSample) return null
+  // isDemo === null means not yet known; say nothing until it is.
+  if (isDemo !== false || !showingSample) return null
 
   return (
     <div className="mb-4 flex flex-col gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">

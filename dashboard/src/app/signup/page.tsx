@@ -5,13 +5,14 @@ import Link from 'next/link'
 import axios from 'axios'
 import { Check, ArrowRight } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
-import { isDemoMode } from '@/lib/demoMode'
+import { useFixtureView } from '@/hooks/useFixtureView'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 type View = 'form' | 'sent'
 
 export default function SignupPage() {
+  const fixtureView = useFixtureView()
   const [view, setView] = useState<View>('form')
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
@@ -89,7 +90,7 @@ export default function SignupPage() {
             <span className="font-bold text-white">TekWatch</span>
           </div>
 
-          {isDemoMode() ? (
+          {fixtureView ? (
             <div className="text-center">
               <div className="w-16 h-16 bg-cyan-500/15 border border-cyan-500/25 rounded-full flex items-center justify-center mx-auto mb-5">
                 <LogoMark className="w-7 h-7 text-cyan-400" />
@@ -169,7 +170,7 @@ export default function SignupPage() {
             </div>
           )}
 
-          {!isDemoMode() && (
+          {!fixtureView && (
             <p className="mt-10 text-center text-xs text-slate-600">
               Questions before you sign up?{' '}
               <Link href="/contact" className="text-indigo-500 hover:text-indigo-400">Contact us</Link>
