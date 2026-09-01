@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -10,7 +10,8 @@ import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lu
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
-import { isDemoMode } from '@/lib/demoMode'
+import { isDemoMode, isDemoSession } from '@/lib/demoMode'
+import { useShowingSampleData } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -77,6 +78,21 @@ export default function AgentPage() {
   const { customerId }      = useAuth()
   const { data: a } = useAgent()
 
+  // A real account with no agent must not be shown a healthy one.
+  //
+  // Every other page labels its sample figures and moves on, which is fair for
+  // a resource count. This page is different: "Healthy", "Up 2,184h", "18/18
+  // collectors" is a claim about the customer's own infrastructure, and a
+  // caption above it does not stop it reading as fact. Someone with nothing
+  // deployed was being told their monitoring was fine.
+  //
+  // Demo visitors still get the full sample view — that is the point of the
+  // demo, and DemoBadge says so.
+  const showingSample = useShowingSampleData()
+  const [isDemo, setIsDemo] = useState(true) // assume demo until the browser says otherwise
+  useEffect(() => { setIsDemo(isDemoSession()) }, [])
+  const notConnected = showingSample && !isDemo
+
   if (!a) {
     return (
       <DashboardLayout customerId={customerId || undefined}>
@@ -85,6 +101,37 @@ export default function AgentPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
           </div>
+        </div>
+      </DashboardLayout>
+    )
+  }
+
+  if (notConnected) {
+    return (
+      <DashboardLayout customerId={customerId || undefined}>
+        <div className="space-y-6 max-w-3xl">
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">Agent</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Collection agent running in your AWS account
+            </p>
+          </div>
+
+          <Card>
+            <CardContent className="p-8 text-center">
+              <div className="w-14 h-14 rounded-full bg-muted/40 border border-border flex items-center justify-center mx-auto mb-4">
+                <Radio className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <h2 className="text-lg font-semibold text-foreground mb-1.5">No agent connected yet</h2>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+                Nothing is reporting from your AWS account, so there is no health,
+                no collectors and no metrics to show. Deploy the read-only agent
+                and this page fills in on its own, usually within a few minutes.
+              </p>
+            </CardContent>
+          </Card>
+
+          <DeployAgentCard customerId={customerId || ''} />
         </div>
       </DashboardLayout>
     )
