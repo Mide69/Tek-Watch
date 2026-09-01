@@ -206,6 +206,22 @@ jobs:
           cache: 'npm'
           cache-dependency-path: admin-portal/package-lock.json
 
+      # A missing secret must not ship an admin console that accepts any
+      # password. Fail here, where it is visible.
+      - name: Check Cognito configuration is present
+        env:
+          POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID_PROD }}
+          CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID_PROD }}
+        run: |
+          fail() { echo "::error::$1"; exit 1; }
+          [ -n "$POOL_ID" ]   || fail "COGNITO_ADMIN_USER_POOL_ID_PROD is not set on the prod environment."
+          [ -n "$CLIENT_ID" ] || fail "COGNITO_ADMIN_APP_CLIENT_ID_PROD is not set on the prod environment."
+          case "$POOL_ID" in
+            *[Pp][Ll][Aa][Cc][Ee][Hh][Oo][Ll][Dd][Ee][Rr]*)
+              fail "COGNITO_ADMIN_USER_POOL_ID_PROD is a placeholder value." ;;
+          esac
+          echo "Cognito configuration present."
+
       - name: Install and build for prod
         env:
           NEXT_PUBLIC_API_BASE_URL: https://api.tekwatch.io
