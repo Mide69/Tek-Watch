@@ -3,7 +3,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from auth.dependencies import CustomerContext, get_current_customer
 from config import load_config
@@ -113,8 +113,24 @@ async def get_agent_health(
 @router.get("/cfn-template")
 async def download_own_cfn_template(
     customer: CustomerContext = Depends(get_current_customer),
+    new_key: bool = Query(
+        False,
+        description="Issue a fresh agent key and embed it. Invalidates the previous key.",
+    ),
 ):
-    """Download the CloudFormation template for the logged-in customer's own agent."""
+    """Download the CloudFormation template for the logged-in customer's own agent.
+
+    The agent authenticates with a key that only ever exists in plaintext at the
+    moment it is generated: everything stored is a hash. Signup generated one
+    and showed it to nobody, and the template told the customer to obtain it
+    "from your admin", for which there was no mechanism. Onboarding could not be
+    completed without someone rotating a key by hand and emailing it.
+
+    So the key is issued here, on the first download, and embedded. Later
+    downloads leave it blank rather than silently rotating, because rotating
+    would stop an agent that is already running and nothing would say why.
+    Asking for new_key is the deliberate way to replace it.
+    """
     db = DynamoDBService()
     profile = db.get_customer(customer.customer_id)
 
@@ -125,7 +141,28 @@ async def download_own_cfn_template(
         )
 
     config = load_config()
-    template_yaml = generate_agent_template(customer.customer_id, profile.get("name", ""), config)
+    if not config.agent_public_image_uri:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent downloads are not configured on this environment.",
+        )
+
+    api_key = ""
+    if new_key or not profile.get("agent_key_issued_at"):
+        api_key = db.rotate_api_key(customer.customer_id) or ""
+        if not api_key:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not issue an agent key. Please try again.",
+            )
+        db.update_customer(
+            customer.customer_id,
+            {"agent_key_issued_at": datetime.now(timezone.utc).isoformat()},
+        )
+
+    template_yaml = generate_agent_template(
+        customer.customer_id, profile.get("name", ""), config, api_key
+    )
     filename = f"tek-watch-agent-{customer.customer_id}.yaml"
 
     return Response(

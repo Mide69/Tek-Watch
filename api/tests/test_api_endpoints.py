@@ -45,6 +45,10 @@ def client(mock_customer_context):
             anthropic_api_key="",
             sns_ops_alerts_topic_arn="",
             sqs_ingest_queue_url="",
+            # Real strings, not MagicMock attributes: these end up inside the
+            # CloudFormation template, and yaml.dump cannot serialise a Mock.
+            agent_public_image_uri="public.ecr.aws/tek-watch/tek-watch-agent:latest",
+            s3_uploads_bucket="tek-watch-test-uploads",
         )
         mock_cfg.return_value = cfg
         mock_ts_cfg.return_value = cfg
@@ -191,6 +195,7 @@ class TestAgentCfnTemplateEndpoint:
         with patch("routers.agent.DynamoDBService") as mock_db:
             mock_db.return_value.get_customer.return_value = {
                 "customer_id": "TT-0001", "name": "Acme Ltd",
+                "agent_key_issued_at": "2026-09-01T00:00:00Z",
             }
             resp = client.get("/api/v1/agent/cfn-template")
             assert resp.status_code == 200
@@ -198,6 +203,53 @@ class TestAgentCfnTemplateEndpoint:
             assert "attachment" in resp.headers["content-disposition"]
             assert "TT-0001" in resp.text
             assert "AgentTaskRole" in resp.text
+
+    def test_issues_the_agent_key_on_the_first_download(self, client):
+        # The key exists in plaintext only at the moment it is generated. If it
+        # is not handed over here the customer has no way to obtain one, which
+        # is what blocked onboarding: the template told them to ask an admin,
+        # and no admin path existed.
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = {
+                "customer_id": "TT-0001", "name": "Acme Ltd",
+                "agent_key_issued_at": "",
+            }
+            mock_db.return_value.rotate_api_key.return_value = "issued-key-123"
+
+            resp = client.get("/api/v1/agent/cfn-template")
+
+            assert resp.status_code == 200
+            assert "issued-key-123" in resp.text
+            # and it is recorded, so the next download does not silently rotate
+            args = mock_db.return_value.update_customer.call_args[0]
+            assert "agent_key_issued_at" in args[1]
+
+    def test_does_not_rotate_a_key_that_is_already_in_use(self, client):
+        # Rotating here would stop a running agent, and nothing on the customer's
+        # dashboard would say why.
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = {
+                "customer_id": "TT-0001", "name": "Acme Ltd",
+                "agent_key_issued_at": "2026-09-01T00:00:00Z",
+            }
+
+            resp = client.get("/api/v1/agent/cfn-template")
+
+            assert resp.status_code == 200
+            mock_db.return_value.rotate_api_key.assert_not_called()
+
+    def test_new_key_is_issued_when_explicitly_asked_for(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = {
+                "customer_id": "TT-0001", "name": "Acme Ltd",
+                "agent_key_issued_at": "2026-09-01T00:00:00Z",
+            }
+            mock_db.return_value.rotate_api_key.return_value = "replacement-key"
+
+            resp = client.get("/api/v1/agent/cfn-template?new_key=true")
+
+            assert resp.status_code == 200
+            assert "replacement-key" in resp.text
 
     def test_404_when_profile_missing(self, client):
         with patch("routers.agent.DynamoDBService") as mock_db:

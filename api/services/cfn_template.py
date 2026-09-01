@@ -9,7 +9,12 @@ import yaml
 from config import APIConfig
 
 
-def generate_agent_template(customer_id: str, customer_name: str, config: APIConfig) -> str:
+def generate_agent_template(
+    customer_id: str,
+    customer_name: str,
+    config: APIConfig,
+    api_key: str = "",
+) -> str:
     """Build the CloudFormation template as YAML for a customer's agent deployment."""
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
@@ -28,12 +33,23 @@ def generate_agent_template(customer_id: str, customer_name: str, config: APICon
             "APIKey": {
                 "Type": "String",
                 "NoEcho": True,
-                "Description": "Tek Watch API key, enter the value provided by your admin",
+                # Filled in when the key is being issued to this customer, which
+                # is the only moment it exists in plaintext. Otherwise left blank
+                # and they paste the one they saved. It used to say "provided by
+                # your admin", and there was no way for an admin to provide it
+                # short of rotating the key by hand.
+                **({"Default": api_key} if api_key else {}),
+                "Description": (
+                    "Tek Watch agent key. Already filled in if this template was "
+                    "downloaded with a new key, otherwise paste the key you saved."
+                ),
             },
             "AgentImageURI": {
                 "Type": "String",
-                "Default": "123456789012.dkr.ecr.eu-west-2.amazonaws.com/tek-watch-agent:latest",
-                "Description": "Tek Watch agent Docker image URI",
+                # Was hardcoded to 123456789012, a documentation placeholder.
+                # Every customer stack that reached the pull step failed on it.
+                "Default": config.agent_public_image_uri,
+                "Description": "Tek Watch agent image (public, no credentials needed)",
             },
             "ScheduleExpression": {
                 "Type": "String",

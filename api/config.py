@@ -41,6 +41,10 @@ class APIConfig:
     slack_webhook_url: str
     # SQS
     sqs_ingest_queue_url: str
+    # Public image the customer agent runs from, baked into the CloudFormation
+    # template customers download.
+    agent_public_image_uri: str
+
     # Private bucket holding customer-uploaded company logos. Served through
     # short-lived presigned GET urls, never public.
     s3_uploads_bucket: str
@@ -82,7 +86,7 @@ def load_config() -> APIConfig:
             "cognito_admin_user_pool_id", "cognito_admin_app_client_id",
             "anthropic_api_key", "sns_ops_alerts_topic_arn", "ses_from_email",
             "slack_webhook_url", "sqs_ingest_queue_url", "allowed_origins",
-            "s3_uploads_bucket",
+            "s3_uploads_bucket", "agent_public_image_uri",
         ]}
         # Sensible local defaults
         secrets.setdefault("dynamodb_customers_table", "tek_watch_customers")
@@ -114,6 +118,10 @@ def load_config() -> APIConfig:
         slack_webhook_url=secrets.get("slack_webhook_url", ""),
         sqs_ingest_queue_url=secrets.get("sqs_ingest_queue_url", ""),
         s3_uploads_bucket=secrets.get("s3_uploads_bucket", "") or os.environ.get("S3_UPLOADS_BUCKET", ""),
+        agent_public_image_uri=(
+            secrets.get("agent_public_image_uri", "")
+            or os.environ.get("AGENT_PUBLIC_IMAGE_URI", "")
+        ),
         allowed_origins=secrets.get(
             "allowed_origins",
             "http://localhost:3000,http://localhost:3001,"

@@ -58,6 +58,13 @@ variable "uploads_bucket_arn" {
   default = ""
 }
 
+# Public image the customer agent is pulled from, embedded in the
+# CloudFormation template the dashboard hands out.
+variable "agent_public_image_uri" {
+  type    = string
+  default = ""
+}
+
 # ── Agent (self-hosted — dogfoods Tek Watch's own AWS account) ────────────────
 variable "agent_image_uri" { type = string }
 variable "agent_cpu" { type = number }
@@ -340,7 +347,8 @@ resource "aws_ecs_task_definition" "api" {
       { name = "ENVIRONMENT", value = var.environment },
       { name = "LOG_LEVEL", value = "INFO" },
       { name = "SECRETS_MANAGER_SECRET_ARN", value = var.secrets_manager_arn },
-      { name = "S3_UPLOADS_BUCKET", value = var.uploads_bucket_name }
+      { name = "S3_UPLOADS_BUCKET", value = var.uploads_bucket_name },
+      { name = "AGENT_PUBLIC_IMAGE_URI", value = var.agent_public_image_uri }
     ]
 
     logConfiguration = {
