@@ -12,6 +12,7 @@ import {
 import { formatCurrency, formatRelativeTime } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
+import { useFixtureView } from '@/hooks/useFixtureView'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useOverview, useAlerts, useEC2 } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,12 @@ export default function OverviewPage() {
   // Company name where they have set one; the raw Customer ID is a poor
   // thing to greet someone with on their own dashboard.
   const { data: profile } = useProfile()
+  // Several flourishes on this page are fixture copy with no data behind them:
+  // a hardcoded "+7 this period", a fixed "3.2% vs last month", and an AI
+  // Insight naming a Lambda function in somebody else's account. They read as
+  // findings about the customer's own estate. Shown only where they are
+  // honestly labelled sample, which is the demo.
+  const fixtureView = useFixtureView()
   const { timeRange }   = useDashboard()
   const { data }   = useOverview()
   const { data: alertsData }  = useAlerts()
@@ -86,7 +93,7 @@ export default function OverviewPage() {
             {
               title: 'Total Resources',
               value: data.total_resources.toLocaleString(),
-              change: '+7 this period',
+              change: fixtureView ? '+7 this period' : '',
               positive: true,
               icon: Server,
               colorClass: 'text-blue-500 dark:text-blue-400',
@@ -108,7 +115,7 @@ export default function OverviewPage() {
             {
               title: 'Security Findings',
               value: data.security_findings.toString(),
-              change: '1 high severity',
+              change: `${activeAlerts.filter(a => a.severity === 'high').length} high severity`,
               positive: false,
               icon: Activity,
               colorClass: 'text-amber-500 dark:text-amber-400',
@@ -119,7 +126,7 @@ export default function OverviewPage() {
             {
               title: 'Est. Monthly Cost',
               value: formatCurrency(data.estimated_monthly_cost),
-              change: '↓ 3.2% vs last month',
+              change: fixtureView ? '↓ 3.2% vs last month' : '',
               positive: true,
               icon: DollarSign,
               colorClass: 'text-emerald-600 dark:text-emerald-400',
@@ -246,10 +253,12 @@ export default function OverviewPage() {
                     <h3 className="font-semibold text-foreground">Daily Spend</h3>
                     <p className="text-xs text-muted-foreground mt-0.5">{TIME_RANGE_LABELS[timeRange]}</p>
                   </div>
-                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                    <TrendingDown className="w-3.5 h-3.5" />
-                    ↓ 3.2% vs last month
-                  </div>
+                  {fixtureView && (
+                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                      <TrendingDown className="w-3.5 h-3.5" />
+                      ↓ 3.2% vs last month
+                    </div>
+                  )}
                 </div>
                 <BarChart data={costBars} height={96} />
                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
@@ -260,31 +269,36 @@ export default function OverviewPage() {
             </Card>
           </div>
 
+          {/* Hand-written example of the feature, not a generated analysis: it
+              names a Lambda function in an account that is not the customer's.
+              Shown only where the page is honestly labelled as sample data. */}
+          {fixtureView && (
           <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-                  <Zap className="w-3.5 h-3.5 text-primary" />
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
+                    <Zap className="w-3.5 h-3.5 text-primary" />
+                  </div>
+                  <span className="text-xs font-semibold text-primary">AI Insight</span>
                 </div>
-                <span className="text-xs font-semibold text-primary">AI Insight</span>
-              </div>
-              <p className="text-sm text-foreground leading-relaxed mb-4">
-                Lambda spend is up{' '}
-                <span className="text-amber-500 dark:text-amber-400 font-semibold">+38.7%</span>{' '}
-                month-over-month. The{' '}
-                <span className="font-medium">acme-image-processor</span> function is responsible
-                — cold-start duration spiked 340% in the last 2 hours.
-              </p>
-              <p className="text-xs text-muted-foreground">
-                <span className="text-primary font-medium">Recommendation:</span> Investigate recent
-                dependency changes. Consider enabling Lambda SnapStart.
-              </p>
-              <div className="mt-4 pt-4 border-t border-border flex items-center gap-1.5 text-xs text-muted-foreground">
-                <Zap className="w-3 h-3 text-primary" />
-                Powered by Claude AI
-              </div>
-            </CardContent>
+                <p className="text-sm text-foreground leading-relaxed mb-4">
+                  Lambda spend is up{' '}
+                  <span className="text-amber-500 dark:text-amber-400 font-semibold">+38.7%</span>{' '}
+                  month-over-month. The{' '}
+                  <span className="font-medium">acme-image-processor</span> function is responsible
+                  — cold-start duration spiked 340% in the last 2 hours.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  <span className="text-primary font-medium">Recommendation:</span> Investigate recent
+                  dependency changes. Consider enabling Lambda SnapStart.
+                </p>
+                <div className="mt-4 pt-4 border-t border-border flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Zap className="w-3 h-3 text-primary" />
+                  Powered by Claude AI
+                </div>
+              </CardContent>
           </Card>
+          )}
         </div>
 
         {/* Region breakdown */}
@@ -297,7 +311,9 @@ export default function OverviewPage() {
                 { region: 'eu-west-1', name: 'EU West (Ireland)',     pct: 17 },
                 { region: 'us-east-1', name: 'US East (N. Virginia)', pct:  7 },
               ].map(r => {
-                const count = Math.round((data.total_resources * r.pct) / 100)
+                const total = data.total_resources ?? 0
+                const count = Math.round((total * r.pct) / 100)
+                const width = total > 0 ? r.pct : 0
                 return (
                   <div key={r.region} className="p-4 rounded-xl bg-muted/50 border border-border">
                     <div className="flex items-center justify-between mb-2">
@@ -306,7 +322,7 @@ export default function OverviewPage() {
                     </div>
                     <p className="text-xs text-muted-foreground mb-2">{r.name}</p>
                     <div className="h-1 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${r.pct}%` }} />
+                      <div className="h-full bg-primary rounded-full" style={{ width: `${width}%` }} />
                     </div>
                   </div>
                 )
