@@ -28,7 +28,7 @@ export default function OverviewPage() {
 
   if (!data) {
     return (
-      <DashboardLayout customerId={customerId || 'TT-DEMO'}>
+      <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6">
           <div className="h-8 w-48 bg-muted rounded animate-pulse" />
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -52,7 +52,7 @@ export default function OverviewPage() {
   const costBars = trend.map(d => ({ value: d.cost, label: d.label }))
 
   return (
-    <DashboardLayout customerId={customerId || 'TT-DEMO'}>
+    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
 
         {/* Header */}

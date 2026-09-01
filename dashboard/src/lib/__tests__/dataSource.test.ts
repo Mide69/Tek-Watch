@@ -4,6 +4,16 @@
  *   1. apiFetch sent no Authorization header, so every call 401'd.
  *   2. The mock fallback was silent, so the 401s looked like real data.
  */
+// Controls whether this is a fixture view (demo) or a real signed-in account.
+// demoMode reads the Cognito pool id once at import, so it cannot be steered
+// by setting an env var mid-test.
+let fixtureView = true
+jest.mock('../demoMode', () => ({
+  isFixtureView: () => fixtureView,
+  isDemoMode: () => fixtureView,
+  isDemoSession: () => false,
+}))
+
 import { apiFetch, normaliseAgent } from '@/hooks/useData'
 import { markDataSource, isShowingSampleData, resetDataSource } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
@@ -170,5 +180,56 @@ describe('normaliseAgent', () => {
   it('returns null for a non-object so the caller can fall back', () => {
     expect(normaliseAgent('nonsense', FALLBACK)).toBeNull()
     expect(normaliseAgent(null, FALLBACK)).toBeNull()
+  })
+})
+
+describe('what a real account sees before connecting anything', () => {
+  beforeEach(() => {
+    resetDataSource()
+    apiClient.setToken('good')
+    fixtureView = false
+    global.fetch = jest.fn().mockResolvedValue({ ok: false, status: 401 }) as unknown as typeof fetch
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    apiClient.clearToken()
+    fixtureView = true
+  })
+
+  it('gets zeros, not somebody elses figures', async () => {
+    // The point of the change: a brand new account must not open on 847
+    // resources and 4,247.80 of monthly spend belonging to nobody.
+    const result = await apiFetch('/api/v1/overview', {
+      total_resources: 847,
+      estimated_monthly_cost: 4247.8,
+      active_alarms: 3,
+      agent_status: { status: 'healthy', last_seen: 'x' },
+      cost_trend: [{ cost: 1, label: 'a' }],
+    })
+
+    expect(result).toEqual({
+      total_resources: 0,
+      estimated_monthly_cost: 0,
+      active_alarms: 0,
+      agent_status: { status: '', last_seen: '' },
+      cost_trend: [],
+    })
+  })
+
+  it('empties lists rather than inventing rows', async () => {
+    await expect(apiFetch('/api/v1/compute/ec2', [{ id: 'i-fake' }], 'instances'))
+      .resolves.toEqual([])
+  })
+
+  it('still raises the banner, so the zeros are explained', async () => {
+    await apiFetch('/api/v1/overview', { total_resources: 847 })
+    expect(isShowingSampleData()).toBe(true)
+  })
+
+  it('keeps the fixtures for a demo view', async () => {
+    // The demo exists to show what a populated dashboard looks like.
+    fixtureView = true
+    await expect(apiFetch('/api/v1/overview', { total_resources: 847 }))
+      .resolves.toEqual({ total_resources: 847 })
   })
 })
