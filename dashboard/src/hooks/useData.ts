@@ -79,6 +79,25 @@ function unwrap<T>(payload: unknown, fallback: T, pick?: string): T | null {
   if (Array.isArray(fallback) && !Array.isArray(lifted)) return null
   if (lifted === null || lifted === undefined) return null
 
+  // Guarantee every key the page reads exists, defaulted to empty.
+  //
+  // The API's overview returns no cost_trend; only the fixtures have one. The
+  // page read data.cost_trend[0] and threw "Cannot read properties of
+  // undefined" the moment real data arrived — the third crash of this exact
+  // shape, after .filter on an envelope and .map on the same missing field.
+  // Guarding each site as it surfaces is a losing game: any key the API stops
+  // sending is another blank screen.
+  //
+  // Defaults come from emptyLike, never from the fixtures, so a field the API
+  // does not send reads as empty rather than as somebody else's number. Real
+  // values always win.
+  if (
+    lifted && typeof lifted === 'object' && !Array.isArray(lifted) &&
+    fallback && typeof fallback === 'object' && !Array.isArray(fallback)
+  ) {
+    return { ...emptyLike(fallback), ...lifted } as T
+  }
+
   return lifted as T
 }
 
