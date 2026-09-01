@@ -91,6 +91,33 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "image_uri=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+      # Customers pull this image into their own AWS account, so it has to be
+      # readable from outside ours. The private repository above is not, which
+      # is why every customer stack failed on AccessDenied at the pull step.
+      #
+      # Published after the scan-free build but before the deploy jobs, so the
+      # registry a customer pulls from always holds the same image this run
+      # tested and shipped.
+      - name: Publish agent to ECR Public
+        working-directory: ./agent
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          PUBLIC_REGISTRY: public.ecr.aws/${{ vars.ECR_PUBLIC_ALIAS }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          if [ -z "${{ vars.ECR_PUBLIC_ALIAS }}" ]; then
+            echo "::error::ECR_PUBLIC_ALIAS is not set. Customers cannot pull the agent without it."
+            exit 1
+          fi
+          # ECR Public authenticates only through us-east-1, whatever region the
+          # rest of this account is in.
+          aws ecr-public get-login-password --region us-east-1             | docker login --username AWS --password-stdin public.ecr.aws
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $PUBLIC_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $PUBLIC_REGISTRY/$ECR_REPOSITORY:latest
+          docker push $PUBLIC_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          docker push $PUBLIC_REGISTRY/$ECR_REPOSITORY:latest
+          echo "Published $PUBLIC_REGISTRY/$ECR_REPOSITORY:latest"
+
       - name: Scan image for vulnerabilities (Trivy)
         # Advisory, never blocking. exit-code '0' already meant findings do
         # not fail the build, and the image is pushed BEFORE this runs — so

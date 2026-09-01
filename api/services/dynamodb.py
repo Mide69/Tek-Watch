@@ -90,6 +90,9 @@ class DynamoDBService:
             "postcode": "",
             "country": "",
             "logo_key": "",
+            # The signup key is hashed on write and never shown to anyone, so
+            # until this is set the customer has no usable agent key.
+            "agent_key_issued_at": "",
             "subscription_tier": subscription_tier,
             "aws_account_ids": aws_account_ids,
             "api_key_hash": api_key_hash,
@@ -126,7 +129,7 @@ class DynamoDBService:
             "name", "email", "subscription_tier", "aws_account_ids", "status",
             # Company profile, editable by the customer via PUT /api/v1/profile.
             "company_name", "phone", "website", "address_line1", "address_line2",
-            "city", "postcode", "country", "logo_key",
+            "city", "postcode", "country", "logo_key", "agent_key_issued_at",
         }
         safe_updates = {k: v for k, v in updates.items() if k in allowed}
         if not safe_updates:
