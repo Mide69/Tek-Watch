@@ -26,12 +26,13 @@ export function useAuth() {
   // is not knowable at import time.
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const [configError, setConfigError] = useState(false)
 
   useEffect(() => {
     // A deployed build with no Cognito configuration. Not a demo — a broken
     // deployment, and it must not quietly behave like a signed-in dashboard.
-    if (isMisconfigured()) { setConfigError(true); return }
+    // Nothing to authenticate against. ConfigErrorBanner says so on every
+    // page; there is no point redirecting to a login that cannot work either.
+    if (isMisconfigured()) return
 
     if (isDemoBuild()) { setCustomerId('TT-DEMO'); return }
 
@@ -69,5 +70,5 @@ export function useAuth() {
     return () => { cancelled = true }
   }, [])
 
-  return { customerId, loading, configError }
+  return { customerId, loading }
 }
