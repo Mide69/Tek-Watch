@@ -88,6 +88,17 @@ resource "aws_sns_topic_subscription" "ops_alerts_email" {
   endpoint  = var.ops_alert_email
 }
 
+# Say so in the plan when there is no subscriber, rather than counting to zero
+# in silence. The count above means a missing value does not fail the apply, it
+# just produces a topic nobody is listening to — which is indistinguishable
+# from a healthy platform right up until the first alarm nobody answers.
+check "ops_alerts_have_a_subscriber" {
+  assert {
+    condition     = var.environment != "prod" || var.ops_alert_email != ""
+    error_message = "ops_alert_email is empty, so the prod ops alerts topic has no subscriber. Set the OPS_ALERT_EMAIL secret (CI) or prod.secret.auto.tfvars (local)."
+  }
+}
+
 # ── ACM certificate for the CloudFront custom domains ────────────────────────
 # Must live in us-east-1: CloudFront only accepts certificates from that region
 # no matter where the distribution or its origin sit. This is a common trip-up.

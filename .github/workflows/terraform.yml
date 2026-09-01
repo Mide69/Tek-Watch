@@ -172,6 +172,7 @@ jobs:
     env:
       TF_VAR_environment: staging
       TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+      TF_VAR_ops_alert_email: ${{ secrets.OPS_ALERT_EMAIL }}
       TF_VAR_acm_certificate_arn: ${{ secrets.ACM_CERT_ARN_STAGING }}
     steps:
       - uses: actions/checkout@v4
@@ -206,6 +207,11 @@ jobs:
     env:
       TF_VAR_environment: prod
       TF_VAR_anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+      # Lives in a gitignored *.auto.tfvars locally because this repo is
+      # public. Without it here the variable is empty in CI, the subscription
+      # resource counts to zero, and the apply reports Success having quietly
+      # left the ops alerts topic with no subscriber at all.
+      TF_VAR_ops_alert_email: ${{ secrets.OPS_ALERT_EMAIL }}
       TF_VAR_acm_certificate_arn: ${{ secrets.ACM_CERT_ARN_PROD }}
     steps:
       - uses: actions/checkout@v4
