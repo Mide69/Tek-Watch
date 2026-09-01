@@ -253,7 +253,7 @@ export default function OverviewPage() {
                 </div>
                 <BarChart data={costBars} height={96} />
                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
-                  <span>{data.cost_trend[0]?.label ?? 'Earlier'}</span>
+                  <span>{trend[0]?.label ?? 'Earlier'}</span>
                   <span>Today</span>
                 </div>
               </CardContent>
