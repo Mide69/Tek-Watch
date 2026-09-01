@@ -11,7 +11,8 @@ import {
 } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
-import { isDemoMode, isDemoSession, endDemoSession } from '@/lib/demoMode'
+import { isDemoSession, endDemoSession } from '@/lib/demoMode'
+import { useFixtureView } from '@/hooks/useFixtureView'
 import {
   useDashboard,
   TIME_RANGE_OPTIONS, type TimeRange, type Region,
@@ -21,6 +22,7 @@ import { NotificationBell } from '@/components/ui/NotificationBell'
 import { HistoryNav } from '@/components/ui/HistoryNav'
 import { DemoBadge } from '@/components/ui/DemoBadge'
 import { SampleDataBanner } from '@/components/ui/SampleDataBanner'
+import { ConfigErrorBanner } from '@/components/ui/ConfigErrorBanner'
 import { useProfile } from '@/hooks/useProfile'
 
 interface DashboardLayoutProps {
@@ -42,8 +44,6 @@ const navigation = [
   { name: 'Ask AI',     href: '/chat',       icon: MessageSquare },
   { name: 'Settings',   href: '/settings',   icon: Settings },
 ]
-
-const DEMO_MODE = isDemoMode()
 
 // ─── Toast ────────────────────────────────────────────────────────────────────
 
@@ -91,6 +91,8 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
   // Company identity for the sidebar. Returns null when there is no token yet
   // (demo visitors, first paint), which just falls back to the Customer ID.
   const { data: profile } = useProfile()
+  // Asked per render, not once at import: signing in ends a demo.
+  const DEMO_MODE = useFixtureView()
 
   const handleSignOut = useCallback(async () => {
     if (DEMO_MODE) { router.push('/'); return }
@@ -292,6 +294,7 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
 
         {/* Page content — theme-page enables CSS cascade for page internals */}
         <main className="flex-1 p-4 lg:p-6 theme-page">
+          <ConfigErrorBanner />
           <SampleDataBanner />
           {children}
         </main>
