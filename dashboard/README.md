@@ -158,19 +158,27 @@ const ec2 = await apiClient.getEC2Instances('eu-west-2')
 
 ## Deployment
 
-### Vercel (Recommended)
+Deployed by GitHub Actions to S3 behind CloudFront, as `app.tekwatch.io`. See
+`.github/workflows/dashboard.yml`; there is nothing to run by hand.
+
+The build needs real Cognito configuration. Without it the app says so on every
+page rather than falling back to sample data, because a deployment that quietly
+becomes a demo is indistinguishable from a working one:
 
 ```bash
-vercel
+NEXT_PUBLIC_COGNITO_USER_POOL_ID=eu-west-2_xxxxxxxxx NEXT_PUBLIC_COGNITO_APP_CLIENT_ID=xxxxxxxxxxxx NEXT_PUBLIC_API_BASE_URL=https://app.tekwatch.io npm run build
 ```
 
-### AWS Amplify
+### Building the sample-data demo
+
+Only when you want a build with no backend at all:
 
 ```bash
-amplify init
-amplify add hosting
-amplify publish
+NEXT_PUBLIC_DEMO_MODE=true npm run build
 ```
+
+On a normally configured build the demo is reached at `/overview?demo=1`
+instead, which keeps it in one browser tab and leaves real accounts alone.
 
 ### Docker
 
