@@ -123,3 +123,46 @@ describe('a demo visitor', () => {
     expect(m.isFixtureView()).toBe(false)
   })
 })
+
+describe('the viewer can change after first paint', () => {
+  it('tells subscribers when a demo ends', () => {
+    // Components resolve the viewer once, in an effect. useAuth confirms a
+    // Cognito session after that has already run, so without a notification the
+    // first, stale answer stood for the rest of the page's life: the demo badge
+    // stayed up on a signed-in account, security showed fixture IAM figures, and
+    // the agent page hid the download button behind "not this demo".
+    const m = load(REAL_POOL)
+    window.localStorage.setItem(DEMO_KEY, '1')
+
+    let told = 0
+    const stop = m.subscribeViewer(() => { told += 1 })
+
+    m.endDemoSession()
+
+    expect(told).toBe(1)
+    expect(window.localStorage.getItem(DEMO_KEY)).toBeNull()
+    stop()
+  })
+
+  it('stops telling a subscriber that has unsubscribed', () => {
+    const m = load(REAL_POOL)
+    let told = 0
+    const stop = m.subscribeViewer(() => { told += 1 })
+    stop()
+
+    m.endDemoSession()
+
+    expect(told).toBe(0)
+  })
+
+  it('reports a real account once the demo has ended', () => {
+    const m = load(REAL_POOL)
+    window.localStorage.setItem(DEMO_KEY, '1')
+    expect(m.isFixtureView()).toBe(true)
+
+    // What useAuth now does the moment Cognito confirms a session.
+    m.endDemoSession()
+
+    expect(m.isFixtureView()).toBe(false)
+  })
+})
