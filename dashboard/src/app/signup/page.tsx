@@ -121,22 +121,22 @@ export default function SignupPage() {
 
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Name</label>
-                  <input type="text" required value={name}
+                  <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1.5">Name</label>
+                  <input id="name" type="text" required value={name}
                     onChange={e => setName(e.target.value)}
                     className={inputCls} placeholder="Jane Smith" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
-                  <input type="email" required value={email}
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1.5">Email</label>
+                  <input id="email" type="email" required value={email}
                     onChange={e => setEmail(e.target.value)}
                     className={inputCls} placeholder="jane@company.co.uk" />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">
+                  <label htmlFor="company-optional" className="block text-sm font-medium text-slate-300 mb-1.5">
                     Company <span className="text-slate-500">(optional)</span>
                   </label>
-                  <input type="text" value={company}
+                  <input id="company-optional" type="text" value={company}
                     onChange={e => setCompany(e.target.value)}
                     className={inputCls} placeholder="Company Ltd" />
                 </div>

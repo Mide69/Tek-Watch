@@ -175,14 +175,14 @@ export default function LoginPage() {
 
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
-                  <input type="text" required placeholder="TT-XXXXXXXX" value={customerId}
+                  <label htmlFor="customer-id" className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
+                  <input id="customer-id" type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())}
                     className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
-                  <input type="password" required value={password}
+                  <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+                  <input id="password" type="password" required value={password}
                     onChange={e => setPassword(e.target.value)}
                     className={inputCls} />
                 </div>
@@ -224,8 +224,8 @@ export default function LoginPage() {
               </div>
               <form onSubmit={handleNewPassword} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
-                  <input type="password" required minLength={7} autoComplete="new-password"
+                  <label htmlFor="new-password" className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <input id="new-password" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={newPassword} autoFocus
                     onChange={e => setNewPassword(e.target.value)} className={inputCls} />
                   <p className="mt-1.5 text-xs text-slate-500">
@@ -233,8 +233,8 @@ export default function LoginPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
-                  <input type="password" required minLength={7} autoComplete="new-password"
+                  <label htmlFor="confirm-new-password" className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <input id="confirm-new-password" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
                 </div>
@@ -261,8 +261,8 @@ export default function LoginPage() {
               </div>
               <form onSubmit={handleForgot} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
-                  <input type="text" required placeholder="TT-XXXXXXXX" value={customerId}
+                  <label htmlFor="customer-id-2" className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
+                  <input id="customer-id-2" type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())} className={inputCls} />
                 </div>
                 {error && (
@@ -290,15 +290,15 @@ export default function LoginPage() {
               </div>
               <form onSubmit={handleForgotConfirm} className="space-y-5">
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Reset code</label>
-                  <input type="text" required maxLength={6} inputMode="numeric" autoComplete="one-time-code"
+                  <label htmlFor="reset-code" className="block text-sm font-medium text-slate-300 mb-1.5">Reset code</label>
+                  <input id="reset-code" type="text" required maxLength={6} inputMode="numeric" autoComplete="one-time-code"
                     placeholder="000000" value={resetCode}
                     onChange={e => setResetCode(e.target.value.replace(/\D/g, ''))}
                     className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
-                  <input type="password" required minLength={7} autoComplete="new-password"
+                  <label htmlFor="new-password-2" className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <input id="new-password-2" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={newPassword}
                     onChange={e => setNewPassword(e.target.value)} className={inputCls} />
                   <p className="mt-1.5 text-xs text-slate-500">
@@ -306,8 +306,8 @@ export default function LoginPage() {
                   </p>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
-                  <input type="password" required minLength={7} autoComplete="new-password"
+                  <label htmlFor="confirm-new-password-2" className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <input id="confirm-new-password-2" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
                 </div>
