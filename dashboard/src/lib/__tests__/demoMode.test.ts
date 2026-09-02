@@ -191,3 +191,42 @@ describe('the viewer can change after first paint', () => {
     expect(after.isFixtureView()).toBe(false)
   })
 })
+
+describe('a real pool beats a stale demo flag', () => {
+  it('is not a demo build when Cognito is genuinely configured', () => {
+    // The defect that shipped: .env.production is committed with
+    // NEXT_PUBLIC_DEMO_MODE=true for the Vercel demo, Next.js loads it for
+    // every production build, and the deploy overrode the pool but not the
+    // flag. Every build on app.tekwatch.io was therefore a demo build.
+    const m = load({
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: 'eu-west-2_real',
+      NEXT_PUBLIC_DEMO_MODE: 'true',
+    })
+
+    expect(m.hasCognitoConfig()).toBe(true)
+    expect(m.isDemoBuild()).toBe(false)
+    expect(m.isFixtureView()).toBe(false)
+  })
+
+  it('still honours the flag when there is no real pool', () => {
+    // The Vercel demo: placeholder pool, flag set, and it should be a demo.
+    const m = load({
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: 'placeholder',
+      NEXT_PUBLIC_DEMO_MODE: 'true',
+    })
+
+    expect(m.isDemoBuild()).toBe(true)
+  })
+
+  it('a demo tab still works on a real build', () => {
+    // Making a real pool win must not take the demo away from someone who
+    // asked for it.
+    const m = load({
+      NEXT_PUBLIC_COGNITO_USER_POOL_ID: 'eu-west-2_real',
+      NEXT_PUBLIC_DEMO_MODE: undefined,
+    }, 'https://app.tekwatch.io/overview?demo=1')
+
+    expect(m.isDemoBuild()).toBe(false)
+    expect(m.isFixtureView()).toBe(true)
+  })
+})
