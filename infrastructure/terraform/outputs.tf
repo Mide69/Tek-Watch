@@ -150,3 +150,12 @@ output "custom_domains" {
     admin     = local.admin_domain
   }
 }
+
+# Printed by terraform apply so the ECR_PUBLIC_ALIAS repository variable can be
+# read straight off the run that creates the registry. AWS assigns the alias
+# when the first public repository is created, so it does not exist before
+# this apply, and the agent workflow refuses to publish without it.
+output "agent_public_repository_uri" {
+  description = "Public image customers pull the agent from. The alias is the segment after public.ecr.aws/."
+  value       = module.ecr.agent_public_repository_uri
+}
