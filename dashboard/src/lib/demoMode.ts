@@ -80,8 +80,22 @@ function onLocalhost(): boolean {
  * deployed build can never qualify by accident.
  */
 export const isDemoBuild = (): boolean => {
+  // A real user pool settles it, whatever else the environment claims.
+  //
+  // dashboard/.env.production is committed and sets NEXT_PUBLIC_DEMO_MODE=true,
+  // for the zero-cost Vercel demo. Next.js loads that file for every production
+  // build, and the deploy workflow overrode the pool and client id but not the
+  // demo flag — so every build shipped to app.tekwatch.io was a demo build.
+  // That is the whole of it: the badge over a signed-in dashboard, fixtures on
+  // a live account, a hidden download button, and "Back to Home" in place of
+  // Sign out.
+  //
+  // Configuration that contradicts itself now resolves towards "this is real",
+  // because being wrong in that direction shows a customer an empty dashboard,
+  // and being wrong in the other shows them somebody else's data.
+  if (hasCognitoConfig()) return false
   if (process.env.NEXT_PUBLIC_DEMO_MODE === 'true') return true
-  return !hasCognitoConfig() && onLocalhost()
+  return onLocalhost()
 }
 
 /**
