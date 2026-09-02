@@ -6,12 +6,12 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   Activity, AlertTriangle, Database, DollarSign, Globe,
   HardDrive, LayoutDashboard, LogOut, Mail, Menu, MessageSquare,
-  RefreshCw, Server, Settings, Shield, X, CheckCircle,
+  Home, RefreshCw, Server, Settings, Shield, X, CheckCircle,
   AlertCircle, Info, XCircle,
 } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
 import { cn } from '@/lib/utils'
-import { isDemoSession, endDemoSession } from '@/lib/demoMode'
+import { isDemoBuild, isDemoSession, endDemoSession } from '@/lib/demoMode'
 import { useFixtureView } from '@/hooks/useFixtureView'
 import {
   useDashboard,
@@ -24,6 +24,7 @@ import { DemoBadge } from '@/components/ui/DemoBadge'
 import { SampleDataBanner } from '@/components/ui/SampleDataBanner'
 import { ConfigErrorBanner } from '@/components/ui/ConfigErrorBanner'
 import { useProfile } from '@/hooks/useProfile'
+import apiClient from '@/lib/api'
 
 interface DashboardLayoutProps {
   children: React.ReactNode
@@ -95,13 +96,26 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
   const DEMO_MODE = useFixtureView()
 
   const handleSignOut = useCallback(async () => {
-    if (DEMO_MODE) { router.push('/'); return }
-    // A visitor browsing the demo has no Cognito session to end — clear the
-    // demo flag instead, or they would be bounced straight back into it.
-    if (isDemoSession()) { endDemoSession(); router.push('/'); return }
+    // Leaving a demo tab ends the demo and nothing else: a visitor has no
+    // session, and someone signed in who was only looking should still be
+    // signed in afterwards.
+    if (isDemoSession()) {
+      endDemoSession()
+      router.push('/')
+      return
+    }
+    // A demo build has no Cognito to sign out of.
+    if (isDemoBuild()) { router.push('/'); return }
+
     const { authSignOut } = await import('@/lib/auth')
-    await authSignOut()
-    router.push('/login')
+    try {
+      await authSignOut()
+    } finally {
+      // Even if Cognito rejects the call, the local session must not survive a
+      // sign-out. Leaving the token behind would put them straight back in.
+      apiClient.clearToken()
+      router.push('/login')
+    }
   }, [router])
 
   const SidebarContent = () => (
@@ -172,12 +186,24 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
         <div className="px-3 py-1.5 text-xs text-muted-foreground/60" suppressHydrationWarning>
           Updated {lastUpdated.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
         </div>
+        {/* Two separate things. One button did whichever the app had guessed,
+            so a signed-in customer whose session was mistaken for a demo got
+            "Back to Home" and no way to sign out at all — and nobody could
+            reach the marketing site without losing their session. Going home
+            and leaving your account are not the same action. */}
+        <Link
+          href="/"
+          className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
+        >
+          <Home className="h-4 w-4" />
+          Home
+        </Link>
         <button
           onClick={handleSignOut}
           className="flex items-center gap-2 w-full px-3 py-2 text-sm font-medium rounded-lg text-sidebar-muted hover:text-sidebar-foreground hover:bg-sidebar-hover transition-colors"
         >
           <LogOut className="h-4 w-4" />
-          {DEMO_MODE ? 'Back to Home' : 'Sign out'}
+          {DEMO_MODE ? 'Exit demo' : 'Sign out'}
         </button>
       </div>
     </div>

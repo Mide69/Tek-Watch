@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { endDemoSession, hasCognitoConfig, hasSession, isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
+import { isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
 
 /**
  * useAuth — who is looking at this dashboard.
@@ -10,15 +10,16 @@ import { endDemoSession, hasCognitoConfig, hasSession, isDemoBuild, isDemoSessio
  *
  *   1. Misconfigured deployment. No Cognito to authenticate against, so there
  *      is nothing to do but let ConfigErrorBanner say so.
- *   2. A real session. Always wins. A customer who is signed in is never the
- *      demo user, whatever else local storage happens to hold.
- *   3. A demo build, or a visitor who chose the demo. TT-DEMO, no redirect,
- *      sample estate.
- *   4. Otherwise: validate with Cognito, redirect to /login if there is no
- *      session.
+ *   2. A demo tab, or a demo build. TT-DEMO, no redirect, sample estate — and
+ *      deliberately so even for someone signed in, because you should be able
+ *      to look at the demo without signing out of your own account.
+ *   3. Otherwise: validate with Cognito, redirect to /login if there is none.
  *
- * Rule 2 was missing, and it is the one the customer noticed: their company
- * name and "TT-DEMO" on the same line in the sidebar.
+ * What keeps 2 from leaking into 3 is that the demo now lives in
+ * sessionStorage, so it belongs to the tab it was opened in. An account tab
+ * never carries the flag and so can never show fixtures. Previously it lived
+ * in localStorage, shared across every tab and surviving a browser restart,
+ * which is how a customer ended up signed in and labelled TT-DEMO.
  */
 
 export function useAuth() {
@@ -39,10 +40,7 @@ export function useAuth() {
     // page; there is no point redirecting to a login that cannot work either.
     if (isMisconfigured()) return
 
-    // Gated on the build having real Cognito, so `npm run dev` without a pool
-    // stays a demo rather than redirecting to a login it cannot serve.
-    const signedIn = hasCognitoConfig() && hasSession()
-    if (!signedIn && (isDemoBuild() || isDemoSession())) {
+    if (isDemoBuild() || isDemoSession()) {
       setCustomerId('TT-DEMO')
       return
     }
@@ -64,13 +62,6 @@ export function useAuth() {
           return
         }
         apiClient.setToken(user.idToken)
-        // Cognito has confirmed a real session, so any demo flag left over from
-        // an earlier visit is now wrong. Clearing it here rather than only in
-        // the login form covers the customer who arrives with a session already
-        // established and never passes through that form — which is how a
-        // signed-in account ended up showing the demo badge, sample security
-        // figures, and an agent page with the download button hidden.
-        endDemoSession()
         // Empty is not a customer id. Left as-is it is falsy, and every
         // `customerId || 'TT-DEMO'` downstream quietly resolved to the demo.
         setCustomerId(user.customerId || null)

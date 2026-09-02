@@ -33,6 +33,30 @@
 const DEMO_SESSION_KEY = 'tw_demo_session'
 const TOKEN_KEY = 'tek_watch_token'
 
+/**
+ * The demo lives in sessionStorage, so it belongs to one browser tab.
+ *
+ * It used to live in localStorage, which is shared by every tab and survives
+ * the browser closing. So a visitor who tried the demo once carried the flag
+ * into their account weeks later: the demo badge on a signed-in dashboard,
+ * sample security figures, and the agent page hiding its download button
+ * behind "available on a real account, not this demo".
+ *
+ * Per-tab is the separation the product actually wants. A demo tab shows the
+ * sample estate even to someone signed in, which is the point — you should be
+ * able to look at the demo without signing out. Their account tab never has
+ * the flag, so it can never show fixtures. Closing the tab ends the demo, and
+ * so does Exit demo.
+ */
+function demoStore(): Storage | null {
+  if (typeof window === 'undefined') return null
+  try {
+    return window.sessionStorage
+  } catch {
+    return null
+  }
+}
+
 const COGNITO_POOL = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID ?? ''
 
 /** A pool id that is present and is not a CI placeholder. */
@@ -91,30 +115,40 @@ export function hasSession(): boolean {
 export const isDemoSession = (): boolean => {
   if (typeof window === 'undefined') return false
 
-  if (hasSession()) {
-    endDemoSession()
-    return false
+  let onDemoUrl = false
+  try {
+    onDemoUrl = new URLSearchParams(window.location.search).has('demo')
+  } catch {
+    onDemoUrl = false
   }
 
-  try {
-    if (new URLSearchParams(window.location.search).has('demo')) {
-      window.localStorage.setItem(DEMO_SESSION_KEY, '1')
-      return true
-    }
-    return window.localStorage.getItem(DEMO_SESSION_KEY) === '1'
-  } catch {
-    // Private browsing or blocked storage — fall back to the url alone so the
-    // demo still works for that visit.
-    try {
-      return new URLSearchParams(window.location.search).has('demo')
-    } catch {
-      return false
-    }
+  const store = demoStore()
+  if (!store) return onDemoUrl // private browsing: the url alone drives it
+
+  if (onDemoUrl) {
+    store.setItem(DEMO_SESSION_KEY, '1')
+    return true
   }
+  return store.getItem(DEMO_SESSION_KEY) === '1'
 }
 
 export const endDemoSession = (): void => {
-  if (typeof window === 'undefined') return
+  demoStore()?.removeItem(DEMO_SESSION_KEY)
+
+  // Take ?demo=1 out of the address bar as well. isDemoSession reads the url
+  // first, so leaving it there would re-arm the demo on the very next read and
+  // Exit demo would appear to do nothing.
+  try {
+    const url = new URL(window.location.href)
+    if (url.searchParams.has('demo')) {
+      url.searchParams.delete('demo')
+      window.history.replaceState({}, '', url.toString())
+    }
+  } catch {
+    /* no history api, or a url we cannot parse */
+  }
+  // Older builds put this in localStorage, where it outlived the browser
+  // closing. Clear that too, or anyone carrying one stays in the demo forever.
   try {
     window.localStorage.removeItem(DEMO_SESSION_KEY)
   } catch {
