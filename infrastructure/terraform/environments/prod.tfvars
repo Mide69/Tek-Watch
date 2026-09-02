@@ -80,3 +80,8 @@ acm_certificate_arn = "" # ALB HTTPS listener; API is served via the CloudFront 
 # Production access was granted on 2026-08-31 (50,000/day, enforcement HEALTHY).
 cognito_ses_source_arn = "arn:aws:ses:eu-west-2:409415530028:identity/tekwatch.io"
 cognito_ses_from_email = "no-reply@tekwatch.io"
+
+# Accounts in this organization may publish to the ingest queue. The previous
+# condition compared aws:PrincipalOrgID to the literal "*", which StringEquals
+# never matches, so no agent could publish at all.
+publisher_org_id = "o-vvi9eethqx"
