@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { isFixtureView } from '@/lib/demoMode'
+import { isFixtureView, subscribeViewer } from '@/lib/demoMode'
 
 /**
  * Is this view showing the sample estate rather than a real account?
@@ -29,6 +29,15 @@ import { isFixtureView } from '@/lib/demoMode'
  */
 export function useFixtureView(): boolean | null {
   const [fixture, setFixture] = useState<boolean | null>(null)
-  useEffect(() => { setFixture(isFixtureView()) }, [])
+
+  useEffect(() => {
+    const read = () => setFixture(isFixtureView())
+    read()
+    // Re-read when the viewer changes. useAuth confirms a Cognito session after
+    // this has already run, and without this the first, stale answer stood for
+    // the rest of the page's life.
+    return subscribeViewer(read)
+  }, [])
+
   return fixture
 }

@@ -120,6 +120,32 @@ export const endDemoSession = (): void => {
   } catch {
     /* nothing to clear */
   }
+  notifyViewerChanged()
+}
+
+/**
+ * Who is viewing can change after first paint.
+ *
+ * Components resolve it once in an effect, which was right when the answer was
+ * fixed for the life of the page. It is not: useAuth confirms a Cognito session
+ * asynchronously, and a demo flag left in local storage from an earlier visit
+ * is still set while that happens. Anything that had already asked kept the
+ * stale answer for the rest of the page's life — which is why a signed-in
+ * customer saw the demo badge, sample IAM figures, and an agent page that hid
+ * the download button behind "not this demo".
+ *
+ * So the answer is published rather than sampled: clearing a demo session
+ * tells everyone who asked.
+ */
+const viewerListeners = new Set<() => void>()
+
+export function subscribeViewer(listener: () => void): () => void {
+  viewerListeners.add(listener)
+  return () => { viewerListeners.delete(listener) }
+}
+
+export function notifyViewerChanged(): void {
+  viewerListeners.forEach(listener => listener())
 }
 
 /**
