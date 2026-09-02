@@ -69,7 +69,10 @@ export const isDemoBuild = (): boolean => {
 export const isMisconfigured = (): boolean =>
   !hasCognitoConfig() && !isDemoBuild()
 
-function hasSession(): boolean {
+/** Is there a stored session token? Exported: useAuth has to ask the same
+ *  question, and two implementations of "are they signed in" is how the demo
+ *  and the account got tangled in the first place. */
+export function hasSession(): boolean {
   if (typeof window === 'undefined') return false
   try {
     return !!window.localStorage.getItem(TOKEN_KEY)
