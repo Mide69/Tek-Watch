@@ -226,9 +226,10 @@ jobs:
         env:
           NEXT_PUBLIC_API_BASE_URL: https://api.tekwatch.io
           NEXT_PUBLIC_COGNITO_REGION: eu-west-2
-          # .env.production is committed and sets this to true for the Vercel
-          # demo. It is loaded by every production build, so a real deploy has
-          # to say otherwise out loud rather than leave it to precedence.
+          # Pinned rather than assumed. A committed .env.production used to set
+          # this to true for a Vercel demo and was loaded by every production
+          # build, so every deploy of this app was a demo build. That file is
+          # gone, and this says out loud what the build is.
           NEXT_PUBLIC_DEMO_MODE: 'false'
           NEXT_PUBLIC_COGNITO_USER_POOL_ID: ${{ secrets.COGNITO_ADMIN_USER_POOL_ID_PROD }}
           NEXT_PUBLIC_COGNITO_APP_CLIENT_ID: ${{ secrets.COGNITO_ADMIN_APP_CLIENT_ID_PROD }}
