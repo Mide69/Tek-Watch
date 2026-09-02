@@ -1,19 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
+import { hasCognitoConfig, hasSession, isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
 
 /**
- * useAuth — returns the current authenticated user.
+ * useAuth — who is looking at this dashboard.
  *
- * Demo mode (no real Cognito): returns TT-DEMO immediately, no redirect.
- * Production mode (real Cognito pool): validates session and redirects to
- * /login when unauthenticated.
+ * Precedence, highest first:
  *
- * A visitor-opted demo session (?demo=1) also skips the redirect, so the
- * landing page's "Launch Live Demo" works against a real Cognito build. They
- * get no token, so the API rejects every call and useData falls back to its
- * mock data — which is exactly the sample dashboard we want to show them.
+ *   1. Misconfigured deployment. No Cognito to authenticate against, so there
+ *      is nothing to do but let ConfigErrorBanner say so.
+ *   2. A real session. Always wins. A customer who is signed in is never the
+ *      demo user, whatever else local storage happens to hold.
+ *   3. A demo build, or a visitor who chose the demo. TT-DEMO, no redirect,
+ *      sample estate.
+ *   4. Otherwise: validate with Cognito, redirect to /login if there is no
+ *      session.
+ *
+ * Rule 2 was missing, and it is the one the customer noticed: their company
+ * name and "TT-DEMO" on the same line in the sidebar.
  */
 
 export function useAuth() {
@@ -34,11 +39,14 @@ export function useAuth() {
     // page; there is no point redirecting to a login that cannot work either.
     if (isMisconfigured()) return
 
-    if (isDemoBuild()) { setCustomerId('TT-DEMO'); return }
+    // Gated on the build having real Cognito, so `npm run dev` without a pool
+    // stays a demo rather than redirecting to a login it cannot serve.
+    const signedIn = hasCognitoConfig() && hasSession()
+    if (!signedIn && (isDemoBuild() || isDemoSession())) {
+      setCustomerId('TT-DEMO')
+      return
+    }
 
-    // A visitor exploring the sample estate. isDemoSession is false the moment
-    // a session exists, so a signed-in customer never lands here.
-    if (isDemoSession()) { setCustomerId('TT-DEMO'); return }
 
     let cancelled = false
     setLoading(true)
