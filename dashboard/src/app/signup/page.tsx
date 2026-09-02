@@ -83,12 +83,14 @@ export default function SignupPage() {
       {/* Right, form */}
       <div className="flex flex-1 items-center justify-center px-8 py-12">
         <div className="w-full max-w-md">
-          <div className="flex items-center gap-2.5 mb-8 lg:hidden">
+          {/* The desktop panel already links home; below lg it is hidden, so
+              this was the one place a phone had no way back to the site. */}
+          <Link href="/" className="flex items-center gap-2.5 mb-8 lg:hidden w-fit">
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
               <LogoMark className="w-4 h-4 text-white" />
             </div>
             <span className="font-bold text-white">TekWatch</span>
-          </div>
+          </Link>
 
           {fixtureView ? (
             <div className="text-center">

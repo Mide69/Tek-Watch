@@ -42,3 +42,21 @@ test.describe('Landing page', () => {
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
   })
 })
+
+test.describe('getting back to the site', () => {
+  for (const page_ of ['/login', '/signup']) {
+    test(`${page_} — the brand links home`, async ({ page }) => {
+      // Both pages were dead ends: the only way back to the marketing site was
+      // the browser's back button, and anyone redirected here had nothing.
+      await page.goto(page_)
+
+      const brand = page.getByRole('link', { name: /tek\s?watch/i }).first()
+      await expect(brand).toBeVisible()
+      expect(await brand.getAttribute('href')).toBe('/')
+
+      const home = await page.goto('/')
+      expect(home?.status()).toBeLessThan(400)
+      await expect(page.getByRole('heading', { level: 1 })).toBeVisible()
+    })
+  }
+})
