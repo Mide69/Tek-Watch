@@ -110,6 +110,24 @@ function unwrap<T>(payload: unknown, fallback: T, pick?: string): T | null {
   return lifted as T
 }
 
+/**
+ * What a page paints before its first response arrives.
+ *
+ * SWR renders fallbackData immediately, and that was always the fixtures — so
+ * a signed-in customer saw 847 resources and a stranger's IAM figures on every
+ * page transition, for as long as the request took. That is the flash of demo
+ * data on every click. apiFetch already returns zeros to a real account; this
+ * makes the first paint agree with the answer that follows it.
+ *
+ * Safe to call during render: it reads local storage, which is absent
+ * server-side, so prerendering yields the empty shape. The dashboard layout
+ * does not paint page content until the viewer is known, so the server never
+ * commits to the other branch and there is nothing to mismatch on hydration.
+ */
+function initial<T>(mock: T): T {
+  return isFixtureView() ? mock : emptyLike(mock)
+}
+
 // Exported for tests: the defects this guards against (missing auth header,
 // silent mock fallback, envelope mismatch) were all invisible from the outside.
 export async function apiFetch<T>(path: string, fallback: T, pick?: string): Promise<T> {
@@ -156,7 +174,7 @@ export function useOverview() {
   const fallback = getMockOverview(timeRange)
   return useSWR(key, () => apiFetch(`/api/v1/overview?range=${timeRange}&region=${region}`, fallback), {
     revalidateOnFocus: false,
-    fallbackData: fallback,
+    fallbackData: initial(fallback),
   })
 }
 
@@ -168,7 +186,7 @@ export function useEC2() {
   const fallback = getMockEC2WithMetrics(timeRange)
   return useSWR(key, () => apiFetch(`/api/v1/compute/ec2?range=${timeRange}&region=${region}`, fallback, 'instances'), {
     revalidateOnFocus: false,
-    fallbackData: fallback,
+    fallbackData: initial(fallback),
   })
 }
 
@@ -178,7 +196,7 @@ export function useLambda() {
   const fallback = getMockLambdaWithMetrics(timeRange)
   return useSWR(key, () => apiFetch(`/api/v1/compute/lambda?range=${timeRange}&region=${region}`, fallback, 'functions'), {
     revalidateOnFocus: false,
-    fallbackData: fallback,
+    fallbackData: initial(fallback),
   })
 }
 
@@ -187,7 +205,7 @@ export function useECS() {
   const key = `ecs|${timeRange}|${region}|${refreshKey}`
   return useSWR(key, () => apiFetch(`/api/v1/compute/ecs?region=${region}`, MOCK_ECS, 'services'), {
     revalidateOnFocus: false,
-    fallbackData: MOCK_ECS,
+    fallbackData: initial(MOCK_ECS),
   })
 }
 
@@ -199,7 +217,7 @@ export function useRDS() {
   const fallback = getMockRDSWithMetrics(timeRange)
   return useSWR(key, () => apiFetch(`/api/v1/databases/rds?range=${timeRange}&region=${region}`, fallback, 'instances'), {
     revalidateOnFocus: false,
-    fallbackData: fallback,
+    fallbackData: initial(fallback),
   })
 }
 
@@ -208,7 +226,7 @@ export function useDynamoDB() {
   const key = `dynamodb|${region}|${refreshKey}`
   return useSWR(key, () => apiFetch(`/api/v1/databases/dynamodb?region=${region}`, MOCK_DYNAMODB, 'tables'), {
     revalidateOnFocus: false,
-    fallbackData: MOCK_DYNAMODB,
+    fallbackData: initial(MOCK_DYNAMODB),
   })
 }
 
@@ -226,7 +244,7 @@ export function useNetworking() {
     return { vpcs, elbs, cloudfront: cf }
   }, {
     revalidateOnFocus: false,
-    fallbackData: { vpcs: MOCK_VPCS, elbs: MOCK_ELBS, cloudfront: MOCK_CLOUDFRONT },
+    fallbackData: initial({ vpcs: MOCK_VPCS, elbs: MOCK_ELBS, cloudfront: MOCK_CLOUDFRONT }),
   })
 }
 
@@ -237,7 +255,7 @@ export function useStorage() {
   const key = `storage|${region}|${refreshKey}`
   return useSWR(key, () => apiFetch(`/api/v1/storage/s3?region=${region}`, MOCK_S3, 'buckets'), {
     revalidateOnFocus: false,
-    fallbackData: MOCK_S3,
+    fallbackData: initial(MOCK_S3),
   })
 }
 
@@ -254,7 +272,7 @@ export function useMessaging() {
     return { sqs, sns }
   }, {
     revalidateOnFocus: false,
-    fallbackData: { sqs: MOCK_SQS, sns: MOCK_SNS },
+    fallbackData: initial({ sqs: MOCK_SQS, sns: MOCK_SNS }),
   })
 }
 
@@ -274,13 +292,13 @@ export function useSecurity() {
     return { guardduty, iam, certs, alarms, compliance: fallbackCompliance }
   }, {
     revalidateOnFocus: false,
-    fallbackData: {
+    fallbackData: initial({
       guardduty: MOCK_GUARDDUTY,
       iam: MOCK_IAM,
       certs: MOCK_ACM_CERTS,
       alarms: MOCK_CW_ALARMS,
       compliance: fallbackCompliance,
-    },
+    }),
   })
 }
 
@@ -301,7 +319,7 @@ export function useCost() {
     return { summary, breakdown }
   }, {
     revalidateOnFocus: false,
-    fallbackData: { summary: fallbackSummary, breakdown: MOCK_COST_BREAKDOWN },
+    fallbackData: initial({ summary: fallbackSummary, breakdown: MOCK_COST_BREAKDOWN }),
   })
 }
 
@@ -347,7 +365,7 @@ export function useAlerts(limit = 100, offset = 0) {
     },
     {
       revalidateOnFocus: false,
-      fallbackData: fallback,
+      fallbackData: initial(fallback),
       refreshInterval: 30_000,
     },
   )
@@ -408,6 +426,6 @@ export function useAgent() {
     return normaliseAgent(raw, MOCK_AGENT) ?? MOCK_AGENT
   }, {
     revalidateOnFocus: false,
-    fallbackData: MOCK_AGENT,
+    fallbackData: initial(MOCK_AGENT),
   })
 }

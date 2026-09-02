@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { hasCognitoConfig, hasSession, isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
+import { endDemoSession, hasCognitoConfig, hasSession, isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
 
 /**
  * useAuth — who is looking at this dashboard.
@@ -64,6 +64,13 @@ export function useAuth() {
           return
         }
         apiClient.setToken(user.idToken)
+        // Cognito has confirmed a real session, so any demo flag left over from
+        // an earlier visit is now wrong. Clearing it here rather than only in
+        // the login form covers the customer who arrives with a session already
+        // established and never passes through that form — which is how a
+        // signed-in account ended up showing the demo badge, sample security
+        // figures, and an agent page with the download button hidden.
+        endDemoSession()
         // Empty is not a customer id. Left as-is it is falsy, and every
         // `customerId || 'TT-DEMO'` downstream quietly resolved to the demo.
         setCustomerId(user.customerId || null)

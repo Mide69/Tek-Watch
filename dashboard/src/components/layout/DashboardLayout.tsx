@@ -296,7 +296,14 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
         <main className="flex-1 p-4 lg:p-6 theme-page">
           <ConfigErrorBanner />
           <SampleDataBanner />
-          {children}
+          {/* Nothing paints until we know whose data this is. It costs one
+              frame and removes the window in which a signed-in customer was
+              shown the sample estate — the flash on every page transition.
+              The skeleton is what the server prerenders too, so there is no
+              hydration mismatch to trade for it. */}
+          {DEMO_MODE === null
+            ? <div className="h-64 rounded-xl bg-muted/40 animate-pulse" aria-hidden />
+            : children}
         </main>
       </div>
 
