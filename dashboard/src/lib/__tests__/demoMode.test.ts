@@ -29,6 +29,7 @@ const NO_POOL = { NEXT_PUBLIC_COGNITO_USER_POOL_ID: '', NEXT_PUBLIC_DEMO_MODE: u
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.sessionStorage.clear()
 })
 
 describe('a deployment with no Cognito configuration', () => {
@@ -69,9 +70,22 @@ describe('a demo build', () => {
   })
 })
 
-describe('a signed-in customer', () => {
+describe('an account tab', () => {
   it('is never shown the sample estate', () => {
-    // The guarantee the whole module exists for.
+    // The guarantee the whole module exists for. No demo flag in this tab, so
+    // no fixtures, whatever else is lying around.
+    const m = load(REAL_POOL)
+    window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
+
+    expect(m.isDemoSession()).toBe(false)
+    expect(m.isFixtureView()).toBe(false)
+  })
+
+  it('ignores a demo flag left in localStorage by an older build', () => {
+    // The defect the customer hit: the flag used to live in localStorage,
+    // shared by every tab and surviving a browser restart, so a demo tried
+    // once followed them into their account indefinitely. Nothing reads that
+    // location any more.
     const m = load(REAL_POOL)
     window.localStorage.setItem(DEMO_KEY, '1')
     window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
@@ -80,47 +94,54 @@ describe('a signed-in customer', () => {
     expect(m.isFixtureView()).toBe(false)
   })
 
-  it('has the stale demo flag cleared, not merely ignored', () => {
-    // Ignoring it would leave it to resurface after signing out.
+  it('does not inherit a demo opened in a different tab', () => {
+    // sessionStorage is per tab. Simulating the other tab by writing the flag
+    // to localStorage, which is the only storage the two would share.
     const m = load(REAL_POOL)
     window.localStorage.setItem(DEMO_KEY, '1')
-    window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
 
-    m.isDemoSession()
-
-    expect(window.localStorage.getItem(DEMO_KEY)).toBeNull()
-  })
-
-  it('stays real even arriving on a ?demo=1 link', () => {
-    // Someone forwards a demo link to a customer who is already signed in.
-    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
-    window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
-
-    expect(m.isDemoSession()).toBe(false)
     expect(m.isFixtureView()).toBe(false)
   })
 })
 
-describe('a demo visitor', () => {
-  it('gets the sample estate from a ?demo=1 link', () => {
+describe('a demo tab', () => {
+  it('shows the sample estate even to someone signed in', () => {
+    // Deliberate: you should be able to look at the demo without signing out.
+    // It stays in this tab, so their account tab is unaffected.
     const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
+    window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
+
     expect(m.isDemoSession()).toBe(true)
     expect(m.isFixtureView()).toBe(true)
   })
 
-  it('keeps it across pages once opted in', () => {
-    const m = load(REAL_POOL)
-    window.localStorage.setItem(DEMO_KEY, '1')
-    expect(m.isFixtureView()).toBe(true)
+  it('remembers across pages within that tab', () => {
+    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
+    expect(m.isDemoSession()).toBe(true)
+
+    const same = load(REAL_POOL, 'https://app.tekwatch.io/cost')
+    expect(same.isDemoSession()).toBe(true)
   })
 
-  it('loses it the moment a session exists', () => {
-    const m = load(REAL_POOL)
-    window.localStorage.setItem(DEMO_KEY, '1')
-    expect(m.isFixtureView()).toBe(true)
+  it('does not write the flag anywhere other tabs can see', () => {
+    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
+    m.isDemoSession()
 
-    window.localStorage.setItem(TOKEN_KEY, 'a.real.token')
-    expect(m.isFixtureView()).toBe(false)
+    expect(window.sessionStorage.getItem(DEMO_KEY)).toBe('1')
+    expect(window.localStorage.getItem(DEMO_KEY)).toBeNull()
+  })
+})
+
+describe('leaving the demo', () => {
+  it('ends it, and clears the older localStorage flag too', () => {
+    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
+    m.isDemoSession()
+    window.localStorage.setItem(DEMO_KEY, '1') // as an older build would have left it
+
+    m.endDemoSession()
+
+    expect(window.sessionStorage.getItem(DEMO_KEY)).toBeNull()
+    expect(window.localStorage.getItem(DEMO_KEY)).toBeNull()
   })
 })
 
@@ -131,8 +152,8 @@ describe('the viewer can change after first paint', () => {
     // first, stale answer stood for the rest of the page's life: the demo badge
     // stayed up on a signed-in account, security showed fixture IAM figures, and
     // the agent page hid the download button behind "not this demo".
-    const m = load(REAL_POOL)
-    window.localStorage.setItem(DEMO_KEY, '1')
+    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
+    m.isDemoSession()
 
     let told = 0
     const stop = m.subscribeViewer(() => { told += 1 })
@@ -140,7 +161,7 @@ describe('the viewer can change after first paint', () => {
     m.endDemoSession()
 
     expect(told).toBe(1)
-    expect(window.localStorage.getItem(DEMO_KEY)).toBeNull()
+    expect(window.sessionStorage.getItem(DEMO_KEY)).toBeNull()
     stop()
   })
 
@@ -156,13 +177,17 @@ describe('the viewer can change after first paint', () => {
   })
 
   it('reports a real account once the demo has ended', () => {
-    const m = load(REAL_POOL)
-    window.localStorage.setItem(DEMO_KEY, '1')
+    const m = load(REAL_POOL, 'https://app.tekwatch.io/overview?demo=1')
     expect(m.isFixtureView()).toBe(true)
 
-    // What useAuth now does the moment Cognito confirms a session.
     m.endDemoSession()
+    expect(window.sessionStorage.getItem(DEMO_KEY)).toBeNull()
 
-    expect(m.isFixtureView()).toBe(false)
+    // Exit demo navigates away, so the next page has no ?demo in the url. The
+    // real code also strips the param in place, but jsdom's location is a stub
+    // here and history.replaceState cannot touch it, so the navigation is what
+    // this asserts.
+    const after = load(REAL_POOL, 'https://app.tekwatch.io/overview')
+    expect(after.isFixtureView()).toBe(false)
   })
 })
