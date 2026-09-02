@@ -201,7 +201,18 @@ data "archive_file" "silence_detector" {
   type        = "zip"
   source_dir  = "${path.module}/../../../lambda/silence_detector"
   output_path = "${path.module}/silence_detector.zip"
-  excludes    = ["test_handler.py", "__pycache__", "*.pyc", "requirements.txt"]
+  # .pytest_cache was not excluded, so running the lambda's tests locally put
+  # the cache directory inside the deployed zip. "__pycache__" only matches the
+  # directory at the top level, hence the explicit path patterns too.
+  excludes = [
+    "test_handler.py",
+    "requirements.txt",
+    "__pycache__",
+    "__pycache__/*",
+    "*.pyc",
+    ".pytest_cache",
+    ".pytest_cache/*",
+  ]
 }
 
 resource "aws_iam_role" "silence_detector" {
@@ -282,9 +293,14 @@ resource "aws_lambda_function" "silence_detector" {
   # identical, and a plan that is never clean is a plan nobody reads carefully.
   # This repository has already had an apply quietly do nothing while
   # reporting success, so that matters more here than the tidiness of it.
+  # Only the files that actually ship. A "**" fileset also picked up
+  # .pytest_cache and __pycache__, which exist on a machine that has run the
+  # tests and not on a CI runner, so the hash changed depending on who planned
+  # — replacing a perpetual diff with a worse, non-reproducible one.
   source_code_hash = sha256(join("", [
-    for f in sort(fileset("${path.module}/../../../lambda/silence_detector", "**")) :
+    for f in sort(fileset("${path.module}/../../../lambda/silence_detector", "*.py")) :
     filesha256("${path.module}/../../../lambda/silence_detector/${f}")
+    if f != "test_handler.py"
   ]))
   timeout = 60
 
