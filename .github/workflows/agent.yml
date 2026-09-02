@@ -175,8 +175,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Verifies Tek Watch's own self-hosted agent, which prod does not run:
+      # enable_self_hosted_agent is false there on cost grounds, so the schedule
+      # rule this reads its network configuration from does not exist, and the
+      # job failed on every dispatch.
+      #
+      # Nothing customer-facing depends on it. The image customers pull is
+      # published in build-and-push, which has already succeeded by this point.
+      # So report the absence and stop, rather than failing a run whose real
+      # work is done.
       - name: Trigger immediate agent run (verification)
         run: |
+          if ! aws events describe-rule --name "$SCHEDULE_RULE" >/dev/null 2>&1; then
+            echo "::notice::$SCHEDULE_RULE does not exist, so this environment runs no self-hosted agent. Nothing to verify; the public image was already published."
+            exit 0
+          fi
           NET_CONFIG=$(aws events list-targets-by-rule \
             --rule "$SCHEDULE_RULE" \
             --query 'Targets[0].EcsParameters.NetworkConfiguration' \
@@ -204,8 +217,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Verifies Tek Watch's own self-hosted agent, which prod does not run:
+      # enable_self_hosted_agent is false there on cost grounds, so the schedule
+      # rule this reads its network configuration from does not exist, and the
+      # job failed on every dispatch.
+      #
+      # Nothing customer-facing depends on it. The image customers pull is
+      # published in build-and-push, which has already succeeded by this point.
+      # So report the absence and stop, rather than failing a run whose real
+      # work is done.
       - name: Trigger immediate agent run (verification)
         run: |
+          if ! aws events describe-rule --name "$SCHEDULE_RULE" >/dev/null 2>&1; then
+            echo "::notice::$SCHEDULE_RULE does not exist, so this environment runs no self-hosted agent. Nothing to verify; the public image was already published."
+            exit 0
+          fi
           NET_CONFIG=$(aws events list-targets-by-rule \
             --rule "$SCHEDULE_RULE" \
             --query 'Targets[0].EcsParameters.NetworkConfiguration' \
@@ -232,8 +258,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
+      # Verifies Tek Watch's own self-hosted agent, which prod does not run:
+      # enable_self_hosted_agent is false there on cost grounds, so the schedule
+      # rule this reads its network configuration from does not exist, and the
+      # job failed on every dispatch.
+      #
+      # Nothing customer-facing depends on it. The image customers pull is
+      # published in build-and-push, which has already succeeded by this point.
+      # So report the absence and stop, rather than failing a run whose real
+      # work is done.
       - name: Trigger immediate agent run (verification)
         run: |
+          if ! aws events describe-rule --name "$SCHEDULE_RULE" >/dev/null 2>&1; then
+            echo "::notice::$SCHEDULE_RULE does not exist, so this environment runs no self-hosted agent. Nothing to verify; the public image was already published."
+            exit 0
+          fi
           NET_CONFIG=$(aws events list-targets-by-rule \
             --rule "$SCHEDULE_RULE" \
             --query 'Targets[0].EcsParameters.NetworkConfiguration' \
