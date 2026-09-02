@@ -185,6 +185,8 @@ module "sqs" {
   visibility_timeout_seconds = var.sqs_visibility_timeout_seconds
   message_retention_seconds  = var.sqs_message_retention_seconds
   dlq_max_receive_count      = var.sqs_dlq_max_receive_count
+
+  publisher_org_id = var.publisher_org_id
 }
 
 # ── Cognito ───────────────────────────────────────────────────────────────────
