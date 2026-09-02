@@ -1,0 +1,14 @@
+# Test-only dependencies.
+#
+# Kept out of requirements.txt on purpose: the Dockerfile installs that file
+# into the runtime image, and that image is now published publicly for
+# customers to pull into their own AWS accounts. Test tooling has no business
+# shipping to them, and every megabyte is one they pull on every agent start.
+#
+# CI installed requirements.txt alone and then ran pytest, which was not there.
+# The job had never passed; it failed in nine seconds the first time it was
+# actually run.
+-r requirements.txt
+
+pytest==8.4.2
+pytest-cov==5.0.0
