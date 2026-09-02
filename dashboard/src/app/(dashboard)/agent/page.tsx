@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime } from '@/lib/utils'
 import { useFixtureView } from '@/hooks/useFixtureView'
+import { SetupGuide } from '@/components/agent/SetupGuide'
 import { useShowingSampleData } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
@@ -92,6 +93,29 @@ export default function AgentPage() {
   const showingSample = useShowingSampleData()
   const isDemo = useFixtureView()
   const notConnected = showingSample && isDemo === false
+  // Reachable in both states. Someone with a working agent still needs to know
+  // how to remove it, and someone with none needs to know what they are about
+  // to run before they run it.
+  const [tab, setTab] = useState<'status' | 'guide'>('status')
+
+  const tabs = (
+    <div className="flex items-center gap-1 border-b border-border">
+      {([['status', 'Status'], ['guide', 'Setup guide']] as const).map(([key, label]) => (
+        <button
+          key={key}
+          onClick={() => setTab(key)}
+          className={
+            'px-3.5 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ' +
+            (tab === key
+              ? 'border-primary text-foreground'
+              : 'border-transparent text-muted-foreground hover:text-foreground')
+          }
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
 
   if (!a) {
     return (
@@ -117,21 +141,32 @@ export default function AgentPage() {
             </p>
           </div>
 
-          <Card>
-            <CardContent className="p-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-muted/40 border border-border flex items-center justify-center mx-auto mb-4">
-                <Radio className="w-6 h-6 text-muted-foreground" />
-              </div>
-              <h2 className="text-lg font-semibold text-foreground mb-1.5">No agent connected yet</h2>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-                Nothing is reporting from your AWS account, so there is no health,
-                no collectors and no metrics to show. Deploy the read-only agent
-                and this page fills in on its own, usually within a few minutes.
-              </p>
-            </CardContent>
-          </Card>
+          {tabs}
 
-          <DeployAgentCard customerId={customerId || ''} />
+          {tab === 'status' ? (
+            <>
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="w-14 h-14 rounded-full bg-muted/40 border border-border flex items-center justify-center mx-auto mb-4">
+                    <Radio className="w-6 h-6 text-muted-foreground" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-foreground mb-1.5">No agent connected yet</h2>
+                  <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
+                    Nothing is reporting from your AWS account, so there is no health,
+                    no collectors and no metrics to show. Deploy the read-only agent
+                    and this page fills in on its own, usually within a few minutes.
+                  </p>
+                </CardContent>
+              </Card>
+
+              <DeployAgentCard customerId={customerId || ''} />
+            </>
+          ) : (
+            <>
+              <DeployAgentCard customerId={customerId || ''} />
+              <SetupGuide customerId={customerId || undefined} />
+            </>
+          )}
         </div>
       </DashboardLayout>
     )
@@ -150,10 +185,19 @@ export default function AgentPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agent</h1>
           <p className="text-muted-foreground text-sm mt-0.5">
-            Collection agent running in the customer&apos;s AWS account
+            Collection agent running in your AWS account
           </p>
         </div>
 
+        {tabs}
+
+        {tab === 'guide' ? (
+          <>
+            <DeployAgentCard customerId={customerId || a.customer_id} />
+            <SetupGuide customerId={customerId || a.customer_id} />
+          </>
+        ) : (
+        <>
         <DeployAgentCard customerId={customerId || a.customer_id} />
 
         {/* Status hero */}
@@ -260,6 +304,8 @@ export default function AgentPage() {
             </div>
           </CardContent>
         </Card>
+        </>
+        )}
       </div>
     </DashboardLayout>
   )
