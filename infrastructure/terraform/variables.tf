@@ -245,3 +245,10 @@ variable "cognito_ses_from_email" {
   type    = string
   default = ""
 }
+
+# ── Ingest ────────────────────────────────────────────────────────────────────
+# Organization whose accounts may publish to the ingest queue. Agents run in the
+# customer's own account, so the queue has to name who is allowed to send.
+variable "publisher_org_id" {
+  type = string
+}
