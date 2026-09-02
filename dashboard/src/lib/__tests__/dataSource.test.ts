@@ -293,3 +293,45 @@ describe('keys the API does not send', () => {
       .resolves.toEqual([{ id: 'i-1' }])
   })
 })
+
+describe('envelope mismatches never reach a page', () => {
+  beforeEach(() => {
+    resetDataSource()
+    apiClient.setToken('good')
+  })
+  afterEach(() => {
+    jest.restoreAllMocks()
+    apiClient.clearToken()
+  })
+
+  const respond = (body: unknown) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true, json: async () => body,
+    }) as unknown as typeof fetch
+  }
+
+  it('refuses an array where the page expects an object', async () => {
+    // The live cost crash: MOCK_COST_BREAKDOWN is already {breakdown:[...]},
+    // the same shape the API sends, so lifting the array out left the page
+    // reading .breakdown off an array and calling .map on undefined.
+    respond([{ aws_service: 'EC2' }])
+
+    const result = await apiFetch('/api/v1/cost/breakdown', { breakdown: [{ aws_service: 'mock' }] })
+
+    expect(result).toEqual({ breakdown: [{ aws_service: 'mock' }] })
+    expect(isShowingSampleData()).toBe(true)
+  })
+
+  it('refuses an object where the page expects an array', async () => {
+    respond({ instances: [] })
+    const result = await apiFetch('/api/v1/compute/ec2', ['mock'])
+    expect(result).toEqual(['mock'])
+    expect(isShowingSampleData()).toBe(true)
+  })
+
+  it('keeps the enveloped object when no key is lifted', async () => {
+    respond({ breakdown: [{ aws_service: 'EC2' }] })
+    await expect(apiFetch('/api/v1/cost/breakdown', { breakdown: [] }))
+      .resolves.toEqual({ breakdown: [{ aws_service: 'EC2' }] })
+  })
+})

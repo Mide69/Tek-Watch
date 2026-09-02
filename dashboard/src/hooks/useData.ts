@@ -76,8 +76,17 @@ function unwrap<T>(payload: unknown, fallback: T, pick?: string): T | null {
   // Shape guard. If the API ever answers with something other than what the
   // page expects, show sample data and say so, rather than handing a component
   // an object it will call .filter on and blanking the whole dashboard.
-  if (Array.isArray(fallback) && !Array.isArray(lifted)) return null
   if (lifted === null || lifted === undefined) return null
+
+  // Both directions. A page written against an array that receives an object
+  // calls .filter on it; a page written against an object that receives an
+  // array reads .breakdown off it and gets undefined. Either way the mismatch
+  // must stop here and fall back to a labelled empty view, not reach a
+  // component. Both have now happened in production.
+  const fallbackIsArray = Array.isArray(fallback)
+  const liftedIsArray = Array.isArray(lifted)
+  if (fallbackIsArray !== liftedIsArray) return null
+  if (!fallbackIsArray && typeof fallback === 'object' && typeof lifted !== 'object') return null
 
   // Guarantee every key the page reads exists, defaulted to empty.
   //
@@ -284,7 +293,10 @@ export function useCost() {
   return useSWR(key, async () => {
     const [summary, breakdown] = await Promise.all([
       apiFetch(`/api/v1/cost/summary?range=${timeRange}`, fallbackSummary),
-      apiFetch('/api/v1/cost/breakdown', MOCK_COST_BREAKDOWN, 'breakdown'),
+      // No unwrap here: MOCK_COST_BREAKDOWN is already { breakdown: [...] },
+      // the same shape the API sends, and the page reads breakdown.breakdown.
+      // Lifting the array out left the page calling .map on undefined.
+      apiFetch('/api/v1/cost/breakdown', MOCK_COST_BREAKDOWN),
     ])
     return { summary, breakdown }
   }, {
