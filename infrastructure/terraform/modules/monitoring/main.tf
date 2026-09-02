@@ -269,13 +269,24 @@ resource "aws_lambda_function" "silence_detector" {
   # Ensures the retention policy exists before the function can log anything.
   depends_on = [aws_cloudwatch_log_group.silence_detector]
 
-  function_name    = "${var.name_prefix}-silence-detector"
-  role             = aws_iam_role.silence_detector.arn
-  handler          = "handler.handler"
-  runtime          = "python3.12"
-  filename         = data.archive_file.silence_detector.output_path
-  source_code_hash = data.archive_file.silence_detector.output_base64sha256
-  timeout          = 60
+  function_name = "${var.name_prefix}-silence-detector"
+  role          = aws_iam_role.silence_detector.arn
+  handler       = "handler.handler"
+  runtime       = "python3.12"
+  filename      = data.archive_file.silence_detector.output_path
+  # Hashed from the source files rather than the built zip.
+  #
+  # archive_file's output hash changes with the file modification times baked
+  # into the zip, so it differed between machines and between checkouts. Every
+  # prod plan therefore showed this lambda as changed when its code was
+  # identical, and a plan that is never clean is a plan nobody reads carefully.
+  # This repository has already had an apply quietly do nothing while
+  # reporting success, so that matters more here than the tidiness of it.
+  source_code_hash = sha256(join("", [
+    for f in sort(fileset("${path.module}/../../../lambda/silence_detector", "**")) :
+    filesha256("${path.module}/../../../lambda/silence_detector/${f}")
+  ]))
+  timeout = 60
 
   environment {
     variables = {
