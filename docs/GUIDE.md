@@ -9,8 +9,8 @@ Tek Watch is a multi-tenant AWS cloud monitoring SaaS platform. It consists of:
 | **Agent** | Python 3.12, Docker/ECS | Runs in each customer's AWS account; collects metrics from 20+ services and publishes to SQS |
 | **Ingest Consumer** | Python 3.12, Docker/ECS | Reads from SQS, writes metrics/events to DynamoDB |
 | **API** | FastAPI, Docker/ECS | REST API with Cognito JWT auth; serves dashboard and admin portal |
-| **Dashboard** | Next.js 14, Vercel/S3 | Customer-facing monitoring UI |
-| **Admin Portal** | Next.js 14, Vercel/S3 | Internal portal for managing customers and billing |
+| **Dashboard** | Next.js 14, S3 + CloudFront | Customer-facing monitoring UI |
+| **Admin Portal** | Next.js 14, S3 + CloudFront | Internal portal for managing customers and billing |
 | **Silence Detector** | Python Lambda | EventBridge-triggered; raises CRITICAL alerts when an agent stops heartbeating |
 
 **Deployment environments:**
