@@ -287,7 +287,12 @@ resource "aws_iam_role_policy" "consumer_task" {
           # the old timestream:WriteRecords grant — Timestream for
           # LiveAnalytics closed to new customers 2025-06-20).
           "dynamodb:GetItem", "dynamodb:Query",
-          "dynamodb:PutItem", "dynamodb:BatchWriteItem"
+          "dynamodb:PutItem", "dynamodb:BatchWriteItem",
+          # UpdateItem records the agent heartbeat on the customer profile
+          # after a successful write. Without it the dashboard reports an
+          # agent silent while it is feeding the platform, and the silence
+          # detector reads the same fields and would alert on a working agent.
+          "dynamodb:UpdateItem"
         ]
         Resource = var.dynamodb_table_arns
       }

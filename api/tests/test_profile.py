@@ -111,3 +111,38 @@ class TestLogoSniffing:
 
     def test_size_cap_is_two_megabytes(self):
         assert LOGO_MAX_BYTES == 2 * 1024 * 1024
+
+
+class TestAgentQueueArn:
+    """The agent's own policy has to name the queue it publishes to.
+
+    Cross-account sending needs both the queue's resource policy and the
+    caller's identity policy. The identity policy granted send on the wildcard
+    arn:aws:sqs:*:*:tek-watch-ingest-*, and the queue is tek-watch-prod-ingest,
+    which does not start with "tek-watch-ingest-". So the first real customer
+    agent collected 163 records without an error and was refused at the last
+    step with AccessDenied.
+    """
+
+    def test_derives_the_arn_from_a_queue_url(self):
+        from services.cfn_template import _queue_arn
+
+        assert _queue_arn(
+            "https://sqs.eu-west-2.amazonaws.com/409415530028/tek-watch-prod-ingest"
+        ) == "arn:aws:sqs:eu-west-2:409415530028:tek-watch-prod-ingest"
+
+    def test_the_old_wildcard_would_not_have_matched(self):
+        import fnmatch
+
+        from services.cfn_template import _queue_arn
+
+        arn = _queue_arn(
+            "https://sqs.eu-west-2.amazonaws.com/409415530028/tek-watch-prod-ingest"
+        )
+        assert not fnmatch.fnmatch(arn, "arn:aws:sqs:*:*:tek-watch-ingest-*")
+
+    def test_falls_back_rather_than_failing_to_generate(self):
+        from services.cfn_template import _queue_arn
+
+        assert _queue_arn("") == "arn:aws:sqs:*:*:*"
+        assert _queue_arn("not-a-url") == "arn:aws:sqs:*:*:*"

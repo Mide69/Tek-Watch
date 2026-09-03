@@ -18,7 +18,7 @@ Two tables, mirroring Timestream's old metrics/events split:
 import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Set
 
 import boto3
 from botocore.exceptions import ClientError
@@ -45,10 +45,14 @@ class MetricsWriter:
         metrics_table_name: str,
         events_table_name: str,
         aws_region: str,
+        customers_table_name: str = "",
     ) -> None:
         dynamodb = boto3.resource("dynamodb", region_name=aws_region)
         self._metrics_table = dynamodb.Table(metrics_table_name)
         self._events_table = dynamodb.Table(events_table_name)
+        self._customers_table = (
+            dynamodb.Table(customers_table_name) if customers_table_name else None
+        )
 
     def write_batch(self, records: List[ValidatedRecord]) -> int:
         """Write a batch of validated records to DynamoDB.
@@ -69,7 +73,43 @@ class MetricsWriter:
         written = 0
         written += self._write_metrics(metric_records)
         written += self._write_events(event_records)
+
+        if written:
+            self._mark_agents_seen({r.customer_id for r in records})
+
         return written
+
+    def _mark_agents_seen(self, customer_ids: Set[str]) -> None:
+        """Record that these customers' agents just reported.
+
+        Nothing was doing this. The agent published, the consumer stored the
+        records, and the customer's profile still said agent_status "unknown"
+        with no last_agent_seen — so the dashboard reported the agent silent
+        while it was demonstrably feeding it. The silence detector reads the
+        same fields, so it would eventually have raised an alert about an agent
+        that was working.
+
+        Deliberately after a successful write and never fatal: a heartbeat is a
+        report about ingestion, so it must not be able to fail ingestion.
+        """
+        if self._customers_table is None:
+            return
+
+        now = datetime.now(timezone.utc).isoformat()
+        for customer_id in customer_ids:
+            try:
+                self._customers_table.update_item(
+                    Key={"customer_id": customer_id, "SK": "PROFILE"},
+                    UpdateExpression="SET last_agent_seen = :t, agent_status = :s",
+                    ExpressionAttributeValues={":t": now, ":s": "healthy"},
+                    # Never create a profile from an id that arrived in a
+                    # message; only ever update one that already exists.
+                    ConditionExpression="attribute_exists(customer_id)",
+                )
+            except ClientError as exc:
+                logger.warning(
+                    "Could not record heartbeat for %s: %s", customer_id, exc
+                )
 
     def _write_metrics(self, records: List[ValidatedRecord]) -> int:
         if not records:

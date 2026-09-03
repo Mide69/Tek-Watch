@@ -125,6 +125,8 @@ def run() -> None:
         metrics_table_name=config.dynamodb_metrics_table,
         events_table_name=config.dynamodb_events_table,
         aws_region=config.aws_region,
+        # So a successful write can record that the agent reported.
+        customers_table_name=config.dynamodb_customers_table,
     )
 
     total_processed = 0
