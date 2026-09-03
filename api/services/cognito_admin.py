@@ -39,6 +39,15 @@ def generate_password(length: int = 16) -> str:
 def provision_customer_login(
     user_pool_id: str, region: str, customer_id: str, email: str, password: str
 ) -> None:
+    """Create the customer's Cognito login.
+
+    The pool is case-insensitive, so Cognito stores and returns this username
+    lower-cased however it is passed in. Anything that turns a token back into
+    a database key therefore has to fold the case itself — see
+    auth.dependencies.canonical_customer_id. Passing the id unchanged here is
+    correct; assuming it comes back unchanged is what created a second,
+    parallel customer record.
+    """
     """Create a Cognito user for a newly self-signed-up customer with a
     permanent password, ready to sign in immediately.
 
