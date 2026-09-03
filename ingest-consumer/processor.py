@@ -87,7 +87,12 @@ class MessageProcessor:
             logger.warning("Message missing required fields: %s", missing)
             return None
 
-        customer_id = data["customer_id"]
+        # Same fold as the API's auth boundary. An agent reports whatever id
+        # its CloudFormation template carries, and templates issued before the
+        # casing was fixed carry the lower-case form. Without this, those
+        # agents publish to an id no record matches and every message is
+        # dropped as an unknown customer — silently, from the customer's side.
+        customer_id = (data["customer_id"] or "").strip().upper()
 
         # Step 3: Verify customer exists
         customer = self._get_customer(customer_id)
