@@ -9,13 +9,30 @@ import {
   Activity, AlertTriangle, DollarSign, Server,
   CheckCircle, TrendingDown, Zap,
 } from 'lucide-react'
-import { formatCurrency, formatRelativeTime } from '@/lib/utils'
+import { formatCurrency, formatRelativeTime, fmtPercent } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { useFixtureView } from '@/hooks/useFixtureView'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useOverview, useAlerts, useEC2 } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
+
+// Region display names. The agent reports region codes; only the codes an
+// account actually uses are ever rendered, so this is a lookup, not a list of
+// regions to show.
+const REGION_NAMES: Record<string, string> = {
+  'us-east-1': 'US East (N. Virginia)',   'us-east-2': 'US East (Ohio)',
+  'us-west-1': 'US West (N. California)', 'us-west-2': 'US West (Oregon)',
+  'eu-west-1': 'EU West (Ireland)',       'eu-west-2': 'EU West (London)',
+  'eu-west-3': 'EU West (Paris)',         'eu-central-1': 'EU Central (Frankfurt)',
+  'eu-north-1': 'EU North (Stockholm)',   'eu-south-1': 'EU South (Milan)',
+  'ap-south-1': 'Asia Pacific (Mumbai)',  'ap-northeast-1': 'Asia Pacific (Tokyo)',
+  'ap-northeast-2': 'Asia Pacific (Seoul)', 'ap-northeast-3': 'Asia Pacific (Osaka)',
+  'ap-southeast-1': 'Asia Pacific (Singapore)', 'ap-southeast-2': 'Asia Pacific (Sydney)',
+  'ca-central-1': 'Canada (Central)',     'sa-east-1': 'South America (São Paulo)',
+  'me-south-1': 'Middle East (Bahrain)',  'af-south-1': 'Africa (Cape Town)',
+  'global': 'Global services',
+}
 
 export default function OverviewPage() {
   const { customerId }  = useAuth()
@@ -45,6 +62,12 @@ export default function OverviewPage() {
       </DashboardLayout>
     )
   }
+
+  // Real region counts from the agent, biggest first. The bar is scaled
+  // against the largest region rather than the total, so a long tail of
+  // single-resource regions stays visible instead of rounding to nothing.
+  const regions = (data.resources_by_region ?? []) as Array<{ region: string; count: number }>
+  const regionMax = regions.reduce((m, r) => Math.max(m, r.count), 0)
 
   const alerts = alertsData?.alerts ?? []
   const activeAlerts = (alerts as Array<{ status: string; severity: string; type?: string; alert_id: string; service?: string; description?: string; triggered_at?: string }>)
@@ -224,7 +247,7 @@ export default function OverviewPage() {
                           : i.cpu > 60 ? 'text-amber-500 dark:text-amber-400'
                           : 'text-foreground',
                       )}>
-                        {i.cpu.toFixed(1)}%
+                        {fmtPercent(i.cpu)}
                       </span>
                     </div>
                     <div className="h-1 bg-muted rounded-full overflow-hidden">
@@ -305,29 +328,39 @@ export default function OverviewPage() {
         <Card>
           <CardContent className="p-5">
             <h3 className="font-semibold text-foreground mb-4">Resources by Region</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {[
-                { region: 'eu-west-2', name: 'EU West (London)',      pct: 76 },
-                { region: 'eu-west-1', name: 'EU West (Ireland)',     pct: 17 },
-                { region: 'us-east-1', name: 'US East (N. Virginia)', pct:  7 },
-              ].map(r => {
-                const total = data.total_resources ?? 0
-                const count = Math.round((total * r.pct) / 100)
-                const width = total > 0 ? r.pct : 0
-                return (
-                  <div key={r.region} className="p-4 rounded-xl bg-muted/50 border border-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono text-muted-foreground">{r.region}</span>
-                      <span className="text-xs text-muted-foreground">{count} resources</span>
+            {/* This panel used to be three hardcoded regions — eu-west-2,
+                eu-west-1, us-east-1 — split 76/17/7, with the counts derived
+                from that split rather than measured. It queried nothing. An
+                account in different regions was shown a breakdown of regions
+                it did not use, and the bars beside them were drawn from
+                constants in this file. It reported zero only because the
+                total it multiplied was itself broken; the moment that was
+                fixed it would have started inventing confident numbers. */}
+            {regions.length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No resources reported yet. Regions appear here once your agent completes a collection.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {regions.map(r => {
+                  const width = regionMax > 0 ? Math.round((r.count / regionMax) * 100) : 0
+                  return (
+                    <div key={r.region} className="p-4 rounded-xl bg-muted/50 border border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-mono text-muted-foreground">{r.region}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {r.count} {r.count === 1 ? 'resource' : 'resources'}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground mb-2">{REGION_NAMES[r.region] ?? r.region}</p>
+                      <div className="h-1 bg-muted rounded-full overflow-hidden">
+                        <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${width}%` }} />
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mb-2">{r.name}</p>
-                    <div className="h-1 bg-muted rounded-full overflow-hidden">
-                      <div className="h-full bg-primary rounded-full" style={{ width: `${width}%` }} />
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
+                  )
+                })}
+              </div>
+            )}
           </CardContent>
         </Card>
 

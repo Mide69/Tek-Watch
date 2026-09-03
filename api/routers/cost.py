@@ -1,5 +1,6 @@
 """Cost router — Cost Explorer data and forecasts."""
 import logging
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends
 
@@ -20,12 +21,28 @@ async def get_cost_summary(
     # Get daily costs for chart
     daily_costs = ts.get_daily_costs(customer.customer_id)
     
-    # Calculate MTD total
-    mtd_total = sum(float(row.get("cost", 0)) for row in daily_costs)
-    
-    # Get forecast (latest forecast metric)
+    # Month-to-date total.
+    #
+    # daily_costs covers 30 days, which spans the previous month, so summing
+    # all of it was never month-to-date — it was a rolling 30-day total
+    # labelled MTD. (It was also counting each day once per collection until
+    # get_daily_costs started folding by calendar day.)
+    this_month = datetime.now(timezone.utc).strftime("%Y-%m")
+    mtd_total = sum(
+        float(row.get("cost", 0))
+        for row in daily_costs
+        if str(row.get("time", "")).startswith(this_month)
+    )
+
+    # The agent publishes the forecast against the customer id, as
+    # "forecasted_monthly_cost". Asking for resource "forecast" and metric
+    # "forecasted_monthly_spend" matched nothing, so this was always None and
+    # the page showed a forecast of zero next to real daily costs.
     forecast = ts.get_latest_metric(
-        customer.customer_id, "cost_explorer", "forecast", "forecasted_monthly_spend"
+        customer.customer_id,
+        "cost_explorer",
+        customer.customer_id,
+        "forecasted_monthly_cost",
     )
     
     return {

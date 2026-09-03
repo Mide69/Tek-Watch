@@ -31,6 +31,18 @@ logger = logging.getLogger(__name__)
 _SAFE_ID_RE    = re.compile(r'^[A-Za-z0-9_\-]{1,64}$')
 _SAFE_RANGE_RE = re.compile(r'^(24h|7d|30d|90d|5m|1h)$')
 
+# How far back "what exists right now" looks.
+#
+# This must be comfortably wider than the agent's collection interval, which
+# the CloudFormation template defaults to rate(5 minutes). The overview used a
+# 5m window — exactly the interval — so the newest reading was always between
+# 0 and 5 minutes old *plus* however long the agent took to scan every region,
+# reach SQS and be drained by the consumer. Whenever that sum crossed five
+# minutes the window held nothing and the dashboard read zero, then filled in
+# again on the next cycle. An estate does not blink in and out of existence,
+# so the window should not be tight enough to make it look like it does.
+_INVENTORY_WINDOW = "1h"
+
 _RANGE_TO_TIMEDELTA = {
     "5m": timedelta(minutes=5),
     "1h": timedelta(hours=1),
@@ -186,7 +198,25 @@ class TimestreamQueryService:
             r for r in rows
             if r.get("service") == "cost_explorer" and r.get("metric_name") == "daily_blended_cost"
         ]
-        return [{"time": r["time"], "cost": float(r["value"])} for r in filtered]
+
+        # One row per calendar day, not one per collection.
+        #
+        # daily_blended_cost is a running total for the day, and the agent
+        # re-reports it every cycle. Returning every row made the chart draw a
+        # point per collection instead of per day, and the caller sums this
+        # list for the month-to-date figure — so a single day at rate(5
+        # minutes) was added 288 times. The cost page overstated spend by
+        # roughly the collection frequency, growing worse the longer the agent
+        # ran. Keeping the last reading for each day gives the day's total once.
+        by_day: Dict[str, Dict[str, Any]] = {}
+        for r in sorted(filtered, key=lambda r: str(r.get("time", ""))):
+            day = str(r.get("time", ""))[:10]
+            if day:
+                by_day[day] = r
+        return [
+            {"time": r["time"], "cost": float(r["value"])}
+            for _, r in sorted(by_day.items())
+        ]
 
     def get_service_costs(self, customer_id: str) -> List[Dict[str, Any]]:
         """Get month-to-date cost breakdown by AWS service."""
@@ -196,12 +226,171 @@ class TimestreamQueryService:
             r for r in rows
             if r.get("service") == "cost_explorer" and r.get("metric_name") == "mtd_blended_cost"
         ]
+        # Latest reading per service. Same duplication as the daily costs:
+        # every collection re-reports month-to-date for each service, so the
+        # breakdown table listed each service once per cycle.
+        latest: Dict[str, Dict[str, Any]] = {}
+        for r in sorted(filtered, key=lambda r: str(r.get("time", ""))):
+            name = r.get("resource_name") or r.get("resource_id") or "unknown"
+            latest[str(name)] = r
+
         result = [
-            {"aws_service": r.get("resource_name"), "mtd_cost": float(r["value"])}
-            for r in filtered
+            {"aws_service": name, "mtd_cost": float(r["value"])}
+            for name, r in latest.items()
         ]
         result.sort(key=lambda r: r["mtd_cost"], reverse=True)
         return result
+
+    # ── Inventory ─────────────────────────────────────────────────────────────
+    #
+    # Everything above answers "what were the numbers for this metric". The
+    # dashboard's resource pages ask a different question — "what do I have" —
+    # and nothing answered it. Each page was handed the raw rows and expected
+    # to find an object per resource, so the storage page read b.object_count
+    # on a row that only ever carries metric_name and value, and the whole page
+    # died on `Cannot read properties of undefined`.
+    #
+    # A resource is not a row. It is every row about the same resource_id
+    # folded together: the newest value of each metric, plus the descriptive
+    # dimensions the collector went and fetched. That fold is what these two
+    # methods do, once, so every router can stop reinventing it.
+
+    def _fold_rows(self, rows: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+        """Fold metric rows into one entry per resource, newest value wins."""
+        resources: Dict[str, Dict[str, Any]] = {}
+
+        for row in sorted(rows, key=lambda r: str(r.get("time", ""))):
+            rid = row.get("resource_id")
+            if not rid:
+                continue
+
+            entry = resources.setdefault(
+                str(rid),
+                {
+                    "resource_id": str(rid),
+                    "resource_name": "",
+                    "resource_type": "",
+                    "region": "",
+                    "service": "",
+                    "last_seen": "",
+                    "metrics": {},
+                },
+            )
+
+            for field in ("resource_name", "resource_type", "region", "service"):
+                value = row.get(field)
+                if value:
+                    entry[field] = value
+
+            time = row.get("time")
+            if time and str(time) > str(entry["last_seen"]):
+                entry["last_seen"] = str(time)
+
+            metric = row.get("metric_name")
+            if metric:
+                value = row.get("value")
+                # Metric rows store Decimal, event rows store the raw string.
+                # Callers want a number wherever the value is one, so that a
+                # template can format it without knowing which table it lived in.
+                try:
+                    entry["metrics"][str(metric)] = float(value)
+                except (TypeError, ValueError):
+                    entry["metrics"][str(metric)] = value
+
+            dimensions = row.get("dimensions")
+            if isinstance(dimensions, dict):
+                entry.setdefault("dimensions", {}).update(
+                    {str(k): v for k, v in dimensions.items()}
+                )
+
+        for entry in resources.values():
+            entry.setdefault("dimensions", {})
+            if not entry["resource_name"]:
+                entry["resource_name"] = entry["resource_id"]
+
+        return resources
+
+    def get_service_inventory(
+        self, customer_id: str, service: str, time_range: str = _INVENTORY_WINDOW
+    ) -> List[Dict[str, Any]]:
+        """Every resource of one service, with its latest metrics and dimensions.
+
+        Reads both tables. The split between them is a storage detail — a
+        bucket's state is a string and lives in events while its size is a
+        number and lives in metrics — and a customer looking at their buckets
+        should not be able to tell. Reading only events, as the routers did,
+        meant the numbers were never in the response at all.
+        """
+        cid = _safe(customer_id)
+        svc = _safe(service)
+        _safe(time_range, _SAFE_RANGE_RE)
+        since = self._since_iso(time_range)
+
+        rows: List[Dict[str, Any]] = []
+        try:
+            rows.extend(
+                self._paginated_query(
+                    self._events_table,
+                    Key("pk").eq(f"{cid}#{svc}") & Key("sk").gte(since),
+                    scan_forward=True,
+                )
+            )
+        except ClientError as exc:
+            logger.error("DynamoDB events query failed: %s", exc)
+
+        rows.extend(
+            r for r in self._query_metrics_by_customer(cid, since)
+            if r.get("service") == svc
+        )
+
+        inventory = list(self._fold_rows(rows).values())
+        inventory.sort(key=lambda r: str(r.get("resource_name") or ""))
+        return inventory
+
+    def get_resource_inventory(
+        self, customer_id: str, time_range: str = _INVENTORY_WINDOW
+    ) -> Dict[str, Any]:
+        """Total distinct resources, broken down by region and by service.
+
+        The overview counted EC2 only, over a five-minute window. An account
+        with no EC2 instances — this platform's first real customer is one —
+        therefore reported zero resources while the agent was reporting fifty
+        across eighteen regions, and the region panel beside it was hardcoded.
+        """
+        cid = _safe(customer_id)
+        _safe(time_range, _SAFE_RANGE_RE)
+        since = self._since_iso(time_range)
+
+        rows = self._query_metrics_by_customer(cid, since)
+
+        by_region: Dict[str, set] = {}
+        by_service: Dict[str, set] = {}
+        seen: set = set()
+
+        for row in rows:
+            service = str(row.get("service") or "unknown")
+            rid = row.get("resource_id")
+            if not rid:
+                continue
+            # A resource_id is only unique within its service: the cost
+            # collector reports the customer id as a resource, and so would
+            # anything else keyed on the account.
+            key = (service, str(rid))
+            seen.add(key)
+            by_region.setdefault(str(row.get("region") or "unknown"), set()).add(key)
+            by_service.setdefault(service, set()).add(key)
+
+        return {
+            "total": len(seen),
+            "by_region": sorted(
+                ({"region": r, "count": len(v)} for r, v in by_region.items()),
+                key=lambda x: (-x["count"], x["region"]),
+            ),
+            "by_service": sorted(
+                ({"service": s, "count": len(v)} for s, v in by_service.items()),
+                key=lambda x: (-x["count"], x["service"]),
+            ),
+        }
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 

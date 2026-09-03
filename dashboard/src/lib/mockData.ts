@@ -78,6 +78,12 @@ export function getMockOverview(timeRange: TimeRange = '24h') {
   const multiplier = timeRange === '1h' ? 0.85 : timeRange === '6h' ? 0.9 : timeRange === '7d' ? 1.05 : timeRange === '30d' ? 1.12 : 1
   return {
     total_resources: Math.round(847 * multiplier),
+    resources_by_region: [
+      { region: 'eu-west-2', count: Math.round(644 * multiplier) },
+      { region: 'eu-west-1', count: Math.round(144 * multiplier) },
+      { region: 'us-east-1', count: Math.round(59 * multiplier) },
+    ] as RegionCount[],
+    resources_by_service: [] as Array<{ service: string; count: number }>,
     active_alarms: timeRange === '1h' ? 2 : 3,
     security_findings: 2,
     estimated_monthly_cost: +(4247.80 * multiplier).toFixed(2),
@@ -201,7 +207,33 @@ export const MOCK_CLOUDFRONT = [
 
 // ─── Storage — S3 ─────────────────────────────────────────────────────────────
 
-export const MOCK_S3 = [
+/**
+ * Shapes the live API can return, which the fixtures below must satisfy.
+ *
+ * A field the agent could not collect comes back null, not zero — so these are
+ * declared nullable and the fixtures, which have a value for everything, still
+ * typecheck against them. Without the annotation the shape is inferred from
+ * the demo data, where nothing is ever missing, and every page is written
+ * against a world that cannot happen on a real account.
+ */
+export interface S3Bucket {
+  bucket_name: string
+  region: string
+  size_bytes: number | null
+  object_count: number | null
+  versioning: boolean | null
+  public_access_blocked: boolean | null
+  encryption: string | null
+  cost_mtd: number | null
+  last_seen?: string | null
+}
+
+export interface RegionCount {
+  region: string
+  count: number
+}
+
+export const MOCK_S3: S3Bucket[] = [
   { bucket_name: 'acme-prod-assets',        region: 'eu-west-2', size_bytes: 284_200_000_000, object_count: 2842000, versioning: true,  public_access_blocked: true,  encryption: 'SSE-S3',  cost_mtd: 48.20  },
   { bucket_name: 'acme-prod-backups',       region: 'eu-west-2', size_bytes: 1_840_000_000_000,object_count: 18400,  versioning: true,  public_access_blocked: true,  encryption: 'SSE-KMS', cost_mtd: 220.60 },
   { bucket_name: 'acme-logs',              region: 'eu-west-2', size_bytes: 89_400_000_000,  object_count: 8940000, versioning: false, public_access_blocked: true,  encryption: 'SSE-S3',  cost_mtd: 28.40  },

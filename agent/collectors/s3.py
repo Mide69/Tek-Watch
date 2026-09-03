@@ -56,20 +56,64 @@ class S3Collector(BaseCollector):
         except (ClientError, EndpointResolutionError):
             pass
 
-        # Encryption status
+        # Encryption status, and which algorithm. The dashboard names the
+        # algorithm next to the padlock, so "encrypted: true" was never enough
+        # to render the column it was collected for.
         encryption_enabled = False
+        encryption_algorithm = ""
         try:
-            self._s3.get_bucket_encryption(Bucket=name)
-            encryption_enabled = True
+            enc = self._s3.get_bucket_encryption(Bucket=name)
+            rules = (
+                enc.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
+            )
+            for rule in rules:
+                algorithm = (
+                    rule.get("ApplyServerSideEncryptionByDefault", {})
+                    .get("SSEAlgorithm", "")
+                )
+                if algorithm:
+                    encryption_enabled = True
+                    encryption_algorithm = algorithm
+                    break
+        except (ClientError, EndpointResolutionError):
+            pass  # No configuration, or no permission to read it — not encrypted
+
+        # Public access block. This is the single most consequential fact about
+        # a bucket and the storage page has a column for it, but nothing
+        # collected it, so every bucket was about to be labelled Public on the
+        # strength of a missing field.
+        public_access_blocked: Optional[bool] = None
+        try:
+            cfg = self._s3.get_public_access_block(Bucket=name)
+            block = cfg.get("PublicAccessBlockConfiguration", {})
+            public_access_blocked = all(
+                bool(block.get(key))
+                for key in (
+                    "BlockPublicAcls",
+                    "IgnorePublicAcls",
+                    "BlockPublicPolicy",
+                    "RestrictPublicBuckets",
+                )
+            )
         except ClientError as exc:
-            if exc.response.get("Error", {}).get("Code") != "ServerSideEncryptionConfigurationNotFoundError":
-                pass  # Any other error — assume not encrypted
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code == "NoSuchPublicAccessBlockConfiguration":
+                public_access_blocked = False
+            # Any other error means we could not determine it. Leave it unknown
+            # rather than guessing, in either direction: claiming a bucket is
+            # blocked when it is not is dangerous, and claiming it is public
+            # when it is not trains people to ignore the warning.
+        except EndpointResolutionError:
+            pass
 
         base_dims = {
             "bucket_region":       bucket_region,
             "versioning_enabled":  str(versioning == "Enabled"),
             "encryption_enabled":  str(encryption_enabled),
+            "encryption_algorithm": encryption_algorithm,
         }
+        if public_access_blocked is not None:
+            base_dims["public_access_blocked"] = str(public_access_blocked)
 
         # Inventory record
         records.append(self._make_record(

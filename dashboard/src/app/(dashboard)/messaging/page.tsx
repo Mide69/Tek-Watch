@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { useMessaging } from '@/hooks/useData'
+import { fmtCount } from '@/lib/utils'
 
 export default function MessagingPage() {
   const { customerId }      = useAuth()
@@ -57,14 +58,14 @@ export default function MessagingPage() {
                         <td className="px-4 py-3"><Badge variant="info">{q.type}</Badge></td>
                         <td className="px-4 py-3">
                           <span className={q.messages_visible > 1000 ? 'text-amber-400 font-semibold' : 'text-foreground'}>
-                            {q.messages_visible.toLocaleString()}
+                            {fmtCount(q.messages_visible)}
                           </span>
                         </td>
                         <td className="px-4 py-3 text-foreground">{q.messages_inflight}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">
                           {q.oldest_message_age > 0 ? `${q.oldest_message_age}s` : '—'}
                         </td>
-                        <td className="px-4 py-3 text-foreground">{q.throughput.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-foreground">{fmtCount(q.throughput)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground font-mono truncate max-w-[120px]">
                           {q.dlq ?? '—'}
                         </td>

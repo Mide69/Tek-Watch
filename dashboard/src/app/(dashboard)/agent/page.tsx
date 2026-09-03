@@ -9,7 +9,7 @@ import { CardSkeleton } from '@/components/ui/Skeleton'
 import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, fmtCount } from '@/lib/utils'
 import { useFixtureView } from '@/hooks/useFixtureView'
 import { SetupGuide } from '@/components/agent/SetupGuide'
 import { useShowingSampleData } from '@/lib/dataSource'
@@ -217,7 +217,7 @@ export default function AgentPage() {
                   <span className={`w-2 h-2 rounded-full ${a.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Customer <span className="text-foreground font-mono">{a.customer_id}</span> · Version {a.version} · Up {a.uptime_hours.toLocaleString()}h
+                  Customer <span className="text-foreground font-mono">{a.customer_id}</span> · Version {a.version} · Up {fmtCount(a.uptime_hours)}h
                 </p>
               </div>
               <div className="text-right text-sm">
@@ -232,7 +232,7 @@ export default function AgentPage() {
         {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: 'Metrics Collected',  value: a.metrics_collected_total.toLocaleString(), icon: Activity,    color: 'text-indigo-400' },
+            { label: 'Metrics Collected',  value: fmtCount(a.metrics_collected_total), icon: Activity,    color: 'text-indigo-400' },
             { label: 'Regions Covered',    value: regions.length.toString(),                icon: Radio,       color: 'text-blue-400'   },
             { label: 'Active Collectors',  value: `${okCollectors}/${collectors.length}`,   icon: CheckCircle, color: 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' },
             { label: 'Collection Interval',value: `${a.collection_interval_s}s`,              icon: Clock,       color: 'text-amber-500 dark:text-amber-400'  },
