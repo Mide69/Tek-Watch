@@ -56,6 +56,20 @@ def generate_agent_template(
                 "Default": "rate(5 minutes)",
                 "Description": "How often the agent runs",
             },
+            # Fargate tasks need awsvpc networking, so the schedule has to know
+            # where to place them. Typed as EC2 resource ids so CloudFormation
+            # renders them as pick-lists of the customer's own VPC and subnets.
+            "VpcId": {
+                "Type": "AWS::EC2::VPC::Id",
+                "Description": "VPC to run the agent in. The default VPC is fine.",
+            },
+            "SubnetIds": {
+                "Type": "List<AWS::EC2::Subnet::Id>",
+                "Description": (
+                    "Subnets to run the agent in. Pick public subnets, or private "
+                    "ones with a NAT gateway: the agent makes outbound calls only."
+                ),
+            },
         },
         "Resources": {
             "AgentCluster": {
@@ -150,9 +164,103 @@ def generate_agent_template(
                     }],
                 },
             },
+            # Outbound only. No ingress rule at all, which is what lets us say
+            # no inbound firewall changes are needed.
+            "AgentSecurityGroup": {
+                "Type": "AWS::EC2::SecurityGroup",
+                "Properties": {
+                    "GroupDescription": "Tek Watch agent: outbound only",
+                    "VpcId": {"Ref": "VpcId"},
+                    "SecurityGroupEgress": [{
+                        "IpProtocol": "-1",
+                        "CidrIp": "0.0.0.0/0",
+                        "Description": "Reach ECR Public, CloudWatch and the Tek Watch queue",
+                    }],
+                },
+            },
+            # EventBridge needs its own role to start the task and to hand the
+            # task its roles.
+            "AgentSchedulerRole": {
+                "Type": "AWS::IAM::Role",
+                "Properties": {
+                    "AssumeRolePolicyDocument": {
+                        "Version": "2012-10-17",
+                        "Statement": [{
+                            "Effect": "Allow",
+                            "Principal": {"Service": "events.amazonaws.com"},
+                            "Action": "sts:AssumeRole",
+                        }],
+                    },
+                    "Policies": [{
+                        "PolicyName": "run-agent-task",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "ecs:RunTask",
+                                    "Resource": {"Ref": "AgentTaskDefinition"},
+                                    "Condition": {
+                                        "ArnEquals": {
+                                            "ecs:cluster": {"Fn::GetAtt": ["AgentCluster", "Arn"]}
+                                        }
+                                    },
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "iam:PassRole",
+                                    "Resource": [
+                                        {"Fn::GetAtt": ["AgentTaskRole", "Arn"]},
+                                        {"Fn::GetAtt": ["AgentExecutionRole", "Arn"]},
+                                    ],
+                                },
+                            ],
+                        },
+                    }],
+                },
+            },
+            # Without this the stack creates a task definition and nothing that
+            # ever runs it. The deploy reported CREATE_COMPLETE, the customer
+            # was told to expect data within ten minutes, and none would ever
+            # have arrived — a silent failure dressed as a success.
+            "AgentSchedule": {
+                "Type": "AWS::Events::Rule",
+                "Properties": {
+                    "Name": {"Fn::Sub": f"tek-watch-agent-{customer_id}-schedule"},
+                    "Description": "Runs the Tek Watch collection agent",
+                    "ScheduleExpression": {"Ref": "ScheduleExpression"},
+                    "State": "ENABLED",
+                    "Targets": [{
+                        "Id": "agent-task",
+                        "Arn": {"Fn::GetAtt": ["AgentCluster", "Arn"]},
+                        "RoleArn": {"Fn::GetAtt": ["AgentSchedulerRole", "Arn"]},
+                        "EcsParameters": {
+                            "TaskDefinitionArn": {"Ref": "AgentTaskDefinition"},
+                            "TaskCount": 1,
+                            "LaunchType": "FARGATE",
+                            "PlatformVersion": "LATEST",
+                            "NetworkConfiguration": {
+                                "AwsVpcConfiguration": {
+                                    "Subnets": {"Ref": "SubnetIds"},
+                                    "SecurityGroups": [
+                                        {"Fn::GetAtt": ["AgentSecurityGroup", "GroupId"]}
+                                    ],
+                                    # Public subnets have no NAT, and the agent
+                                    # has to reach ECR Public to start at all.
+                                    "AssignPublicIp": "ENABLED",
+                                },
+                            },
+                        },
+                    }],
+                },
+            },
         },
         "Outputs": {
             "CustomerID": {"Value": customer_id, "Description": "Tek Watch Customer ID"},
+            "ScheduleName": {
+                "Value": {"Ref": "AgentSchedule"},
+                "Description": "EventBridge rule that runs the agent",
+            },
             "ClusterName": {"Value": {"Ref": "AgentCluster"}, "Description": "ECS Cluster"},
         },
     }

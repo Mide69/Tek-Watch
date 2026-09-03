@@ -24,6 +24,10 @@ const STEPS = [
     body: 'Sign in to the AWS console, choose the region you want to monitor from, and go to CloudFormation → Create stack → With new resources.',
   },
   {
+    title: 'Choose the VPC and subnets',
+    body: 'Two pick-lists. The default VPC and its subnets are fine. The agent only makes outbound calls, so nothing needs opening.',
+  },
+  {
     title: 'Upload the file',
     body: 'Choose "Upload a template file", select the .yaml you downloaded, and continue. Give the stack any name, "tek-watch-agent" is a sensible one.',
   },
@@ -121,6 +125,16 @@ export function SetupGuide({ customerId }: { customerId?: string }) {
               <p className="text-muted-foreground mt-0.5 leading-relaxed">
                 Open the stack in CloudFormation and read the Events tab, newest first. The
                 first red row is the real cause; everything after it is rollback.
+              </p>
+            </div>
+            <div>
+              <p className="font-medium text-foreground">
+                &quot;Unable to assume the service linked role&quot;
+              </p>
+              <p className="text-muted-foreground mt-0.5 leading-relaxed">
+                Your account has never run ECS, and the first attempt creates the role it
+                needs but fails before it can use it. Delete the stack and create it again;
+                the second attempt works. Nothing is wrong with your account or the template.
               </p>
             </div>
             <div>
