@@ -9,6 +9,24 @@ import yaml
 from config import APIConfig
 
 
+def _queue_arn(queue_url: str) -> str:
+    """arn for an SQS queue url, or a permissive fallback if it is not one.
+
+    A queue url is https://sqs.<region>.amazonaws.com/<account>/<name>, and the
+    arn is arn:aws:sqs:<region>:<account>:<name>. Naming the exact queue keeps
+    the grant to one resource, and — more to the point — makes it impossible
+    for the policy and the queue to disagree about what the queue is called.
+    """
+    try:
+        _, _, host, account, name = queue_url.split("/", 4)
+        region = host.split(".")[1]
+        return f"arn:aws:sqs:{region}:{account}:{name}"
+    except (ValueError, IndexError):
+        # Nothing sane to name. Better a broad grant than a template that
+        # cannot be generated at all, and the queue policy still gates it.
+        return "arn:aws:sqs:*:*:*"
+
+
 def generate_agent_template(
     customer_id: str,
     customer_name: str,
@@ -99,7 +117,18 @@ def generate_agent_template(
                             "Statement": [{
                                 "Effect": "Allow",
                                 "Action": ["sqs:SendMessage", "sqs:SendMessageBatch"],
-                                "Resource": {"Fn::Sub": "arn:aws:sqs:*:*:tek-watch-ingest-*"},
+                                # The exact queue, derived from the url this
+                                # deployment actually publishes to.
+                                #
+                                # This was the wildcard arn:aws:sqs:*:*:tek-watch-ingest-*,
+                                # which matches nothing we own: the queue is
+                                # tek-watch-prod-ingest, and that name does not
+                                # start with "tek-watch-ingest-". So the agent
+                                # collected 163 records without an error and was
+                                # then refused at the last step — cross-account
+                                # sending needs the queue policy AND the caller's
+                                # own identity policy, and this was the second one.
+                                "Resource": _queue_arn(config.sqs_ingest_queue_url),
                             }, {
                                 "Effect": "Allow",
                                 "Action": ["ce:GetCostAndUsage", "ce:GetCostForecast"],

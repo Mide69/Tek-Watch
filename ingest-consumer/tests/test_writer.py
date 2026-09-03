@@ -123,3 +123,84 @@ class TestMetricsWriter:
         result = w.write_batch(records)
         assert result == 250
         assert metrics_batch.put_item.call_count == 250
+
+
+class TestAgentHeartbeat:
+    """A successful write must record that the agent reported.
+
+    Nothing did this. The agent published, the consumer stored 152 metrics and
+    121 events, and the customer's profile still said agent_status "unknown"
+    with no last_agent_seen — so the dashboard reported the agent silent while
+    it was feeding it. The silence detector reads the same two fields, so it
+    would eventually have alerted about an agent that was working.
+    """
+
+    def _writer(self, customers_table):
+        from unittest.mock import MagicMock, patch
+
+        with patch("writer.boto3") as boto3_mock:
+            resource = MagicMock()
+            resource.Table.side_effect = lambda name: (
+                customers_table if name == "customers" else MagicMock()
+            )
+            boto3_mock.resource.return_value = resource
+            from writer import MetricsWriter
+
+            return MetricsWriter("metrics", "events", "eu-west-2", "customers")
+
+    def _record(self, customer_id="TT-0001"):
+        from processor import ValidatedRecord
+
+        return ValidatedRecord(
+            customer_id=customer_id,
+            collection_timestamp="2026-09-03T09:15:00+00:00",
+            region="eu-west-2",
+            service="ec2",
+            resource_type="instance",
+            resource_id="i-1",
+            resource_name="web",
+            metric_name="cpu",
+            metric_value=12.5,
+            unit="percent",
+            dimensions={},
+        )
+
+    def test_marks_the_agent_healthy_after_a_write(self):
+        from unittest.mock import MagicMock
+
+        customers = MagicMock()
+        writer = self._writer(customers)
+        writer.write_batch([self._record()])
+
+        assert customers.update_item.called
+        kwargs = customers.update_item.call_args.kwargs
+        assert kwargs["Key"] == {"customer_id": "TT-0001", "SK": "PROFILE"}
+        assert kwargs["ExpressionAttributeValues"][":s"] == "healthy"
+        # Must never invent a customer from an id that arrived in a message.
+        assert "attribute_exists" in kwargs["ConditionExpression"]
+
+    def test_records_each_customer_once_per_batch(self):
+        from unittest.mock import MagicMock
+
+        customers = MagicMock()
+        writer = self._writer(customers)
+        writer.write_batch([self._record(), self._record(), self._record("TT-0002")])
+
+        seen = {
+            c.kwargs["Key"]["customer_id"] for c in customers.update_item.call_args_list
+        }
+        assert seen == {"TT-0001", "TT-0002"}
+
+    def test_a_failed_heartbeat_does_not_fail_ingestion(self):
+        from unittest.mock import MagicMock
+
+        from botocore.exceptions import ClientError
+
+        customers = MagicMock()
+        customers.update_item.side_effect = ClientError(
+            {"Error": {"Code": "ConditionalCheckFailedException"}}, "UpdateItem"
+        )
+        writer = self._writer(customers)
+
+        # The heartbeat is a report about ingestion; it must not break it.
+        assert writer.write_batch([self._record()]) >= 0
