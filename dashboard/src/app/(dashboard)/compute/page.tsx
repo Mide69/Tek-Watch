@@ -10,7 +10,7 @@ import { Server, Zap, Layers, ServerOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useEC2, useLambda, useECS } from '@/hooks/useData'
-import { cn } from '@/lib/utils'
+import { cn, fmtCount, DASH } from '@/lib/utils'
 
 function StateChip({ state }: { state: string }) {
   if (state === 'running') return <Badge variant="success">running</Badge>
@@ -18,7 +18,13 @@ function StateChip({ state }: { state: string }) {
   return <Badge variant="warning">{state}</Badge>
 }
 
-function PctBar({ value }: { value: number }) {
+function PctBar({ value }: { value: number | null }) {
+  // Container Insights is disabled on this cluster, so ECS CPU/memory are
+  // null until it is turned on. value.toFixed(1) on null took the whole
+  // Compute page down the same way object_count did on Storage.
+  if (value == null) {
+    return <span className="text-xs text-muted-foreground">{DASH}</span>
+  }
   const col = value > 80 ? 'bg-red-500' : value > 60 ? 'bg-amber-500' : 'bg-emerald-500'
   return (
     <div className="flex items-center gap-2">
@@ -211,12 +217,14 @@ export default function ComputePage() {
                           </thead>
                           <tbody>
                             {(lambda || []).map((fn, idx) => {
-                              const errPct = fn.invocations > 0
+                              const errPct = fn.invocations && fn.errors != null
                                 ? ((fn.errors / fn.invocations) * 100).toFixed(1)
                                 : '0.0'
-                              const durationS = fn.duration_avg >= 1000
-                                ? `${(fn.duration_avg / 1000).toFixed(1)}s`
-                                : `${fn.duration_avg} ms`
+                              const durationS = fn.duration_avg == null
+                                ? DASH
+                                : fn.duration_avg >= 1000
+                                  ? `${(fn.duration_avg / 1000).toFixed(1)}s`
+                                  : `${fn.duration_avg} ms`
                               return (
                                 <TR key={fn.function_name} idx={idx}>
                                   <td className="px-4 py-3 font-medium text-foreground max-w-[180px] truncate">
@@ -225,30 +233,30 @@ export default function ComputePage() {
                                   <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
                                     {fn.runtime}
                                   </td>
-                                  <td className="px-4 py-3 text-xs text-foreground">{fn.memory} MB</td>
-                                  <td className="px-4 py-3 text-foreground">{fn.invocations.toLocaleString()}</td>
+                                  <td className="px-4 py-3 text-xs text-foreground">{fmtCount(fn.memory)} MB</td>
+                                  <td className="px-4 py-3 text-foreground">{fmtCount(fn.invocations)}</td>
                                   <td className="px-4 py-3">
                                     <span className={cn(
                                       'text-xs font-medium',
-                                      fn.errors > 0
+                                      (fn.errors ?? 0) > 0
                                         ? 'text-red-500 dark:text-red-400'
                                         : 'text-emerald-600 dark:text-emerald-400',
                                     )}>
-                                      {fn.errors}
-                                      {fn.errors > 0 && (
+                                      {fmtCount(fn.errors)}
+                                      {(fn.errors ?? 0) > 0 && (
                                         <span className="text-muted-foreground"> ({errPct}%)</span>
                                       )}
                                     </span>
                                   </td>
                                   <td className="px-4 py-3 text-xs">
-                                    <span className={fn.duration_avg > 2000
+                                    <span className={(fn.duration_avg ?? 0) > 2000
                                       ? 'text-amber-500 dark:text-amber-400'
                                       : 'text-foreground'}>
                                       {durationS}
                                     </span>
                                   </td>
                                   <td className="px-4 py-3">
-                                    {fn.throttles > 0
+                                    {(fn.throttles ?? 0) > 0
                                       ? <Badge variant="warning">{fn.throttles}</Badge>
                                       : <span className="text-xs text-emerald-600 dark:text-emerald-400">0</span>}
                                   </td>
@@ -296,14 +304,15 @@ export default function ComputePage() {
                                 </td>
                                 <td className="px-4 py-3 font-medium text-foreground">{svc.service_name}</td>
                                 <td className="px-4 py-3">
-                                  <span className={svc.running < svc.desired
-                                    ? 'text-red-500 dark:text-red-400 font-semibold'
-                                    : 'text-emerald-600 dark:text-emerald-400 font-semibold'
+                                  <span className={
+                                    svc.running != null && svc.desired != null && svc.running < svc.desired
+                                      ? 'text-red-500 dark:text-red-400 font-semibold'
+                                      : 'text-emerald-600 dark:text-emerald-400 font-semibold'
                                   }>
-                                    {svc.running}
+                                    {fmtCount(svc.running)}
                                   </span>
-                                  <span className="text-muted-foreground text-xs">/{svc.desired}</span>
-                                  {svc.pending > 0 && (
+                                  <span className="text-muted-foreground text-xs">/{fmtCount(svc.desired)}</span>
+                                  {(svc.pending ?? 0) > 0 && (
                                     <span className="text-amber-500 dark:text-amber-400 text-xs ml-1">
                                       (+{svc.pending} pending)
                                     </span>

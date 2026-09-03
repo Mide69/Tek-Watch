@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { useNetworking } from '@/hooks/useData'
+import { fmtCount, fmtPercent, DASH } from '@/lib/utils'
 
 export default function NetworkingPage() {
   const { customerId }       = useAuth()
@@ -49,9 +50,9 @@ export default function NetworkingPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-center mb-3">
                     {[
-                      ['CIDR',         vpc.cidr],
-                      ['Subnets',      vpc.subnets],
-                      ['Route Tables', vpc.route_tables],
+                      ['CIDR',         vpc.cidr || DASH],
+                      ['Subnets',      fmtCount(vpc.subnets)],
+                      ['Route Tables', fmtCount(vpc.route_tables)],
                     ].map(([k, v]) => (
                       <div key={String(k)} className="p-2 rounded-lg bg-muted/30 border border-border">
                         <div className="text-xs text-muted-foreground">{k}</div>
@@ -89,18 +90,22 @@ export default function NetworkingPage() {
                         <td className="px-4 py-3 font-medium text-foreground">{lb.name}</td>
                         <td className="px-4 py-3"><Badge variant="info">{lb.type}</Badge></td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">{lb.scheme}</td>
-                        <td className="px-4 py-3 text-foreground">{lb.request_count.toLocaleString()}</td>
+                        <td className="px-4 py-3 text-foreground">{fmtCount(lb.request_count)}</td>
                         <td className="px-4 py-3">
-                          <span className={lb.error_5xx > 1 ? 'text-red-400 font-semibold' : 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400'}>
-                            {lb.error_5xx.toFixed(2)}%
+                          <span className={(lb.error_5xx ?? 0) > 1 ? 'text-red-400 font-semibold' : 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400'}>
+                            {fmtPercent(lb.error_5xx, 2)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-foreground">{lb.latency_ms} ms</td>
+                        <td className="px-4 py-3 text-foreground">{lb.latency_ms == null ? DASH : `${lb.latency_ms} ms`}</td>
                         <td className="px-4 py-3">
-                          <span className={lb.healthy < lb.targets ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400'}>
-                            {lb.healthy}
+                          <span className={
+                            lb.healthy != null && lb.targets != null && lb.healthy < lb.targets
+                              ? 'text-red-500 dark:text-red-400'
+                              : 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400'
+                          }>
+                            {fmtCount(lb.healthy)}
                           </span>
-                          <span className="text-muted-foreground text-xs">/{lb.targets}</span>
+                          <span className="text-muted-foreground text-xs">/{fmtCount(lb.targets)}</span>
                         </td>
                       </tr>
                     ))}
@@ -127,9 +132,9 @@ export default function NetworkingPage() {
                   </div>
                   <div className="grid grid-cols-3 gap-3 text-center">
                     {[
-                      ['Req/day',   cf.requests_day.toLocaleString()],
-                      ['Error %',   `${cf.error_rate.toFixed(2)}%`],
-                      ['Cache Hit', `${cf.cache_hit.toFixed(1)}%`],
+                      ['Req/day',   fmtCount(cf.requests_day)],
+                      ['Error %',   fmtPercent(cf.error_rate, 2)],
+                      ['Cache Hit', fmtPercent(cf.cache_hit)],
                     ].map(([k, v]) => (
                       <div key={String(k)} className="p-2 rounded-lg bg-muted/30 border border-border">
                         <div className="text-xs text-muted-foreground">{k}</div>

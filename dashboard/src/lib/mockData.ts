@@ -126,7 +126,22 @@ export function getMockEC2WithMetrics(timeRange: TimeRange) {
 
 // ─── Compute — Lambda ─────────────────────────────────────────────────────────
 
-export const MOCK_LAMBDA = [
+export interface LambdaFunction {
+  function_name: string
+  runtime: string
+  memory: number | null
+  timeout: number | null
+  region: string
+  invocations: number | null
+  errors: number | null
+  duration_avg: number | null
+  duration_p99: number | null
+  throttles: number | null
+  cold_starts: number | null
+  cost_mtd: number | null
+}
+
+export const MOCK_LAMBDA: LambdaFunction[] = [
   { function_name: 'acme-image-processor',  runtime: 'python3.11', memory: 1024, timeout: 300, region: 'eu-west-2', invocations: 45230, errors: 234,  duration_avg: 3400, duration_p99: 8200, throttles: 12, cold_starts: 892, cost_mtd: 180.30 },
   { function_name: 'acme-api-authorizer',   runtime: 'nodejs18.x', memory: 256,  timeout: 10,  region: 'eu-west-2', invocations: 892441,errors: 12,   duration_avg: 42,   duration_p99: 180,  throttles: 0,  cold_starts: 1240,cost_mtd: 42.10  },
   { function_name: 'acme-data-sync',        runtime: 'python3.11', memory: 512,  timeout: 900, region: 'eu-west-2', invocations: 1440,  errors: 0,    duration_avg: 28000,duration_p99: 45000,throttles: 0,  cold_starts: 48,  cost_mtd: 28.50  },
@@ -139,16 +154,28 @@ export function getMockLambdaWithMetrics(timeRange: TimeRange) {
   return MOCK_LAMBDA.map((fn, idx) => ({
     ...fn,
     metrics: {
-      invocations: genSeries(timeRange, fn.invocations / 24, 200, 50 + idx, fn.function_name === 'acme-image-processor' ? 0.4 : 0),
-      errors:      genSeries(timeRange, fn.errors / 24,       5,  60 + idx),
-      duration:    genSeries(timeRange, fn.duration_avg,    500,  70 + idx, fn.function_name === 'acme-image-processor' ? 0.5 : 0),
+      invocations: genSeries(timeRange, (fn.invocations ?? 0) / 24, 200, 50 + idx, fn.function_name === 'acme-image-processor' ? 0.4 : 0),
+      errors:      genSeries(timeRange, (fn.errors ?? 0) / 24,       5,  60 + idx),
+      duration:    genSeries(timeRange, fn.duration_avg ?? 0,      500,  70 + idx, fn.function_name === 'acme-image-processor' ? 0.5 : 0),
     },
   }))
 }
 
 // ─── Compute — ECS ────────────────────────────────────────────────────────────
 
-export const MOCK_ECS = [
+export interface ECSService {
+  service_name: string
+  cluster: string
+  desired: number | null
+  running: number | null
+  pending: number | null
+  cpu: number | null
+  memory: number | null
+  region: string
+  status: string
+}
+
+export const MOCK_ECS: ECSService[] = [
   { service_name: 'acme-web-service',     cluster: 'prod-cluster', desired: 4, running: 4, pending: 0, cpu: 68.2, memory: 71.4, region: 'eu-west-2', status: 'ACTIVE' },
   { service_name: 'acme-api-service',     cluster: 'prod-cluster', desired: 6, running: 6, pending: 0, cpu: 42.1, memory: 55.3, region: 'eu-west-2', status: 'ACTIVE' },
   { service_name: 'acme-worker-service',  cluster: 'prod-cluster', desired: 3, running: 3, pending: 0, cpu: 81.3, memory: 64.2, region: 'eu-west-2', status: 'ACTIVE' },
@@ -159,7 +186,23 @@ export const MOCK_ECS = [
 
 // ─── Databases — RDS ──────────────────────────────────────────────────────────
 
-export const MOCK_RDS = [
+export interface RDSInstance {
+  db_identifier: string
+  engine: string
+  instance_class: string
+  status: string
+  region: string
+  cpu: number | null
+  connections: number | null
+  free_storage_gb: number | null
+  read_iops: number | null
+  write_iops: number | null
+  replica_lag_ms: number | null
+  multi_az: boolean | null
+  cost_mtd: number | null
+}
+
+export const MOCK_RDS: RDSInstance[] = [
   { db_identifier: 'prod-db-01',     engine: 'aurora-mysql',    instance_class: 'db.r6g.large',  status: 'available', region: 'eu-west-2', cpu: 34.2, connections: 187, free_storage_gb: 420.5, read_iops: 1240, write_iops: 890, replica_lag_ms: 0,    multi_az: true,  cost_mtd: 620.80 },
   { db_identifier: 'analytics-db-01',engine: 'aurora-postgres', instance_class: 'db.r6g.xlarge', status: 'available', region: 'eu-west-2', cpu: 22.1, connections: 42,  free_storage_gb: 1840.2,read_iops: 340,  write_iops: 120, replica_lag_ms: 0,    multi_az: true,  cost_mtd: 840.20 },
   { db_identifier: 'staging-db-01',  engine: 'mysql',           instance_class: 'db.t3.medium',  status: 'available', region: 'eu-west-2', cpu: 8.4,  connections: 12,  free_storage_gb: 84.1,  read_iops: 45,   write_iops: 22,  replica_lag_ms: 0,    multi_az: false, cost_mtd: 48.60  },
@@ -169,16 +212,30 @@ export function getMockRDSWithMetrics(timeRange: TimeRange) {
   return MOCK_RDS.map((db, idx) => ({
     ...db,
     metrics: {
-      cpu:         genSeries(timeRange, db.cpu,         10, 80 + idx),
-      connections: genSeries(timeRange, db.connections, 20, 90 + idx, db.db_identifier === 'prod-db-01' ? 0.15 : 0),
-      read_iops:   genSeries(timeRange, db.read_iops,  300, 100 + idx),
+      cpu:         genSeries(timeRange, db.cpu ?? 0,         10, 80 + idx),
+      connections: genSeries(timeRange, db.connections ?? 0, 20, 90 + idx, db.db_identifier === 'prod-db-01' ? 0.15 : 0),
+      read_iops:   genSeries(timeRange, db.read_iops ?? 0,  300, 100 + idx),
     },
   }))
 }
 
 // ─── Databases — DynamoDB ─────────────────────────────────────────────────────
 
-export const MOCK_DYNAMODB = [
+export interface DynamoDBTable {
+  table_name: string
+  status: string
+  size_bytes: number | null
+  item_count: number | null
+  read_capacity: number | null
+  write_capacity: number | null
+  consumed_read: number | null
+  consumed_write: number | null
+  throttled_reads: number | null
+  throttled_writes: number | null
+  region: string
+}
+
+export const MOCK_DYNAMODB: DynamoDBTable[] = [
   { table_name: 'acme-users',        status: 'ACTIVE', size_bytes: 2_840_000_000, item_count: 284000, read_capacity: 25, write_capacity: 25, consumed_read: 12.4, consumed_write: 8.2,  throttled_reads: 0,   throttled_writes: 0,   region: 'eu-west-2' },
   { table_name: 'acme-sessions',     status: 'ACTIVE', size_bytes: 456_000_000,   item_count: 45600,  read_capacity: 50, write_capacity: 50, consumed_read: 28.7, consumed_write: 22.1, throttled_reads: 0,   throttled_writes: 0,   region: 'eu-west-2' },
   { table_name: 'acme-events',       status: 'ACTIVE', size_bytes: 18_200_000_000,item_count: 1820000,read_capacity: 100,write_capacity: 100,consumed_read: 78.2, consumed_write: 89.4, throttled_reads: 12,  throttled_writes: 8,   region: 'eu-west-2' },
@@ -187,20 +244,61 @@ export const MOCK_DYNAMODB = [
 
 // ─── Networking ───────────────────────────────────────────────────────────────
 
-export const MOCK_VPCS = [
+export interface VPCResource {
+  vpc_id: string
+  name: string
+  cidr: string
+  region: string
+  subnets: number | null
+  route_tables: number | null
+  security_groups: number | null
+  nacls: number | null
+  state: string
+}
+
+export const MOCK_VPCS: VPCResource[] = [
   { vpc_id: 'vpc-0a1b2c3d4e', name: 'prod-vpc',     cidr: '10.0.0.0/16',  region: 'eu-west-2', subnets: 9,  route_tables: 6,  security_groups: 24, nacls: 3, state: 'available' },
   { vpc_id: 'vpc-1b2c3d4e5f', name: 'staging-vpc',  cidr: '10.1.0.0/16',  region: 'eu-west-2', subnets: 3,  route_tables: 2,  security_groups: 8,  nacls: 1, state: 'available' },
   { vpc_id: 'vpc-2c3d4e5f6g', name: 'analytics-vpc', cidr: '10.2.0.0/16', region: 'eu-west-1', subnets: 3,  route_tables: 2,  security_groups: 6,  nacls: 1, state: 'available' },
 ]
 
-export const MOCK_ELBS = [
+export interface LoadBalancer {
+  name: string
+  type: string
+  scheme: string
+  state: string
+  region: string
+  dns: string
+  targets: number | null
+  healthy: number | null
+  request_count: number | null
+  latency_ms: number | null
+  error_4xx: number | null
+  error_5xx: number | null
+}
+
+export const MOCK_ELBS: LoadBalancer[] = [
   { name: 'prod-alb-web',    type: 'application', scheme: 'internet-facing', state: 'active', region: 'eu-west-2', dns: 'prod-alb-web-123456.eu-west-2.elb.amazonaws.com', targets: 4, healthy: 4, request_count: 284200, latency_ms: 42,  error_4xx: 0.3,  error_5xx: 0.02 },
   { name: 'prod-alb-api',    type: 'application', scheme: 'internet-facing', state: 'active', region: 'eu-west-2', dns: 'prod-alb-api-789012.eu-west-2.elb.amazonaws.com',  targets: 6, healthy: 6, request_count: 892400, latency_ms: 18,  error_4xx: 0.8,  error_5xx: 0.01 },
   { name: 'internal-nlb',    type: 'network',     scheme: 'internal',        state: 'active', region: 'eu-west-2', dns: 'internal-nlb-345678.eu-west-2.elb.amazonaws.com', targets: 3, healthy: 3, request_count: 124000, latency_ms: 4,   error_4xx: 0,    error_5xx: 0    },
   { name: 'staging-alb',     type: 'application', scheme: 'internet-facing', state: 'active', region: 'eu-west-2', dns: 'staging-alb-901234.eu-west-2.elb.amazonaws.com',  targets: 2, healthy: 2, request_count: 12400,  latency_ms: 38,  error_4xx: 1.2,  error_5xx: 0.1  },
 ]
 
-export const MOCK_CLOUDFRONT = [
+export interface CloudFrontDistribution {
+  id: string
+  domain: string
+  origins: number | null
+  status: string
+  enabled: boolean | null
+  price_class: string
+  requests_day: number | null
+  bytes_day: number | null
+  error_rate: number | null
+  cache_hit: number | null
+  region: string
+}
+
+export const MOCK_CLOUDFRONT: CloudFrontDistribution[] = [
   { id: 'E1A2B3C4D5E6F7', domain: 'd1a2b3c4d5e6f7.cloudfront.net', origins: 2, status: 'Deployed', enabled: true, price_class: 'PriceClass_100', requests_day: 4284000, bytes_day: 284_200_000_000, error_rate: 0.02, cache_hit: 89.4, region: 'global' },
   { id: 'E2B3C4D5E6F7G8', domain: 'd2b3c4d5e6f7g8.cloudfront.net', origins: 1, status: 'Deployed', enabled: true, price_class: 'PriceClass_100', requests_day: 892000,  bytes_day: 48_400_000_000,  error_rate: 0.08, cache_hit: 76.2, region: 'global' },
 ]
@@ -254,7 +352,15 @@ export const MOCK_SQS = [
   { queue_name: 'acme-notifications',      type: 'Standard', region: 'eu-west-1', messages_visible: 4,    messages_inflight: 1,    oldest_message_age: 4,    dlq: null,                       dlq_count: 0,  throughput: 120  },
 ]
 
-export const MOCK_SNS = [
+export interface SNSTopic {
+  topic_name: string
+  region: string
+  subscriptions: number | null
+  messages_day: number | null
+  delivery_success: number | null
+}
+
+export const MOCK_SNS: SNSTopic[] = [
   { topic_name: 'acme-alerts',             region: 'eu-west-2', subscriptions: 8,  messages_day: 2840,  delivery_success: 99.8 },
   { topic_name: 'acme-user-events',        region: 'eu-west-2', subscriptions: 12, messages_day: 89200, delivery_success: 99.9 },
   { topic_name: 'acme-billing-events',     region: 'eu-west-2', subscriptions: 4,  messages_day: 240,   delivery_success: 100  },

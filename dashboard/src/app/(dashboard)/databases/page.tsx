@@ -10,9 +10,15 @@ import { Database, Table2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useRDS, useDynamoDB } from '@/hooks/useData'
-import { fmtCount, fmtNum } from '@/lib/utils'
+import { fmtCount, fmtNum, fmtPercent, DASH } from '@/lib/utils'
 
-function PctBar({ value, warn = 70, crit = 85 }: { value: number; warn?: number; crit?: number }) {
+function PctBar({ value, warn = 70, crit = 85 }: { value: number | null; warn?: number; crit?: number }) {
+  // RDS connections are rendered as a percentage of a fixed ceiling — the
+  // metric itself is a count that can be null when the agent has not
+  // collected it yet, and value.toFixed(1) on null took the RDS section down.
+  if (value == null) {
+    return <span className="text-xs text-muted-foreground">{DASH}</span>
+  }
   const col = value >= crit ? 'bg-red-500' : value >= warn ? 'bg-amber-500' : 'bg-emerald-500'
   return (
     <div className="flex items-center gap-2">
@@ -81,8 +87,8 @@ export default function DatabasesPage() {
                           <p className="text-xs text-muted-foreground">{db.engine} · {db.instance_class} · {db.region}</p>
                         </div>
                         <div className="text-right">
-                          <div className={`text-2xl font-bold ${db.cpu > 70 ? 'text-amber-500 dark:text-amber-400' : 'text-foreground'}`}>
-                            {db.cpu.toFixed(1)}%
+                          <div className={`text-2xl font-bold ${(db.cpu ?? 0) > 70 ? 'text-amber-500 dark:text-amber-400' : 'text-foreground'}`}>
+                            {fmtPercent(db.cpu)}
                           </div>
                           <div className="text-xs text-muted-foreground">CPU</div>
                         </div>
@@ -92,20 +98,20 @@ export default function DatabasesPage() {
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                         <div>
                           <p className="text-xs text-muted-foreground mb-1.5">Connections</p>
-                          <PctBar value={Math.min((db.connections / 210) * 100, 100)} />
-                          <p className="text-xs text-muted-foreground mt-1">{db.connections} active</p>
+                          <PctBar value={db.connections == null ? null : Math.min((db.connections / 210) * 100, 100)} />
+                          <p className="text-xs text-muted-foreground mt-1">{fmtCount(db.connections)} active</p>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1.5">Free Storage</p>
-                          <span className="text-sm font-medium text-foreground">{db.free_storage_gb.toFixed(0)} GB</span>
+                          <span className="text-sm font-medium text-foreground">{fmtNum(db.free_storage_gb, 0)} GB</span>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1.5">Read IOPS</p>
-                          <span className="text-sm font-medium text-foreground">{db.read_iops.toLocaleString()}</span>
+                          <span className="text-sm font-medium text-foreground">{fmtCount(db.read_iops)}</span>
                         </div>
                         <div>
                           <p className="text-xs text-muted-foreground mb-1.5">Write IOPS</p>
-                          <span className="text-sm font-medium text-foreground">{db.write_iops.toLocaleString()}</span>
+                          <span className="text-sm font-medium text-foreground">{fmtCount(db.write_iops)}</span>
                         </div>
                       </div>
 
@@ -115,7 +121,7 @@ export default function DatabasesPage() {
                           <p className="text-xs text-muted-foreground mb-1">CPU over {TIME_RANGE_LABELS[timeRange]}</p>
                           <Sparkline
                             data={db.metrics.cpu.map((p: { value: number }) => ({ value: p.value }))}
-                            color={db.cpu > 70 ? '#fbbf24' : '#6366f1'}
+                            color={(db.cpu ?? 0) > 70 ? '#fbbf24' : '#6366f1'}
                             height={40}
                           />
                         </div>
@@ -145,15 +151,18 @@ export default function DatabasesPage() {
                             <td className="px-4 py-3 font-medium text-foreground">{t.table_name}</td>
                             <td className="px-4 py-3"><Badge variant="success">{t.status}</Badge></td>
                             <td className="px-4 py-3 text-foreground">{fmtCount(t.item_count)}</td>
-                            <td className="px-4 py-3 text-foreground">{(t.size_bytes / 1e9).toFixed(2)}</td>
-                            <td className="px-4 py-3 text-foreground">{t.read_capacity}</td>
-                            <td className="px-4 py-3 text-foreground">{t.write_capacity}</td>
+                            <td className="px-4 py-3 text-foreground">{t.size_bytes == null ? DASH : (t.size_bytes / 1e9).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-foreground">{fmtCount(t.read_capacity)}</td>
+                            <td className="px-4 py-3 text-foreground">{fmtCount(t.write_capacity)}</td>
                             <td className="px-4 py-3 text-foreground">{fmtNum(t.consumed_read)}</td>
                             <td className="px-4 py-3 text-foreground">{fmtNum(t.consumed_write)}</td>
                             <td className="px-4 py-3">
-                              {(t.throttled_reads + t.throttled_writes) > 0
-                                ? <Badge variant="warning">{t.throttled_reads + t.throttled_writes}</Badge>
-                                : <span className="text-xs text-emerald-600 dark:text-emerald-400">0</span>}
+                              {(() => {
+                                const throttled = (t.throttled_reads ?? 0) + (t.throttled_writes ?? 0)
+                                return throttled > 0
+                                  ? <Badge variant="warning">{throttled}</Badge>
+                                  : <span className="text-xs text-emerald-600 dark:text-emerald-400">0</span>
+                              })()}
                             </td>
                           </tr>
                         ))}

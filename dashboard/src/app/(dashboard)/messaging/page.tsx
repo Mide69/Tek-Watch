@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { useAuth } from '@/hooks/useAuth'
 import { useMessaging } from '@/hooks/useData'
-import { fmtCount } from '@/lib/utils'
+import { fmtCount, fmtNum, DASH } from '@/lib/utils'
 
 export default function MessagingPage() {
   const { customerId }      = useAuth()
@@ -57,22 +57,24 @@ export default function MessagingPage() {
                         <td className="px-4 py-3 font-medium text-foreground max-w-[160px] truncate">{q.queue_name}</td>
                         <td className="px-4 py-3"><Badge variant="info">{q.type}</Badge></td>
                         <td className="px-4 py-3">
-                          <span className={q.messages_visible > 1000 ? 'text-amber-400 font-semibold' : 'text-foreground'}>
+                          <span className={(q.messages_visible ?? 0) > 1000 ? 'text-amber-400 font-semibold' : 'text-foreground'}>
                             {fmtCount(q.messages_visible)}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-foreground">{q.messages_inflight}</td>
+                        <td className="px-4 py-3 text-foreground">{fmtCount(q.messages_inflight)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground">
-                          {q.oldest_message_age > 0 ? `${q.oldest_message_age}s` : '—'}
+                          {(q.oldest_message_age ?? 0) > 0 ? `${q.oldest_message_age}s` : DASH}
                         </td>
                         <td className="px-4 py-3 text-foreground">{fmtCount(q.throughput)}</td>
                         <td className="px-4 py-3 text-xs text-muted-foreground font-mono truncate max-w-[120px]">
-                          {q.dlq ?? '—'}
+                          {q.dlq ?? DASH}
                         </td>
                         <td className="px-4 py-3">
-                          {q.dlq_count > 0
-                            ? <Badge variant="error">{q.dlq_count}</Badge>
-                            : <span className="text-xs text-emerald-600 dark:text-emerald-400">0</span>}
+                          {q.dlq_count == null
+                            ? <span className="text-xs text-muted-foreground">{DASH}</span>
+                            : q.dlq_count > 0
+                              ? <Badge variant="error">{q.dlq_count}</Badge>
+                              : <span className="text-xs text-emerald-600 dark:text-emerald-400">0</span>}
                         </td>
                       </tr>
                     ))}
@@ -95,16 +97,16 @@ export default function MessagingPage() {
                   <div className="grid grid-cols-3 gap-3 text-center">
                     <div className="p-2 rounded-lg bg-muted/30 border border-border">
                       <div className="text-xs text-muted-foreground">Subscriptions</div>
-                      <div className="text-lg font-bold text-foreground mt-0.5">{topic.subscriptions}</div>
+                      <div className="text-lg font-bold text-foreground mt-0.5">{fmtCount(topic.subscriptions)}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-muted/30 border border-border">
                       <div className="text-xs text-muted-foreground">Msg/day</div>
-                      <div className="text-lg font-bold text-foreground mt-0.5">{topic.messages_day.toLocaleString()}</div>
+                      <div className="text-lg font-bold text-foreground mt-0.5">{fmtCount(topic.messages_day)}</div>
                     </div>
                     <div className="p-2 rounded-lg bg-muted/30 border border-border">
                       <div className="text-xs text-muted-foreground">Delivery %</div>
-                      <div className={`text-lg font-bold mt-0.5 ${topic.delivery_success >= 99.5 ? 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' : 'text-amber-500 dark:text-amber-400'}`}>
-                        {topic.delivery_success.toFixed(1)}
+                      <div className={`text-lg font-bold mt-0.5 ${(topic.delivery_success ?? 0) >= 99.5 ? 'text-emerald-600 dark:text-emerald-600 dark:text-emerald-400' : 'text-amber-500 dark:text-amber-400'}`}>
+                        {fmtNum(topic.delivery_success)}
                       </div>
                     </div>
                   </div>

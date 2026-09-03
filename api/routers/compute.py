@@ -80,21 +80,28 @@ async def get_ecs_services(
 ):
     """Get ECS service inventory and task counts."""
     ts = TimestreamQueryService()
+    def _int(resource, key):
+        raw = dim(resource, key)
+        try:
+            return float(raw)
+        except (TypeError, ValueError):
+            return None
+
     services = [
         {
             "service_name": s["resource_name"],
             "cluster": dim(s, "cluster"),
             "region": s.get("region") or "",
             "status": text(s, "service_status", "unknown"),
-            "running": num(s, "running_task_count")
-            or (float(dim(s, "running_tasks")) if dim(s, "running_tasks").isdigit() else None),
-            "pending": (
-                float(dim(s, "pending_tasks")) if dim(s, "pending_tasks").isdigit() else None
-            ),
-            # Desired count and per-service CPU/memory are not collected.
-            "desired": None,
-            "cpu": None,
-            "memory": None,
+            "running": num(s, "running_task_count") or _int(s, "running_count"),
+            "pending": _int(s, "pending_count"),
+            "desired": _int(s, "desired_count"),
+            # CPU/memory come from Container Insights, which is disabled on
+            # this cluster (the alarm that used to depend on it fired
+            # immediately for the same reason). None rather than a plausible
+            # zero, until Container Insights is actually turned on.
+            "cpu": num(s, "cpu_utilization_percent"),
+            "memory": num(s, "memory_utilization_percent"),
             "last_seen": s.get("last_seen"),
         }
         for s in ts.get_service_inventory(customer.customer_id, "ecs")

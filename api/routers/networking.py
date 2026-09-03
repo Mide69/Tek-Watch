@@ -61,6 +61,17 @@ async def get_load_balancers(
         if latency is None:
             latency = num(lb, "latency_seconds")
 
+        # The collector reports raw HTTP_4XX/5XX counts, not a rate — a
+        # count of 3 is meaningless without knowing the request volume it
+        # came out of. The page renders a percentage and colours it red past
+        # 1%, so this divides by request_count rather than pass the count
+        # through as if it already were one.
+        requests = num(lb, "request_count")
+        count_4xx = num(lb, "http_4xx_count")
+        count_5xx = num(lb, "http_5xx_count")
+        error_4xx = round(count_4xx / requests * 100, 2) if requests and count_4xx is not None else None
+        error_5xx = round(count_5xx / requests * 100, 2) if requests and count_5xx is not None else None
+
         load_balancers.append({
             "name": lb["resource_name"],
             "region": lb.get("region") or "",
@@ -73,7 +84,9 @@ async def get_load_balancers(
                 if healthy is not None and unhealthy is not None
                 else None
             ),
-            "request_count": num(lb, "request_count"),
+            "request_count": requests,
+            "error_4xx": error_4xx,
+            "error_5xx": error_5xx,
             "latency_ms": None if latency is None else round(latency * 1000, 1),
             "last_seen": lb.get("last_seen"),
         })
@@ -90,7 +103,10 @@ async def get_cloudfront_distributions(
     ts = TimestreamQueryService()
     distributions = [
         {
-            "distribution_id": d["resource_id"],
+            # The page keys each card on cf.id and reads cf.id again for the
+            # subtitle — "distribution_id" was never read at all, so every
+            # card shared the same React key and the id line was blank.
+            "id": d["resource_id"],
             "domain": dim(d, "domain") or d["resource_name"],
             "aliases": [a for a in dim(d, "aliases").split(",") if a],
             "status": text(d, "distribution_status", "unknown"),

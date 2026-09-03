@@ -28,10 +28,17 @@ async def get_rds_instances(
 ):
     """Get RDS instance inventory and metrics."""
     ts = TimestreamQueryService()
-    instances = [
-        {
-            "instance_id": i["resource_id"],
-            "instance_name": i["resource_name"],
+    # Field names here have to match the page, not the collector — this used
+    # to send "instance_id" and "cpu" while the page reads "db_identifier"
+    # and "free_storage_gb"/"read_iops"/"write_iops", none of which existed
+    # in the response at all. It rendered because the page destructures with
+    # optional chaining in places, but every RDS instance showed as
+    # nameless with blank IOPS.
+    instances = []
+    for i in ts.get_service_inventory(customer.customer_id, "rds"):
+        free_bytes = num(i, "free_storage_bytes")
+        instances.append({
+            "db_identifier": i["resource_id"],
             "region": i.get("region") or "",
             "engine": dim(i, "engine"),
             "engine_version": dim(i, "engine_version"),
@@ -41,12 +48,14 @@ async def get_rds_instances(
             "allocated_storage_gb": _int_dim(i, "allocated_storage_gb"),
             "status": text(i, "db_instance_status", "unknown"),
             "storage_used_percent": num(i, "storage_used_percent"),
+            "free_storage_gb": None if free_bytes is None else round(free_bytes / (1024 ** 3), 1),
             "cpu": num(i, "cpu_utilization_percent"),
             "connections": num(i, "database_connections"),
+            "read_iops": num(i, "read_iops"),
+            "write_iops": num(i, "write_iops"),
+            "metrics": None,
             "last_seen": i.get("last_seen"),
-        }
-        for i in ts.get_service_inventory(customer.customer_id, "rds")
-    ]
+        })
     if region:
         instances = [i for i in instances if i["region"] == region]
     return {"instances": instances}
