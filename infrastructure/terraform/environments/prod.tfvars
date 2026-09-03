@@ -29,18 +29,39 @@ consumer_memory = 512
 # 0 until the first customer agent publishes. Nothing is sending to SQS yet, so
 # a 24/7 poller on an empty queue is pure cost. Set back to 1 during onboarding
 # — the ingest-queue alarm below is the backstop if that is forgotten.
-consumer_desired_count = 0
+# One task, which is what makes the pipeline actually process anything.
+#
+# This was 0 while no customer had an agent, and the queue-depth alarm below
+# was set to fire on any visible message as the signal to turn it on. The
+# first customer agent is being deployed now, so this is that moment: with 0
+# tasks the agent publishes to SQS and nothing ever reads it, the dashboard
+# stays at zero, and the only sign of life is an alarm.
+#
+# Roughly $9/month for 0.25 vCPU and 0.5 GB running continuously. If that is
+# not worth it at this volume, the cheaper shape is SQS triggering a Lambda
+# rather than an always-on Fargate task — pennies at one message every five
+# minutes, but a real change rather than a tfvars edit.
+consumer_desired_count = 1
 
 # ~70% off the API's Fargate bill. Single task, so a Spot reclaim means a short
 # gap; acceptable pre-revenue, revisit alongside api_desired_count.
 api_use_spot = true
 
-# consumer_desired_count is 0, so ANY visible message means metrics are arriving
-# with nothing draining them. Alarm on the first one rather than the default
-# 10,000, and after one period instead of three — SQS retention below caps how
-# long the backlog survives.
-ingest_queue_depth_threshold          = 0
-ingest_queue_depth_evaluation_periods = 1
+# Now that a consumer is running, this has to mean "the consumer is falling
+# behind" rather than "a message exists".
+#
+# It was 0 with one evaluation period, which was right while nothing drained
+# the queue: any visible message was the news. With a consumer running and an
+# agent publishing every five minutes, that same setting alarms on ordinary
+# traffic — and the ops topic now has a confirmed subscriber, so it would be
+# an email every time. An alarm that cries wolf on healthy behaviour is worse
+# than no alarm, because it is the one people filter.
+#
+# 100 over two consecutive five-minute periods: a single agent's burst is tens
+# of messages and drains in seconds, so sustained triple digits means the
+# consumer is genuinely not keeping up.
+ingest_queue_depth_threshold          = 100
+ingest_queue_depth_evaluation_periods = 2
 
 # ── Cost controls ────────────────────────────────────────────────────────────
 # Off until the central account's own agent is actually configured. While
