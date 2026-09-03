@@ -3,6 +3,7 @@
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { DollarSign, Download, TrendingUp, TrendingDown, Zap } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -89,9 +90,22 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
   )
 }
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on cost data, so it renders even when the content below throws. See
+// the identical note in networking/page.tsx for why this split exists.
 export default function CostPage() {
-  const { customerId }      = useAuth()
-  const { timeRange }       = useDashboard()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <CostContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function CostContent() {
+  const { timeRange } = useDashboard()
   const { data } = useCost()
 
   const handleExport = () => {
@@ -101,14 +115,12 @@ export default function CostPage() {
 
   if (!data) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-6">
-          <div className="h-8 w-40 bg-muted rounded animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[0, 1, 2].map(i => <CardSkeleton key={i} />)}
-          </div>
+      <div className="space-y-6">
+        <div className="h-8 w-40 bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0, 1, 2].map(i => <CardSkeleton key={i} />)}
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
@@ -118,7 +130,6 @@ export default function CostPage() {
   const trendPct = last > 0 ? Math.abs(((mtd - last) / last) * 100).toFixed(1) : '0'
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
@@ -285,6 +296,5 @@ export default function CostPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   )
 }

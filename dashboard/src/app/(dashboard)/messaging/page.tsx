@@ -4,31 +4,42 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { useAuth } from '@/hooks/useAuth'
 import { useMessaging } from '@/hooks/useData'
 import { fmtCount, fmtNum, DASH } from '@/lib/utils'
 
+// See the identical note in networking/page.tsx: the shell depends only on
+// who is signed in, never on message data, so it renders — sidebar, Home,
+// Sign out included — even when the content below throws.
 export default function MessagingPage() {
-  const { customerId }      = useAuth()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <MessagingContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function MessagingContent() {
   const { data } = useMessaging()
 
   if (!data) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-6">
-          <div className="h-8 w-36 bg-muted rounded animate-pulse" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[0,1,2].map(i => <CardSkeleton key={i} />)}
-          </div>
+      <div className="space-y-6">
+        <div className="h-8 w-36 bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[0,1,2].map(i => <CardSkeleton key={i} />)}
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   const { sqs, sns } = data
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Messaging</h1>
@@ -116,6 +127,5 @@ export default function MessagingPage() {
           </div>
         </section>
       </div>
-    </DashboardLayout>
   )
 }

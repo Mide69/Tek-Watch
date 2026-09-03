@@ -6,6 +6,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Activity, CheckCircle, Radio, Clock, AlertTriangle, Download } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useAgent } from '@/hooks/useData'
@@ -76,8 +77,21 @@ function DeployAgentCard({ customerId }: { customerId: string }) {
   )
 }
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on agent data, so it renders even when the content below throws. See
+// the identical note in networking/page.tsx for why this split exists.
 export default function AgentPage() {
-  const { customerId }      = useAuth()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <AgentContent customerId={customerId} />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function AgentContent({ customerId }: { customerId: string | null }) {
   const { data: a } = useAgent()
 
   // A real account with no agent must not be shown a healthy one.
@@ -119,20 +133,17 @@ export default function AgentPage() {
 
   if (!a) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-6">
-          <div className="h-8 w-32 bg-muted rounded animate-pulse" />
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
-          </div>
+      <div className="space-y-6">
+        <div className="h-8 w-32 bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[0,1,2,3].map(i => <CardSkeleton key={i} />)}
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
   if (notConnected) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
         <div className="space-y-6 max-w-3xl">
           <div>
             <h1 className="text-2xl font-bold text-foreground">Agent</h1>
@@ -168,7 +179,6 @@ export default function AgentPage() {
             </>
           )}
         </div>
-      </DashboardLayout>
     )
   }
 
@@ -180,7 +190,6 @@ export default function AgentPage() {
   const warnCollectors = collectors.length - okCollectors
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Agent</h1>
@@ -307,6 +316,5 @@ export default function AgentPage() {
         </>
         )}
       </div>
-    </DashboardLayout>
   )
 }

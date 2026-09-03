@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Sparkline } from '@/components/ui/MiniChart'
 import { Server, Zap, Layers, ServerOff } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -76,8 +77,26 @@ const TR = ({ children, idx }: { children: React.ReactNode; idx: number }) => (
   </tr>
 )
 
+/**
+ * The shell — sidebar, Home, Sign out — depends only on who is signed in,
+ * never on EC2/Lambda/ECS data, so it renders even when the content below
+ * throws. See the identical note in networking/page.tsx for why this split
+ * exists: a page that inlined its data-dependent JSX directly under
+ * <DashboardLayout> lost the whole chrome, not just its own content, the
+ * moment any field crashed a render.
+ */
 export default function ComputePage() {
-  const { customerId }  = useAuth()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <ComputeContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function ComputeContent() {
   const { timeRange }   = useDashboard()
   const [tab, setTab]   = useState<'ec2' | 'lambda' | 'ecs'>('ec2')
 
@@ -98,7 +117,6 @@ export default function ComputePage() {
   ] as const
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Compute</h1>
@@ -178,13 +196,13 @@ export default function ComputePage() {
                                   {i.state === 'running' && i.metrics?.cpu ? (
                                     <Sparkline
                                       data={i.metrics.cpu.map((p: { value: number }) => ({ value: p.value }))}
-                                      color={i.cpu > 80 ? '#ef4444' : i.cpu > 60 ? '#f59e0b' : '#6366f1'}
+                                      color={(i.cpu ?? 0) > 80 ? '#ef4444' : (i.cpu ?? 0) > 60 ? '#f59e0b' : '#6366f1'}
                                       height={28}
                                     />
                                   ) : <span className="text-xs text-muted-foreground/40">—</span>}
                                 </td>
                                 <td className="px-4 py-3 text-xs text-foreground">
-                                  {i.network_in > 0 ? `${i.network_in} Mbps` : '—'}
+                                  {(i.network_in ?? 0) > 0 ? `${i.network_in} Mbps` : '—'}
                                 </td>
                                 <td className="px-4 py-3 text-xs font-mono text-muted-foreground">
                                   {i.private_ip}
@@ -333,6 +351,5 @@ export default function ComputePage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   )
 }

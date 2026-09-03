@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Building2, Check, Trash2, Upload } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -33,8 +34,21 @@ const inputCls =
   'placeholder:text-muted-foreground/60 text-sm focus:outline-none focus:ring-2 ' +
   'focus:ring-primary focus:border-transparent transition'
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on profile data, so it renders even when the content below throws.
+// See the identical note in networking/page.tsx for why this split exists.
 export default function SettingsPage() {
   const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <SettingsContent customerId={customerId} />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function SettingsContent({ customerId }: { customerId: string | null }) {
   const { data: profile, isLoading, mutate } = useProfile()
 
   const [edits, setEdits] = useState<ProfileEdits>(EMPTY_EDITS)
@@ -115,17 +129,14 @@ export default function SettingsPage() {
 
   if (isLoading) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-6">
-          <div className="h-8 w-40 bg-muted rounded animate-pulse" />
-          <CardSkeleton />
-        </div>
-      </DashboardLayout>
+      <div className="space-y-6">
+        <div className="h-8 w-40 bg-muted rounded animate-pulse" />
+        <CardSkeleton />
+      </div>
     )
   }
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 max-w-3xl">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Company profile</h1>
@@ -263,6 +274,5 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
-    </DashboardLayout>
   )
 }

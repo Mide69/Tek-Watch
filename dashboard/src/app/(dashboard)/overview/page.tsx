@@ -4,6 +4,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Sparkline, BarChart } from '@/components/ui/MiniChart'
 import {
   Activity, AlertTriangle, DollarSign, Server,
@@ -34,8 +35,23 @@ const REGION_NAMES: Record<string, string> = {
   'global': 'Global services',
 }
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on overview data, so it renders even when the content below throws.
+// This is the first page a customer lands on after signing in, which makes
+// it the worst possible place to lose the ability to sign out or go home.
+// See the identical note in networking/page.tsx for why this split exists.
 export default function OverviewPage() {
-  const { customerId }  = useAuth()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <OverviewContent customerId={customerId} />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function OverviewContent({ customerId }: { customerId: string | null }) {
   // Company name where they have set one; the raw Customer ID is a poor
   // thing to greet someone with on their own dashboard.
   const { data: profile } = useProfile()
@@ -52,14 +68,12 @@ export default function OverviewPage() {
 
   if (!data) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-6">
-          <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            {[0, 1, 2, 3].map(i => <CardSkeleton key={i} />)}
-          </div>
+      <div className="space-y-6">
+        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map(i => <CardSkeleton key={i} />)}
         </div>
-      </DashboardLayout>
+      </div>
     )
   }
 
@@ -73,7 +87,7 @@ export default function OverviewPage() {
   const activeAlerts = (alerts as Array<{ status: string; severity: string; type?: string; alert_id: string; service?: string; description?: string; triggered_at?: string }>)
     .filter(a => a.status === 'active')
   const runningEC2 = (ec2 || []).filter(i => i.state === 'running')
-    .sort((a, b) => b.cpu - a.cpu).slice(0, 6)
+    .sort((a, b) => (b.cpu ?? 0) - (a.cpu ?? 0)).slice(0, 6)
 
   // The API's overview does not return cost_trend — only the mock has it — so
   // this threw before the page could paint once real data started arriving.
@@ -82,7 +96,6 @@ export default function OverviewPage() {
   const costBars = trend.map(d => ({ value: d.cost, label: d.label }))
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
 
         {/* Header */}
@@ -243,8 +256,8 @@ export default function OverviewPage() {
                       <span className="text-xs text-foreground truncate max-w-[60%]">{i.instance_name}</span>
                       <span className={cn(
                         'text-xs font-semibold',
-                        i.cpu > 80 ? 'text-red-500 dark:text-red-400'
-                          : i.cpu > 60 ? 'text-amber-500 dark:text-amber-400'
+                        (i.cpu ?? 0) > 80 ? 'text-red-500 dark:text-red-400'
+                          : (i.cpu ?? 0) > 60 ? 'text-amber-500 dark:text-amber-400'
                           : 'text-foreground',
                       )}>
                         {fmtPercent(i.cpu)}
@@ -254,9 +267,9 @@ export default function OverviewPage() {
                       <div
                         className={cn(
                           'h-full rounded-full transition-all',
-                          i.cpu > 80 ? 'bg-red-500' : i.cpu > 60 ? 'bg-amber-500' : 'bg-primary',
+                          (i.cpu ?? 0) > 80 ? 'bg-red-500' : (i.cpu ?? 0) > 60 ? 'bg-amber-500' : 'bg-primary',
                         )}
-                        style={{ width: `${i.cpu}%` }}
+                        style={{ width: `${i.cpu ?? 0}%` }}
                       />
                     </div>
                   </div>
@@ -365,6 +378,5 @@ export default function OverviewPage() {
         </Card>
 
       </div>
-    </DashboardLayout>
   )
 }

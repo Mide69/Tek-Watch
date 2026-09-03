@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageSquare, Send, Bot, User, Loader2, Sparkles, X } from 'lucide-react'
 import DashboardLayout from '@/components/layout/DashboardLayout'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import apiClient from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -100,7 +101,19 @@ function TypingIndicator() {
   )
 }
 
+// The shell — sidebar, Home, Sign out — renders unconditionally. See the
+// identical note in networking/page.tsx for why every page is split this way.
 export default function ChatPage() {
+  return (
+    <DashboardLayout>
+      <ErrorBoundary>
+        <ChatContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function ChatContent() {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -151,7 +164,6 @@ export default function ChatPage() {
   const isEmpty = messages.length === 0
 
   return (
-    <DashboardLayout>
       <div className="flex flex-col h-[calc(100vh-7rem)] max-w-3xl mx-auto">
 
         {/* Header */}
@@ -242,6 +254,5 @@ export default function ChatPage() {
           </p>
         </div>
       </div>
-    </DashboardLayout>
   )
 }

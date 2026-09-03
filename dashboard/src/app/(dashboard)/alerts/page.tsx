@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import {
   AlertTriangle, CheckCircle, Clock, Download, Zap,
   ChevronLeft, ChevronRight,
@@ -17,9 +18,22 @@ import { cn } from '@/lib/utils'
 
 const PAGE_SIZE = 20
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on alert data, so it renders even when the content below throws. See
+// the identical note in networking/page.tsx for why this split exists.
 export default function AlertsPage() {
-  const { customerId }      = useAuth()
-  const { refreshKey }      = useDashboard()
+  const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <AlertsContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function AlertsContent() {
+  const { refreshKey } = useDashboard()
   const [filter, setFilter] = useState<'all' | 'active' | 'acknowledged'>('all')
   const [page, setPage]     = useState(0)
   const [localAlerts, setLocalAlerts] = useState<Alert[]>([])
@@ -56,17 +70,14 @@ export default function AlertsPage() {
 
   if (isLoading && localAlerts.length === 0) {
     return (
-      <DashboardLayout customerId={customerId || undefined}>
-        <div className="space-y-4">
-          <div className="h-8 w-32 bg-muted rounded animate-pulse" />
-          {[0, 1, 2].map(i => <CardSkeleton key={i} />)}
-        </div>
-      </DashboardLayout>
+      <div className="space-y-4">
+        <div className="h-8 w-32 bg-muted rounded animate-pulse" />
+        {[0, 1, 2].map(i => <CardSkeleton key={i} />)}
+      </div>
     )
   }
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
 
         {/* Header */}
@@ -246,6 +257,5 @@ export default function AlertsPage() {
         )}
 
       </div>
-    </DashboardLayout>
   )
 }

@@ -5,6 +5,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { TableSkeleton } from '@/components/ui/Skeleton'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Sparkline } from '@/components/ui/MiniChart'
 import { Database, Table2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
@@ -32,8 +33,22 @@ function PctBar({ value, warn = 70, crit = 85 }: { value: number | null; warn?: 
   )
 }
 
+// The shell — sidebar, Home, Sign out — depends only on who is signed in,
+// never on RDS/DynamoDB data, so it renders even when the content below
+// throws. See the identical note in networking/page.tsx for why this split
+// exists.
 export default function DatabasesPage() {
   const { customerId } = useAuth()
+  return (
+    <DashboardLayout customerId={customerId || undefined}>
+      <ErrorBoundary>
+        <DatabasesContent />
+      </ErrorBoundary>
+    </DashboardLayout>
+  )
+}
+
+function DatabasesContent() {
   const { timeRange }  = useDashboard()
   const [tab, setTab]  = useState<'rds' | 'ddb'>('rds')
 
@@ -43,7 +58,6 @@ export default function DatabasesPage() {
   const isLoading = (tab === 'rds' && rdsLoading) || (tab === 'ddb' && ddbLoading)
 
   return (
-    <DashboardLayout customerId={customerId || undefined}>
       <div className="space-y-6 animate-fade-in">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Databases</h1>
@@ -175,6 +189,5 @@ export default function DatabasesPage() {
           </>
         )}
       </div>
-    </DashboardLayout>
   )
 }
