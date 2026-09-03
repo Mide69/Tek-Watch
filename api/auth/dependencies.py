@@ -32,6 +32,26 @@ def _require_credentials(
     return credentials
 
 
+def canonical_customer_id(value: str) -> str:
+    """Fold a customer id to the one casing DynamoDB is keyed on.
+
+    Ids are minted uppercase (TT-9F4KQ7M2) and written to DynamoDB that way,
+    but the Cognito pool is configured case-insensitive, and such a pool stores
+    and returns the username in lower case. So the token said "tt-0001" for a
+    record written as "TT-0001", and DynamoDB keys are case-sensitive.
+
+    Every signed-in write therefore created and updated a second, parallel
+    record: the customer's company name, their uploaded logo and their issued
+    agent key all went to "tt-0001", while their email, subscription tier and
+    account status stayed on "TT-0001". Neither record was complete, and
+    nothing anywhere reported a problem.
+
+    Folding here, at the single point where a token becomes an identity, is
+    what keeps one customer to one record whatever casing arrives.
+    """
+    return (value or "").strip().upper()
+
+
 @dataclass(frozen=True)
 class CustomerContext:
     """Authenticated customer context extracted from JWT."""
@@ -70,7 +90,9 @@ def get_current_customer(
             headers={"WWW-Authenticate": "Bearer"},
         ) from exc
 
-    customer_id = claims.get("cognito:username") or claims.get("username", "")
+    customer_id = canonical_customer_id(
+        claims.get("cognito:username") or claims.get("username", "")
+    )
     if not customer_id:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
