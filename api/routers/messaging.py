@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, flag, num
+from services.inventory_view import dim, flag, num, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ async def get_sqs_queues(
         }
         for q in ts.get_service_inventory(customer.customer_id, "sqs")
     ]
-    if region:
+    if wants_region_filter(region):
         queues = [q for q in queues if q["region"] == region]
     return {"queues": queues}
 
@@ -71,6 +71,6 @@ async def get_sns_topics(
             "last_seen": t.get("last_seen"),
         })
 
-    if region:
+    if wants_region_filter(region):
         topics = [t for t in topics if t["region"] == region]
     return {"topics": topics}

@@ -20,6 +20,21 @@ from typing import Any, Dict, Optional
 _TRUE = {"true", "1", "yes", "enabled"}
 _FALSE = {"false", "0", "no", "disabled"}
 
+# The dashboard's region selector always sends a region — "all" is its value
+# for "every region", not an omitted parameter. Every list router filters
+# with `if region: ... == region`, and "all" is truthy, so the "All Regions"
+# view — the one every page opens on — matched zero resources everywhere:
+# not a fetch failure, a query that filtered out everything it found. This is
+# the one place that has to know what "no filter" looks like, so every router
+# stays a plain `if wants_region_filter(region):` and can't drift from it one
+# file at a time the way the bug itself did.
+_NO_FILTER = {"all", "all regions", ""}
+
+
+def wants_region_filter(region: Optional[str]) -> bool:
+    """True only when `region` names one real region to filter down to."""
+    return bool(region) and region.strip().lower() not in _NO_FILTER
+
 
 def dim(resource: Dict[str, Any], key: str, default: str = "") -> str:
     """A dimension as text."""

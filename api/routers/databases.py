@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, flag, num, text
+from services.inventory_view import dim, flag, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ async def get_rds_instances(
             "metrics": None,
             "last_seen": i.get("last_seen"),
         })
-    if region:
+    if wants_region_filter(region):
         instances = [i for i in instances if i["region"] == region]
     return {"instances": instances}
 
@@ -86,7 +86,7 @@ async def get_dynamodb_tables(
         }
         for t in ts.get_service_inventory(customer.customer_id, "dynamodb")
     ]
-    if region:
+    if wants_region_filter(region):
         tables = [t for t in tables if t["region"] == region]
     return {"tables": tables}
 
@@ -114,6 +114,6 @@ async def get_elasticache_clusters(
         }
         for c in ts.get_service_inventory(customer.customer_id, "elasticache")
     ]
-    if region:
+    if wants_region_filter(region):
         clusters = [c for c in clusters if c["region"] == region]
     return {"clusters": clusters}

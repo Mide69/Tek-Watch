@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, flag, num, text
+from services.inventory_view import dim, flag, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,7 @@ async def get_vpcs(
         # before the events table started carrying a resource type.
         if "vpc_state" in (v.get("metrics") or {})
     ]
-    if region:
+    if wants_region_filter(region):
         resources = [v for v in resources if v["region"] == region]
     return {"resources": resources}
 
@@ -90,7 +90,7 @@ async def get_load_balancers(
             "latency_ms": None if latency is None else round(latency * 1000, 1),
             "last_seen": lb.get("last_seen"),
         })
-    if region:
+    if wants_region_filter(region):
         load_balancers = [lb for lb in load_balancers if lb["region"] == region]
     return {"load_balancers": load_balancers}
 

@@ -14,7 +14,7 @@ from decimal import Decimal
 import pytest
 from unittest.mock import MagicMock, patch
 
-from services.inventory_view import dim, flag, num, text
+from services.inventory_view import dim, flag, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 
@@ -244,3 +244,31 @@ class TestInventoryViewHelpers:
     def test_dim_defaults_to_empty_string(self):
         assert dim({}, "domain") == ""
         assert dim({"dimensions": {"domain": "example.com"}}, "domain") == "example.com"
+
+
+class TestWantsRegionFilter:
+    """The dashboard's region selector always sends a value — "all" is what
+    it sends for "every region", never an omitted parameter. Every list
+    router filtered with `if region: ... == region`, and "all" is truthy, so
+    the very first screen a customer opens — the default "All Regions" view —
+    matched zero resources on every page that filters by region. Not a fetch
+    failure: a query that filtered out everything it found, silently, with no
+    error to show for it.
+    """
+
+    def test_all_is_not_a_filter(self):
+        assert wants_region_filter("all") is False
+
+    def test_all_regions_is_not_a_filter(self):
+        assert wants_region_filter("All Regions") is False
+
+    def test_case_and_whitespace_insensitive(self):
+        assert wants_region_filter("  ALL  ") is False
+
+    def test_empty_and_none_are_not_a_filter(self):
+        assert wants_region_filter("") is False
+        assert wants_region_filter(None) is False
+
+    def test_a_real_region_is_a_filter(self):
+        assert wants_region_filter("eu-west-2") is True
+        assert wants_region_filter("us-east-1") is True

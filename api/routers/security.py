@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, num, text
+from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -140,7 +140,35 @@ async def get_cloudwatch_alarms(
     customer: CustomerContext = Depends(get_current_customer),
     region: Optional[str] = Query(None),
 ):
-    """Get CloudWatch alarm inventory."""
+    """Get CloudWatch alarm inventory.
+
+    This was never migrated off get_resources_by_service — the raw-row method
+    every other endpoint here moved away from. It queried a 5-minute window
+    (the same class of bug that zeroed the overview) and returned rows shaped
+    {resource_id, resource_name, metric_name, value, time}, none of which are
+    the fields this page reads (alarm_name, state, namespace, metric,
+    threshold). It rendered because the mismatch didn't crash — a.alarm_name
+    on a row with no such key is just undefined — it silently showed a blank
+    row per alarm instead of failing.
+    """
     ts = TimestreamQueryService()
-    alarms = ts.get_resources_by_service(customer.customer_id, "cloudwatch_alarms")
+    alarms = [
+        {
+            "alarm_name": a["resource_name"],
+            "state": text(a, "alarm_state", "UNKNOWN"),
+            "namespace": dim(a, "namespace"),
+            "metric": dim(a, "metric_name"),
+            "threshold": dim(a, "threshold"),
+            # The collector reports the alarm's state, not the metric reading
+            # that tripped it — CloudWatch's DescribeAlarms doesn't return
+            # that value either, only GetMetricData does, which this
+            # collector doesn't call. Not collected, so not guessed.
+            "value": None,
+            "region": a.get("region") or "",
+            "last_seen": a.get("last_seen"),
+        }
+        for a in ts.get_service_inventory(customer.customer_id, "cloudwatch_alarms")
+    ]
+    if wants_region_filter(region):
+        alarms = [a for a in alarms if a["region"] == region]
     return {"alarms": alarms}

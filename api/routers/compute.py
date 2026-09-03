@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, num, text
+from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ async def get_ec2_instances(
         }
         for i in ts.get_service_inventory(customer.customer_id, "ec2")
     ]
-    if region:
+    if wants_region_filter(region):
         instances = [i for i in instances if i["region"] == region]
     return {"instances": instances}
 
@@ -68,7 +68,7 @@ async def get_lambda_functions(
         }
         for f in ts.get_service_inventory(customer.customer_id, "lambda")
     ]
-    if region:
+    if wants_region_filter(region):
         functions = [f for f in functions if f["region"] == region]
     return {"functions": functions}
 
@@ -111,6 +111,6 @@ async def get_ecs_services(
         if "service_status" in (s.get("metrics") or {})
         or "running_task_count" in (s.get("metrics") or {})
     ]
-    if region:
+    if wants_region_filter(region):
         services = [s for s in services if s["region"] == region]
     return {"services": services}

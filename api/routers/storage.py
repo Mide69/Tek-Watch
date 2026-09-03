@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services.inventory_view import dim, flag, num
+from services.inventory_view import dim, flag, num, wants_region_filter
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ async def get_s3_buckets(
         for b in ts.get_service_inventory(customer.customer_id, "s3")
     ]
 
-    if region:
+    if wants_region_filter(region):
         buckets = [b for b in buckets if b["region"] == region]
 
     return {"buckets": buckets}
