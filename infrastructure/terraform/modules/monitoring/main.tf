@@ -23,6 +23,12 @@ variable "consumer_desired_count" {
 }
 variable "sqs_ingest_queue_name" { type = string }
 
+variable "enable_container_insights" {
+  description = "Whether ECS Container Insights is on. Alarms on ECS/ContainerInsights metrics only exist when it is, or they alarm on missing data forever."
+  type        = bool
+  default     = false
+}
+
 variable "ingest_queue_depth_threshold" {
   description = "Messages visible before the ingest-queue alarm fires. 10000 suits a running consumer falling behind; set to 0 while consumer_desired_count is 0, so ANY arriving message pages you before SQS retention drops it."
   type        = number
@@ -153,7 +159,15 @@ resource "aws_cloudwatch_metric_alarm" "api_healthy_hosts" {
 # re-enable the consumer AND leave Insights off, move this to a queue-based
 # signal rather than trusting it.
 resource "aws_cloudwatch_metric_alarm" "consumer_task_count" {
-  count               = var.consumer_desired_count > 0 ? 1 : 0
+  # Also gated on Container Insights, because that is where RunningTaskCount
+  # comes from. Prod runs with insights disabled on cost grounds, so this alarm
+  # had no datapoints, and with treat_missing_data = "breaching" it went
+  # straight to ALARM and emailed the on-call the moment the consumer was
+  # scaled up — while the consumer was running perfectly well.
+  #
+  # The same mistake is described three alarms above, for api-healthy-hosts.
+  # Repeating it cost nothing this time only because someone was watching.
+  count               = var.consumer_desired_count > 0 && var.enable_container_insights ? 1 : 0
   alarm_name          = "${var.name_prefix}-consumer-task-count"
   alarm_description   = "Ingest consumer ECS service has no running tasks"
   comparison_operator = "LessThanThreshold"
@@ -175,6 +189,34 @@ resource "aws_cloudwatch_metric_alarm" "consumer_task_count" {
 }
 
 # Ingest queue depth > 10000 — consumer falling behind
+# Detects a stopped consumer without needing Container Insights.
+#
+# This is what consumer-task-count was for: knowing that nothing is draining
+# the queue. Depth alone does not say it — a healthy burst is also depth — but
+# the age of the oldest message does. If the consumer dies, the oldest message
+# gets older every minute; while it is alive, nothing survives more than
+# seconds. ApproximateAgeOfOldestMessage is a basic SQS metric, published
+# whether or not insights are on.
+resource "aws_cloudwatch_metric_alarm" "ingest_backlog_age" {
+  alarm_name          = "${var.name_prefix}-ingest-backlog-age"
+  alarm_description   = "Oldest ingest message is ageing — nothing is draining the queue"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 2
+  metric_name         = "ApproximateAgeOfOldestMessage"
+  namespace           = "AWS/SQS"
+  period              = 300
+  statistic           = "Maximum"
+  # Agents publish every five minutes and the consumer drains in seconds, so
+  # fifteen minutes of unprocessed backlog is not a burst.
+  threshold          = 900
+  treat_missing_data = "notBreaching"
+
+  dimensions = { QueueName = var.sqs_ingest_queue_name }
+
+  alarm_actions = [var.ops_alerts_topic_arn]
+  tags          = { Name = "${var.name_prefix}-ingest-backlog-age-alarm" }
+}
+
 resource "aws_cloudwatch_metric_alarm" "ingest_queue_depth" {
   alarm_name          = "${var.name_prefix}-ingest-queue-depth"
   alarm_description   = "Ingest queue depth is high — consumer may be falling behind"

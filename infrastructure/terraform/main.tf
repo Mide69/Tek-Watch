@@ -305,6 +305,7 @@ module "monitoring" {
   ecs_cluster_name          = module.ecs.cluster_name
   api_service_name          = module.ecs.api_service_name
   consumer_service_name     = module.ecs.consumer_service_name
+  enable_container_insights = var.enable_container_insights
   sqs_ingest_queue_name     = module.sqs.ingest_queue_name
   sqs_dlq_name              = module.sqs.dlq_name
   dynamodb_customers_table  = module.dynamodb.customers_table_name
