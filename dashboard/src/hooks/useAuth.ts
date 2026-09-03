@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { mutate as revalidateAll } from 'swr'
 import { isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
 
 /**
@@ -65,6 +66,27 @@ export function useAuth() {
         // Empty is not a customer id. Left as-is it is falsy, and every
         // `customerId || 'TT-DEMO'` downstream quietly resolved to the demo.
         setCustomerId(user.customerId || null)
+
+        // Every data hook mounts in the same render pass as this effect and
+        // starts fetching immediately — in parallel with the Cognito session
+        // lookup above, not after it. A hook whose first fetch landed before
+        // this line ran found no token yet, so apiFetch's own "not signed in"
+        // fallback answered it: sample data if this looked like a demo,
+        // empty-but-real-shaped data otherwise. SWR then treated that as the
+        // resolved value and had no reason to ask again — nothing about a
+        // token appearing later is part of any hook's key, and every hook
+        // sets revalidateOnFocus: false. The result was exactly what surfaced
+        // in production: the sample-data banner stuck on for a real signed-in
+        // account, and the Agent page reading it as "no agent connected"
+        // because that flag is not page-scoped, it is global — one hook
+        // racing ahead was enough to mislabel every page's data.
+        //
+        // The token existing now is the one thing every one of those stalled
+        // hooks needed and didn't have. Revalidating everything currently
+        // cached re-runs each of them with it, correcting any that resolved
+        // too early — once, right here, rather than on a timer no one could
+        // explain or a page reload the customer shouldn't have had to do.
+        revalidateAll(() => true)
       } catch {
         if (!cancelled) window.location.replace('/login')
       } finally {

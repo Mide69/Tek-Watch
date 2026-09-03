@@ -51,6 +51,7 @@ def generate_agent_template(
             "APIKey": {
                 "Type": "String",
                 "NoEcho": True,
+                "MinLength": 1,
                 # Filled in when the key is being issued to this customer, which
                 # is the only moment it exists in plaintext. Otherwise left blank
                 # and they paste the one they saved. It used to say "provided by
@@ -93,14 +94,14 @@ def generate_agent_template(
             "AgentCluster": {
                 "Type": "AWS::ECS::Cluster",
                 "Properties": {
-                    "ClusterName": {"Fn::Sub": f"tek-watch-agent-{customer_id}"},
+                    "ClusterName": f"tek-watch-agent-{customer_id}",
                     "CapacityProviders": ["FARGATE"],
                 },
             },
             "AgentTaskRole": {
                 "Type": "AWS::IAM::Role",
                 "Properties": {
-                    "RoleName": {"Fn::Sub": f"TekWatchAgentRole-{customer_id}"},
+                    "RoleName": f"TekWatchAgentRole-{customer_id}",
                     "AssumeRolePolicyDocument": {
                         "Version": "2012-10-17",
                         "Statement": [{
@@ -141,7 +142,7 @@ def generate_agent_template(
             "AgentExecutionRole": {
                 "Type": "AWS::IAM::Role",
                 "Properties": {
-                    "RoleName": {"Fn::Sub": f"TekWatchAgentExecutionRole-{customer_id}"},
+                    "RoleName": f"TekWatchAgentExecutionRole-{customer_id}",
                     "AssumeRolePolicyDocument": {
                         "Version": "2012-10-17",
                         "Statement": [{
@@ -153,19 +154,62 @@ def generate_agent_template(
                     "ManagedPolicyArns": [
                         "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
                     ],
+                    "Policies": [{
+                        "PolicyName": "TekWatchReadApiKeySecret",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [{
+                                "Effect": "Allow",
+                                "Action": "secretsmanager:GetSecretValue",
+                                "Resource": {"Ref": "AgentApiKeySecret"},
+                            }],
+                        },
+                    }],
+                },
+            },
+            # Holds the agent's own API key. It used to sit in the task
+            # definition's plain Environment array, which meant anyone in this
+            # AWS account with ecs:DescribeTaskDefinition — a far more common
+            # grant than secretsmanager:GetSecretValue — could read it in
+            # plaintext. NoEcho on the APIKey parameter only hides it from
+            # stack describe calls; it does nothing once the value has been
+            # placed in a resource property. This narrows who can read it to
+            # exactly the execution role, which is the only thing that
+            # legitimately needs to.
+            #
+            # The name carries a suffix from the stack's own id, not just the
+            # customer id, because Secrets Manager does not delete a secret
+            # when its stack is deleted — it schedules deletion 30 days out,
+            # and CloudFormation has no property to force it. A customer who
+            # uninstalls and reinstalls, which the product explicitly offers
+            # as a supported flow, would hit "already scheduled for deletion"
+            # on a fixed name for a full month. A name that is unique to this
+            # stack's own creation can never collide with a secret an earlier,
+            # deleted stack left behind.
+            "AgentApiKeySecret": {
+                "Type": "AWS::SecretsManager::Secret",
+                "Properties": {
+                    "Name": {
+                        "Fn::Sub": [
+                            f"tek-watch-agent-{customer_id}-api-key-${{StackSuffix}}",
+                            {"StackSuffix": {"Fn::Select": [2, {"Fn::Split": ["/", {"Ref": "AWS::StackId"}]}]}},
+                        ]
+                    },
+                    "Description": f"Tek Watch agent API key for {customer_id}",
+                    "SecretString": {"Ref": "APIKey"},
                 },
             },
             "AgentLogGroup": {
                 "Type": "AWS::Logs::LogGroup",
                 "Properties": {
-                    "LogGroupName": {"Fn::Sub": f"/ecs/tek-watch-agent-{customer_id}"},
+                    "LogGroupName": f"/ecs/tek-watch-agent-{customer_id}",
                     "RetentionInDays": 7,
                 },
             },
             "AgentTaskDefinition": {
                 "Type": "AWS::ECS::TaskDefinition",
                 "Properties": {
-                    "Family": {"Fn::Sub": f"tek-watch-agent-{customer_id}"},
+                    "Family": f"tek-watch-agent-{customer_id}",
                     "NetworkMode": "awsvpc",
                     "RequiresCompatibilities": ["FARGATE"],
                     "Cpu": "512",
@@ -179,8 +223,14 @@ def generate_agent_template(
                         "Environment": [
                             {"Name": "TEK_WATCH_CUSTOMER_ID", "Value": {"Ref": "CustomerID"}},
                             {"Name": "TEK_WATCH_INGEST_QUEUE_URL", "Value": {"Ref": "IngestQueueURL"}},
-                            {"Name": "TEK_WATCH_API_KEY", "Value": {"Ref": "APIKey"}},
                             {"Name": "LOG_LEVEL", "Value": "INFO"},
+                        ],
+                        # Resolved by the ECS agent at container start, using
+                        # the execution role's secretsmanager:GetSecretValue
+                        # grant above — never written into the task
+                        # definition itself, unlike everything in Environment.
+                        "Secrets": [
+                            {"Name": "TEK_WATCH_API_KEY", "ValueFrom": {"Ref": "AgentApiKeySecret"}},
                         ],
                         "LogConfiguration": {
                             "LogDriver": "awslogs",
@@ -255,7 +305,7 @@ def generate_agent_template(
             "AgentSchedule": {
                 "Type": "AWS::Events::Rule",
                 "Properties": {
-                    "Name": {"Fn::Sub": f"tek-watch-agent-{customer_id}-schedule"},
+                    "Name": f"tek-watch-agent-{customer_id}-schedule",
                     "Description": "Runs the Tek Watch collection agent",
                     "ScheduleExpression": {"Ref": "ScheduleExpression"},
                     "State": "ENABLED",
