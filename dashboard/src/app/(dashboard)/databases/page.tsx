@@ -10,6 +10,7 @@ import { Database, Table2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useRDS, useDynamoDB } from '@/hooks/useData'
+import { fmtCount, fmtNum } from '@/lib/utils'
 
 function PctBar({ value, warn = 70, crit = 85 }: { value: number; warn?: number; crit?: number }) {
   const col = value >= crit ? 'bg-red-500' : value >= warn ? 'bg-amber-500' : 'bg-emerald-500'
@@ -143,12 +144,12 @@ export default function DatabasesPage() {
                           <tr key={t.table_name} className={`border-b border-border/40 hover:bg-muted/30 ${idx % 2 ? 'bg-muted/10' : ''}`}>
                             <td className="px-4 py-3 font-medium text-foreground">{t.table_name}</td>
                             <td className="px-4 py-3"><Badge variant="success">{t.status}</Badge></td>
-                            <td className="px-4 py-3 text-foreground">{t.item_count.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-foreground">{fmtCount(t.item_count)}</td>
                             <td className="px-4 py-3 text-foreground">{(t.size_bytes / 1e9).toFixed(2)}</td>
                             <td className="px-4 py-3 text-foreground">{t.read_capacity}</td>
                             <td className="px-4 py-3 text-foreground">{t.write_capacity}</td>
-                            <td className="px-4 py-3 text-foreground">{t.consumed_read.toFixed(1)}</td>
-                            <td className="px-4 py-3 text-foreground">{t.consumed_write.toFixed(1)}</td>
+                            <td className="px-4 py-3 text-foreground">{fmtNum(t.consumed_read)}</td>
+                            <td className="px-4 py-3 text-foreground">{fmtNum(t.consumed_write)}</td>
                             <td className="px-4 py-3">
                               {(t.throttled_reads + t.throttled_writes) > 0
                                 ? <Badge variant="warning">{t.throttled_reads + t.throttled_writes}</Badge>

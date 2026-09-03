@@ -130,11 +130,13 @@ async def _execute_tool(tool_name: str, tool_input: dict, customer_id: str) -> A
             customer_profile = db.get_customer(customer_id)
             active_alerts = db.get_alerts(customer_id, status_filter="active")
             monthly_cost = ts.get_latest_metric(
-                customer_id, "cost_explorer", "forecast", "forecasted_monthly_spend"
+                customer_id, "cost_explorer", customer_id, "forecasted_monthly_cost"
             )
-            resources = ts.get_resources_by_service(customer_id, "ec2", "5m")
+            # Counted EC2 only, in a five-minute window. The assistant told
+            # customers with no EC2 that they had no resources at all.
+            inventory = ts.get_resource_inventory(customer_id)
             return {
-                "total_resources": len(set(r.get("resource_id") for r in resources)),
+                "total_resources": inventory["total"],
                 "active_alarms": len([a for a in active_alerts if a.get("type") == "threshold"]),
                 "security_findings": len(
                     [a for a in active_alerts if a.get("severity") in ["high", "critical"]]
@@ -154,7 +156,7 @@ async def _execute_tool(tool_name: str, tool_input: dict, customer_id: str) -> A
             daily_costs = ts.get_daily_costs(customer_id)
             mtd_total = sum(float(row.get("cost", 0)) for row in daily_costs)
             stored_forecast = ts.get_latest_metric(
-                customer_id, "cost_explorer", "forecast", "forecasted_monthly_spend"
+                customer_id, "cost_explorer", customer_id, "forecasted_monthly_cost"
             )
             today = datetime.now(timezone.utc)
             days_elapsed = today.day

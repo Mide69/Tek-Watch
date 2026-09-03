@@ -111,6 +111,34 @@ class TestMetricsWriter:
         assert item["customer_id"] == "TT-0001"
         assert "expires_at" in item
 
+    def test_event_item_keeps_what_describes_the_resource(self, writer):
+        """Region, resource type and dimensions used to be dropped here.
+
+        The metrics item kept all three and the event item kept none, which is
+        backwards for the things only ever recorded as events. A VPC, an ECS
+        service, a CloudFront distribution and the agent's own heartbeat have
+        no numeric metric at all, so their region and every descriptive field
+        the collector went and fetched — a bucket's encryption and versioning,
+        the heartbeat's regions_collected — were written nowhere and could not
+        be shown. The inventory a customer sees is built from these rows.
+        """
+        w, metrics_table, events_table, metrics_batch, events_batch = writer
+        w.write_batch([make_record(metric_value="running")])
+        item = events_batch.put_item.call_args[1]["Item"]
+        assert item["region"] == "eu-west-1"
+        assert item["resource_type"] == "instance"
+        assert item["dimensions"] == {"az": "eu-west-1a"}
+
+    def test_event_item_without_dimensions_omits_the_key(self, writer):
+        w, metrics_table, events_table, metrics_batch, events_batch = writer
+        record = make_record(metric_value="running")
+        record = ValidatedRecord(**{**record.__dict__, "dimensions": {}})
+        w.write_batch([record])
+        item = events_batch.put_item.call_args[1]["Item"]
+        # DynamoDB rejects an empty map in some contexts, and an absent key
+        # reads the same as an empty one to every caller.
+        assert "dimensions" not in item
+
     def test_customer_id_always_present(self, writer):
         w, metrics_table, events_table, metrics_batch, events_batch = writer
         w.write_batch([make_record(1.0)])

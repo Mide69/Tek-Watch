@@ -147,3 +147,31 @@ export function getResourceName(identifier: string): string {
   }
   return identifier
 }
+
+/* ── Formatting values that may not have been collected ──────────────────────
+ *
+ * A field the agent could not collect arrives as null, and every page that
+ * formatted one straight off the row — b.object_count.toLocaleString(),
+ * t.consumed_read.toFixed(1), a.uptime_hours.toLocaleString() — took its whole
+ * route down with "Cannot read properties of undefined" when it did.
+ *
+ * These render a dash instead. A dash is also the honest answer: it says the
+ * platform does not know, where a zero would claim it measured nothing.
+ */
+export const DASH = '—'
+
+export function fmtCount(n: number | null | undefined): string {
+  return n == null || Number.isNaN(n) ? DASH : n.toLocaleString()
+}
+
+export function fmtNum(n: number | null | undefined, digits = 1): string {
+  return n == null || Number.isNaN(n) ? DASH : n.toFixed(digits)
+}
+
+export function fmtMoney(n: number | null | undefined, digits = 2): string {
+  return n == null || Number.isNaN(n) ? DASH : `$${n.toFixed(digits)}`
+}
+
+export function fmtPercent(n: number | null | undefined, digits = 1): string {
+  return n == null || Number.isNaN(n) ? DASH : `${n.toFixed(digits)}%`
+}

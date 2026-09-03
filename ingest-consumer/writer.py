@@ -168,7 +168,7 @@ class MetricsWriter:
         time_iso = dt.isoformat()
         resource_id = record.resource_id[:256]
 
-        return {
+        item: Dict[str, Any] = {
             "pk": f"{record.customer_id}#{record.service}",
             "sk": f"{time_iso}#{resource_id}#{record.metric_name}",
             "time": time_iso,
@@ -176,10 +176,26 @@ class MetricsWriter:
             "service": record.service,
             "resource_id": resource_id,
             "resource_name": record.resource_name or "",
+            "resource_type": record.resource_type or "unknown",
             "metric_name": record.metric_name[:256],
             "value": str(record.metric_value)[:2048],
+            "region": record.region,
             "expires_at": self._expires_at(dt),
         }
+        # region, resource_type and dimensions used to be dropped here, and the
+        # metrics item kept all three. That is backwards for the things only
+        # ever recorded as events: a VPC, an ECS service, a CloudFront
+        # distribution and the agent's own heartbeat have no numeric metric at
+        # all, so their region and every descriptive field the collector went
+        # and fetched — a bucket's encryption and versioning, the heartbeat's
+        # regions_collected and total_errors — were written nowhere and could
+        # not be shown. The inventory a customer sees is assembled from these
+        # rows, so they have to carry what describes the resource.
+        if record.dimensions:
+            item["dimensions"] = {
+                str(k)[:60]: str(v)[:256] for k, v in list(record.dimensions.items())[:128]
+            }
+        return item
 
     @staticmethod
     def _parse_timestamp(collection_timestamp: str) -> datetime:
