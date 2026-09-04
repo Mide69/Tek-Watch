@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { mutate as revalidateAll } from 'swr'
 import { isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
+import { resetDataSource } from '@/lib/dataSource'
 
 /**
  * useAuth — who is looking at this dashboard.
@@ -21,9 +22,35 @@ import { isDemoBuild, isDemoSession, isMisconfigured } from '@/lib/demoMode'
  * never carries the flag and so can never show fixtures. Previously it lived
  * in localStorage, shared across every tab and surviving a browser restart,
  * which is how a customer ended up signed in and labelled TT-DEMO.
+ *
+ * This resolves once per browser session, not once per page.
+ *
+ * Every dashboard page used to call this hook directly at its own top level,
+ * which meant a fresh instance — fresh state, fresh effect — mounted on
+ * every single navigation, because each route is its own React component
+ * that Next.js tears down and rebuilds on the way to the next one. Clicking
+ * through five pages in the time Cognito's own session lookup takes to
+ * resolve raced five separate checks, most of which got cancelled by the
+ * very next navigation before their own correction (see revalidateAll below)
+ * ever ran — leaving whatever the interrupted page had already fetched, sample
+ * data or empty zeros, on screen indefinitely. Nothing ever asked again,
+ * because nothing was still mounted to ask.
+ *
+ * AuthProvider now does this check exactly once, mounted in the shared
+ * dashboard layout that survives every route change within it. Every page
+ * still calls the plain useAuth() hook below unchanged — it just reads a
+ * result that was settled once, cleanly, instead of racing to re-settle it
+ * on every click.
  */
 
-export function useAuth() {
+interface AuthState {
+  customerId: string | null
+  loading: boolean
+}
+
+const AuthContext = createContext<AuthState>({ customerId: null, loading: false })
+
+export function AuthProvider({ children }: { children: ReactNode }) {
   // Starts null for everyone. Only a demo build resolves to TT-DEMO, and it
   // does so in the effect, once the browser can be asked. Seeding it with the
   // demo id meant a customer who had just signed in was greeted as the demo
@@ -46,7 +73,6 @@ export function useAuth() {
       return
     }
 
-
     let cancelled = false
     setLoading(true)
 
@@ -54,7 +80,6 @@ export function useAuth() {
       try {
         const { configureAmplify, getAuthUser } = await import('@/lib/auth')
         const { default: apiClient } = await import('@/lib/api')
-        const { useRouter } = await import('next/navigation')
         configureAmplify()
         const user = await getAuthUser()
         if (cancelled) return
@@ -67,25 +92,25 @@ export function useAuth() {
         // `customerId || 'TT-DEMO'` downstream quietly resolved to the demo.
         setCustomerId(user.customerId || null)
 
-        // Every data hook mounts in the same render pass as this effect and
-        // starts fetching immediately — in parallel with the Cognito session
-        // lookup above, not after it. A hook whose first fetch landed before
-        // this line ran found no token yet, so apiFetch's own "not signed in"
-        // fallback answered it: sample data if this looked like a demo,
-        // empty-but-real-shaped data otherwise. SWR then treated that as the
-        // resolved value and had no reason to ask again — nothing about a
-        // token appearing later is part of any hook's key, and every hook
-        // sets revalidateOnFocus: false. The result was exactly what surfaced
-        // in production: the sample-data banner stuck on for a real signed-in
-        // account, and the Agent page reading it as "no agent connected"
-        // because that flag is not page-scoped, it is global — one hook
-        // racing ahead was enough to mislabel every page's data.
+        // Every data hook mounts and starts fetching in the same render pass
+        // as this effect — in parallel with the Cognito session lookup
+        // above, not after it. A hook whose first fetch landed before this
+        // line ran found no token yet, so apiFetch's own "not signed in"
+        // fallback answered it: sample data, or an empty-but-real-shaped
+        // response. SWR treated that as resolved and had no reason to ask
+        // again on its own.
         //
-        // The token existing now is the one thing every one of those stalled
-        // hooks needed and didn't have. Revalidating everything currently
-        // cached re-runs each of them with it, correcting any that resolved
-        // too early — once, right here, rather than on a timer no one could
-        // explain or a page reload the customer shouldn't have had to do.
+        // The sample-data flag those fallbacks set is also global, not
+        // page-scoped, and nothing used to clear a path's entry when the
+        // page that set it was left before it ever got a chance to correct
+        // itself — so a single early race, on a page visited once and never
+        // revisited, kept the "no data yet" banner showing on every other
+        // page for the rest of the session, even ones already displaying
+        // real, correct data underneath it. Clearing the slate before
+        // asking everything currently mounted to refetch means what's shown
+        // reflects this attempt, not whatever an earlier, abandoned one left
+        // behind.
+        resetDataSource()
         revalidateAll(() => true)
       } catch {
         if (!cancelled) window.location.replace('/login')
@@ -98,5 +123,13 @@ export function useAuth() {
     return () => { cancelled = true }
   }, [])
 
-  return { customerId, loading }
+  return (
+    <AuthContext.Provider value={{ customerId, loading }}>
+      {children}
+    </AuthContext.Provider>
+  )
+}
+
+export function useAuth(): AuthState {
+  return useContext(AuthContext)
 }
