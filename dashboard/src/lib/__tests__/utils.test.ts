@@ -2,12 +2,38 @@ import {
   formatBytes,
   formatDuration,
   formatNumber,
+  formatRelativeTime,
   getSeverityColor,
   getStatusColor,
   truncate,
   parseARN,
   getResourceName,
+  DASH,
 } from '../utils'
+
+describe('formatRelativeTime', () => {
+  // A customer with no agent yet has no heartbeat; a collector or alert that
+  // never ran has no last_run. new Date(null) is not an error — it's a
+  // valid date, January 1st 1970 UTC — so this used to render a 55-year-old
+  // heartbeat next to a status of "Silent" instead of the honest "no
+  // heartbeat yet".
+  it('renders a dash for null rather than the 1970 epoch', () => {
+    expect(formatRelativeTime(null)).toBe(DASH)
+  })
+
+  it('renders a dash for undefined', () => {
+    expect(formatRelativeTime(undefined)).toBe(DASH)
+  })
+
+  it('renders a dash for an empty string rather than "Invalid Date"', () => {
+    expect(formatRelativeTime('')).toBe(DASH)
+  })
+
+  it('still renders a real recent timestamp normally', () => {
+    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString()
+    expect(formatRelativeTime(oneMinuteAgo)).toBe('1 minute ago')
+  })
+})
 
 describe('formatBytes', () => {
   it('returns "0 Bytes" for zero', () => {

@@ -43,9 +43,16 @@ export function formatCurrency(amount: number, currency = 'USD'): string {
 /**
  * Format relative time (e.g., "2 hours ago")
  */
-export function formatRelativeTime(date: string | Date): string {
+export function formatRelativeTime(date: string | Date | null | undefined): string {
+  // null reached here for real: a customer with no agent yet has no
+  // heartbeat to report, and a collector or alert that never ran has no
+  // last_run. new Date(null) is not an error — it is a valid date, January
+  // 1st 1970, UTC — so a missing timestamp used to render as "Silent" next
+  // to a 55-year-old heartbeat instead of the honest "no heartbeat yet".
+  if (!date) return DASH
   const now = new Date()
   const then = new Date(date)
+  if (Number.isNaN(then.getTime())) return DASH
   const diffMs = now.getTime() - then.getTime()
   const diffSec = Math.floor(diffMs / 1000)
   const diffMin = Math.floor(diffSec / 60)
