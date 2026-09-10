@@ -232,8 +232,16 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
       {/* Main content area */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
 
-        {/* Top bar */}
-        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 border-b border-border bg-background/90 backdrop-blur-sm px-4 lg:px-6">
+        {/* Top bar.
+            overflow-x-auto, not overflow visible: on a narrow phone in demo
+            mode, the hamburger, history arrows, demo badge, region picker,
+            refresh, alerts and theme toggle together are wider than the
+            viewport. Nothing here was cut, so the row's own intrinsic width
+            was dragging the whole page into horizontal scroll — the same
+            overflow-x-auto pattern the mobile time-range bar below already
+            uses, now applied one level up so the bar scrolls within itself
+            instead of the page scrolling around it. */}
+        <header className="sticky top-0 z-40 flex h-14 items-center gap-3 overflow-x-auto border-b border-border bg-background/90 backdrop-blur-sm px-4 lg:px-6">
           <button onClick={() => setSidebarOpen(true)} aria-label="Open navigation" className="lg:hidden text-muted-foreground hover:text-foreground">
             <Menu className="h-5 w-5" />
           </button>
@@ -318,8 +326,15 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
           ))}
         </div>
 
-        {/* Page content — theme-page enables CSS cascade for page internals */}
-        <main className="flex-1 p-4 lg:p-6 theme-page">
+        {/* Page content — theme-page enables CSS cascade for page internals.
+            min-w-0 matters here: a flex item's default min-width is auto, not
+            0, so without it main refuses to shrink below the intrinsic width
+            of whatever it contains. A wide table wrapped in its own
+            overflow-x-auto div still has an intrinsic width, and that width
+            was propagating up through main and out to the page body — the
+            table's own scroll container worked, but the whole page scrolled
+            sideways around it on any viewport narrower than the table. */}
+        <main className="flex-1 min-w-0 p-4 lg:p-6 theme-page">
           <ConfigErrorBanner />
           <SampleDataBanner />
           {/* Nothing paints until we know whose data this is. It costs one
