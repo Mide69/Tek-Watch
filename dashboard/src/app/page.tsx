@@ -395,7 +395,17 @@ function HeroFlow() {
   )
 }
 
-/** What the agent reads, and what comes out the other side. */
+/**
+ * What the agent reads, and what comes out the other side, animated as the
+ * pipeline it is. On first view the boxes and connectors build in order; then
+ * data keeps flowing: each service sends a packet to the agent, the agent
+ * pulses as they land, and results travel out to each output, which lights up.
+ *
+ * The flow is SVG (SMIL) animation so every packet, pulse and glow runs on one
+ * shared clock and stays in step. It is not rendered for visitors who asked
+ * for reduced motion; the entrance is CSS and collapses to its end state
+ * under the global reduced-motion rule.
+ */
 function CoverageDiagram() {
   const top = [
     { x: 85,  title: 'Compute',  sub: 'EC2 · ECS · Lambda' },
@@ -407,28 +417,100 @@ function CoverageDiagram() {
     { x: 260, title: 'Alerts',     sub: 'Email & Slack' },
     { x: 435, title: 'Evidence',   sub: 'Compliance checks' },
   ]
+  const [ref, inView] = useReveal<HTMLDivElement>()
+  const [flowing, setFlowing] = useState(false)
+
+  useEffect(() => {
+    if (!inView) return
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+    // Let the build-in finish before anything moves along the lines.
+    const id = setTimeout(() => setFlowing(true), 1600)
+    return () => clearTimeout(id)
+  }, [inView])
+
+  // Timings in seconds. One cycle: packets leave the three services in turn,
+  // reach the agent, then leave the agent for the three outputs.
+  const CYCLE = 3.6
+  const TRAVEL = 0.32                      // share of the cycle a packet spends moving
+  const ARRIVE = TRAVEL * CYCLE            // seconds from leaving to landing
+  const IN = top.map((_, i) => 0.2 + i * 0.25)
+  const AGENT = IN[0] + ARRIVE
+  const OUT = bottom.map((_, i) => IN[2] + ARRIVE + 0.35 + i * 0.2)
+  const loop = { dur: `${CYCLE}s`, repeatCount: 'indefinite' as const }
+  const delay = (ms: number) => ({ animationDelay: `${ms}ms` })
+
+  const packet = (key: string, path: string, begin: number, tone: 'indigo' | 'emerald') => (
+    <g key={key} opacity={0}>
+      <circle r={7} className={tone === 'indigo' ? 'fill-indigo-500/20' : 'fill-emerald-500/20'} />
+      <circle r={3.2} className={tone === 'indigo' ? 'fill-indigo-500 dark:fill-indigo-300' : 'fill-emerald-500 dark:fill-emerald-300'} />
+      <animateMotion path={path} begin={`${begin}s`} {...loop} keyPoints="0;1;1" keyTimes={`0;${TRAVEL};1`} calcMode="linear" />
+      <animate attributeName="opacity" values="0;1;1;0;0" keyTimes={`0;0.03;${TRAVEL - 0.03};${TRAVEL};1`} begin={`${begin}s`} {...loop} />
+    </g>
+  )
+
+  // A ring that flashes once per cycle around a box, starting at `begin`.
+  const flash = (key: string, x: number, y: number, begin: number, className: string) => (
+    <rect key={key} x={x} y={y} width={162} height={54} rx={11} fill="none" strokeWidth={2} opacity={0} className={className}>
+      <animate attributeName="opacity" values="0;0.9;0;0" keyTimes="0;0.06;0.3;1" begin={`${begin}s`} {...loop} />
+    </rect>
+  )
+
+  const ringTimes = '0;0.05;0.3;1'
+  const ringBegin = `${AGENT}s`
+
   return (
-    <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
-      {top.map(t => <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} stroke="#818cf8" strokeWidth={1.2} />)}
-      {bottom.map(b => <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} stroke="#34d399" strokeWidth={1.2} />)}
-      {top.map(t => (
-        <g key={t.title}>
-          <rect x={t.x - 78} y={10} width={156} height={48} rx={8} fill="#312e81" />
-          <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fbfbfd">{t.title}</text>
-          <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} fill="#c7d2fe">{t.sub}</text>
+    <div ref={ref}>
+      <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
+        {/* Connectors draw in on first view. */}
+        {top.map((t, i) => (
+          <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} pathLength={1} strokeWidth={1.2}
+            className={`stroke-indigo-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(380 + i * 90)} />
+        ))}
+        {bottom.map((b, i) => (
+          <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} pathLength={1} strokeWidth={1.2}
+            className={`stroke-emerald-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(980 + i * 90)} />
+        ))}
+
+        {/* Packets travel under the boxes, so they vanish into them. */}
+        {flowing && top.map((t, i) => packet(`in-${t.title}`, `M${t.x} 58 L260 106`, IN[i], 'indigo'))}
+        {flowing && bottom.map((b, i) => packet(`out-${b.title}`, `M260 156 L${b.x} 204`, OUT[i], 'emerald'))}
+
+        {top.map((t, i) => (
+          <g key={t.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(i * 110)}>
+            <rect x={t.x - 78} y={10} width={156} height={48} rx={8} fill="#312e81" />
+            <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fbfbfd">{t.title}</text>
+            <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} fill="#c7d2fe">{t.sub}</text>
+          </g>
+        ))}
+        {flowing && top.map((t, i) => flash(`send-${t.title}`, t.x - 81, 7, IN[i], 'stroke-indigo-400'))}
+
+        {/* The agent pulses as packets land. */}
+        {flowing && (
+          <rect x={160} y={106} width={200} height={50} rx={12} fill="none" strokeWidth={1.5} opacity={0} className="stroke-indigo-400">
+            <animate attributeName="opacity" values="0;0.8;0;0" keyTimes={ringTimes} begin={ringBegin} {...loop} />
+            <animate attributeName="x" values="160;160;150;150" keyTimes={ringTimes} begin={ringBegin} {...loop} />
+            <animate attributeName="y" values="106;106;96;96" keyTimes={ringTimes} begin={ringBegin} {...loop} />
+            <animate attributeName="width" values="200;200;220;220" keyTimes={ringTimes} begin={ringBegin} {...loop} />
+            <animate attributeName="height" values="50;50;70;70" keyTimes={ringTimes} begin={ringBegin} {...loop} />
+          </rect>
+        )}
+        <g className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(700)}>
+          <rect x={160} y={106} width={200} height={50} rx={10} className="fill-indigo-50 stroke-indigo-300 dark:fill-indigo-500/15 dark:stroke-indigo-500/50" />
+          <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} className="fill-indigo-900 dark:fill-indigo-200">TekWatch agent</text>
+          <text x={260} y={144} textAnchor="middle" fontSize={10} className="fill-indigo-600 dark:fill-indigo-300">Read-only · outbound only</text>
         </g>
-      ))}
-      <rect x={160} y={106} width={200} height={50} rx={10} className="fill-indigo-50 stroke-indigo-300 dark:fill-indigo-500/15 dark:stroke-indigo-500/50" />
-      <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} className="fill-indigo-900 dark:fill-indigo-200">TekWatch agent</text>
-      <text x={260} y={144} textAnchor="middle" fontSize={10} className="fill-indigo-600 dark:fill-indigo-300">Read-only · outbound only</text>
-      {bottom.map(b => (
-        <g key={b.title}>
-          <rect x={b.x - 78} y={204} width={156} height={48} rx={8} className="fill-emerald-50 stroke-emerald-300 dark:fill-emerald-500/10 dark:stroke-emerald-500/40" />
-          <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-emerald-800 dark:fill-emerald-300">{b.title}</text>
-          <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-emerald-700 dark:fill-emerald-400">{b.sub}</text>
-        </g>
-      ))}
-    </svg>
+        {flowing && flash('agent', 157, 104, AGENT, 'stroke-indigo-500')}
+
+        {bottom.map((b, i) => (
+          <g key={b.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(1250 + i * 110)}>
+            <rect x={b.x - 78} y={204} width={156} height={48} rx={8} className="fill-emerald-50 stroke-emerald-300 dark:fill-emerald-500/10 dark:stroke-emerald-500/40" />
+            <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-emerald-800 dark:fill-emerald-300">{b.title}</text>
+            <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-emerald-700 dark:fill-emerald-400">{b.sub}</text>
+          </g>
+        ))}
+        {flowing && bottom.map((b, i) => flash(`land-${b.title}`, b.x - 81, 201, OUT[i] + ARRIVE, 'stroke-emerald-400'))}
+      </svg>
+    </div>
   )
 }
 
