@@ -4,10 +4,17 @@ import Link from 'next/link'
 import { Bell } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAlerts } from '@/hooks/useData'
+import { useFixtureView } from '@/hooks/useFixtureView'
 
 export function NotificationBell() {
   const { data } = useAlerts()
-  const alerts = data?.alerts ?? []
+  // The alerts' first paint depends on whether this tab is a demo, which is
+  // only known in the browser. The server always renders no badge; a demo tab
+  // rendered "3" on its first pass, and React reported a hydration mismatch on
+  // every dashboard page. Counting only once the viewer is resolved makes the
+  // first client render match the server's.
+  const viewer = useFixtureView()
+  const alerts = viewer === null ? [] : data?.alerts ?? []
   const activeCount = alerts.filter(a => a.status === 'active').length
 
   return (
