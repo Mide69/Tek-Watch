@@ -106,7 +106,7 @@ class TestPreferencesRouter:
 @pytest.mark.asyncio
 async def test_threshold_alert_reaches_the_customer():
     ts = MagicMock()
-    ts.get_resources_by_service.return_value = [
+    ts.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-1", "resource_name": "web", "metric_name": "cpu_utilization_percent", "value": 97},
     ]
     db = MagicMock()
@@ -131,7 +131,7 @@ async def test_threshold_alert_reaches_the_customer():
 @pytest.mark.asyncio
 async def test_delivery_failure_does_not_stop_evaluation():
     ts = MagicMock()
-    ts.get_resources_by_service.return_value = [
+    ts.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-1", "metric_name": "cpu_utilization_percent", "value": 97},
         {"resource_id": "i-2", "metric_name": "cpu_utilization_percent", "value": 99},
     ]

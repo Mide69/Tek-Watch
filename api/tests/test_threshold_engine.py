@@ -48,7 +48,7 @@ async def test_evaluate_thresholds_creates_alert():
     db_service.create_alert.return_value = "alert-001"
 
     # Resource with CPU at 91% (above threshold)
-    ts_service.get_resources_by_service.return_value = [
+    ts_service.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-abc", "resource_name": "web-server",
          "metric_name": "cpu_utilization_percent", "value": "91.0"}
     ]
@@ -77,7 +77,7 @@ async def test_evaluate_thresholds_no_breach():
     db_service.get_alerts.return_value = []
 
     # CPU at 50% — below threshold
-    ts_service.get_resources_by_service.return_value = [
+    ts_service.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-abc", "metric_name": "cpu_utilization_percent", "value": "50.0"}
     ]
 
@@ -107,7 +107,7 @@ async def test_evaluate_thresholds_skips_existing_alert():
          "metric_name": "cpu_utilization_percent", "status": "active"}
     ]
 
-    ts_service.get_resources_by_service.return_value = [
+    ts_service.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-abc", "metric_name": "cpu_utilization_percent", "value": "91.0"}
     ]
 
@@ -132,7 +132,7 @@ async def test_evaluate_thresholds_disabled_threshold_skipped():
         if cid == "DEFAULT" else []
     )
     db_service.get_alerts.return_value = []
-    ts_service.get_resources_by_service.return_value = [
+    ts_service.get_latest_numeric_metrics.return_value = [
         {"resource_id": "i-abc", "metric_name": "cpu_utilization_percent", "value": "99.0"}
     ]
 

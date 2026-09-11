@@ -1,7 +1,8 @@
 """Threshold alert evaluation engine — runs every 5 minutes."""
 import asyncio
 import logging
-from typing import Any, Dict, List
+from decimal import Decimal
+from typing import Any, Dict, List, Optional
 
 from config import load_config
 from services.dynamodb import DynamoDBService
@@ -16,6 +17,18 @@ _OPERATOR_MAP = {
     "lt":  lambda v, t: v < t,
     "lte": lambda v, t: v <= t,
 }
+
+
+def _dec(value: Optional[float]) -> Optional[Decimal]:
+    """DynamoDB rejects Python floats, so every number stored is a Decimal.
+
+    The comparison needs a float and the stored item needs a Decimal. This was
+    never hit before because the evaluator read the events table and no row's
+    value ever parsed as a number, so it never reached the write.
+    """
+    if value is None:
+        return None
+    return Decimal(str(round(float(value), 6)))
 
 
 def _evaluate(value: float, operator: str, threshold: float) -> bool:
@@ -71,8 +84,11 @@ async def evaluate_thresholds_for_customer(
         threshold_value = float(threshold.get("threshold_value", 0))
         severity = threshold.get("severity", "medium")
 
-        # Query latest values for this service/metric
-        resources = ts_service.get_resources_by_service(customer_id, service, "5m")
+        # Latest numeric readings for this service. This used to call
+        # get_resources_by_service, which reads the events table — string
+        # states only — so float() failed on every row and no threshold could
+        # fire. See TimestreamQueryService.get_latest_numeric_metrics.
+        resources = ts_service.get_latest_numeric_metrics(customer_id, service, "5m")
 
         for resource in resources:
             resource_id = resource.get("resource_id", "")
@@ -102,8 +118,8 @@ async def evaluate_thresholds_for_customer(
                 "resource_id": resource_id,
                 "resource_name": resource.get("resource_name", resource_id),
                 "metric_name": metric_name,
-                "current_value": current_value,
-                "threshold_value": threshold_value,
+                "current_value": _dec(current_value),
+                "threshold_value": _dec(threshold_value),
                 "description": (
                     f"{metric_name} is {current_value:.2f} "
                     f"({operator} {threshold_value})"

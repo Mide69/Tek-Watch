@@ -155,6 +155,45 @@ class TimestreamQueryService:
             for r in rows
         ]
 
+    def get_latest_numeric_metrics(
+        self, customer_id: str, service: str, time_range: str = "5m"
+    ) -> List[Dict[str, Any]]:
+        """The latest numeric reading per resource and metric for one service.
+
+        Threshold evaluation used get_resources_by_service, which reads the
+        events table. That table holds only the string-valued rows — a
+        bucket's "active", an instance's "running". Every metric a threshold
+        can actually be set on (cpu_utilization_percent, item_count, queue
+        depth) is numeric, so the writer puts it in the metrics table, and the
+        evaluator's float() of a state string never parsed: no threshold could
+        ever fire. Its tests passed because they fed it rows shaped like
+        {"metric_name": "cpu_utilization_percent", "value": "91.0"}, which the
+        events table can never produce.
+        """
+        cid = _safe(customer_id)
+        svc = _safe(service)
+        _safe(time_range, _SAFE_RANGE_RE)
+
+        latest: Dict[tuple, Dict[str, Any]] = {}
+        for row in self._query_metrics_by_customer(cid, self._since_iso(time_range)):
+            if row.get("service") != svc:
+                continue
+            key = (row.get("resource_id"), row.get("metric_name"))
+            current = latest.get(key)
+            if current is None or str(row.get("time") or "") >= str(current.get("time") or ""):
+                latest[key] = row
+
+        return [
+            {
+                "resource_id": r.get("resource_id"),
+                "resource_name": r.get("resource_name"),
+                "metric_name": r.get("metric_name"),
+                "value": r.get("value"),
+                "time": r.get("time"),
+            }
+            for r in latest.values()
+        ]
+
     def get_7day_summary(self, customer_id: str) -> List[Dict[str, Any]]:
         """Get 7-day averages and std devs for anomaly detection.
 

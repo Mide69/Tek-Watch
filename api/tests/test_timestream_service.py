@@ -225,6 +225,60 @@ class TestGetResourcesByService:
         assert s.get_resources_by_service("TT-0001", "ec2") == []
 
 
+class TestGetLatestNumericMetrics:
+    """What threshold evaluation reads.
+
+    It used get_resources_by_service, which reads the events table — string
+    states only — so float() never parsed and no threshold could fire.
+    """
+
+    def test_reads_the_metrics_table_through_the_customer_index(self, svc):
+        s, metrics_table, events_table = svc
+        metrics_table.query.return_value = {"Items": [{
+            "service": "ec2", "resource_id": "i-abc", "resource_name": "web",
+            "metric_name": "cpu_utilization_percent", "value": Decimal("91"),
+            "time": "2026-01-01T00:05:00+00:00",
+        }]}
+
+        result = s.get_latest_numeric_metrics("TT-0001", "ec2", "5m")
+
+        assert result == [{
+            "resource_id": "i-abc", "resource_name": "web",
+            "metric_name": "cpu_utilization_percent", "value": Decimal("91"),
+            "time": "2026-01-01T00:05:00+00:00",
+        }]
+        assert metrics_table.query.call_args[1]["IndexName"] == "gsi_customer_time"
+        events_table.query.assert_not_called()
+
+    def test_keeps_only_the_latest_reading_per_resource_and_metric(self, svc):
+        s, metrics_table, _ = svc
+        metrics_table.query.return_value = {"Items": [
+            {"service": "ec2", "resource_id": "i-abc", "metric_name": "cpu_utilization_percent",
+             "value": Decimal("40"), "time": "2026-01-01T00:00:00+00:00"},
+            {"service": "ec2", "resource_id": "i-abc", "metric_name": "cpu_utilization_percent",
+             "value": Decimal("91"), "time": "2026-01-01T00:04:00+00:00"},
+        ]}
+
+        result = s.get_latest_numeric_metrics("TT-0001", "ec2", "5m")
+
+        assert len(result) == 1
+        assert result[0]["value"] == Decimal("91")
+
+    def test_other_services_are_ignored(self, svc):
+        s, metrics_table, _ = svc
+        metrics_table.query.return_value = {"Items": [
+            {"service": "rds", "resource_id": "db-1", "metric_name": "cpu_utilization_percent",
+             "value": Decimal("99"), "time": "2026-01-01T00:04:00+00:00"},
+        ]}
+
+        assert s.get_latest_numeric_metrics("TT-0001", "ec2", "5m") == []
+
+    def test_rejects_bad_range(self, svc):
+        s, _, _ = svc
+        with pytest.raises(ValueError):
+            s.get_latest_numeric_metrics("TT-0001", "ec2", "999d")
+
+
 class TestAnomalyDetectionQueries:
     def test_get_7day_summary_groups_and_aggregates(self, svc):
         s, metrics_table, _ = svc
