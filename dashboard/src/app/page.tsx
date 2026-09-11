@@ -33,8 +33,8 @@ const scoreData = [{ name: 'score', value: 91, fill: '#22d3ee' }]
 
 const complianceFrameworks = [
   { label: 'UK GDPR', status: 'pass' as const },
-  { label: 'Cyber Essentials Plus', status: 'pass' as const },
-  { label: 'FCA PS21/3', status: 'pending' as const },
+  { label: 'Cyber Essentials', status: 'pass' as const },
+  { label: 'ISO 27001:2022', status: 'pending' as const },
 ]
 
 const serviceCostData = [
@@ -64,10 +64,9 @@ const guardDutyPreview = [
 ]
 
 const compliancePreview = [
-  { label: 'UK GDPR', score: 96 },
-  { label: 'Cyber Essentials Plus', score: 91 },
-  { label: 'FCA PS21/3', score: 78 },
-  { label: 'ISO 27001', score: 88 },
+  { label: 'UK GDPR', score: 89 },
+  { label: 'Cyber Essentials', score: 75 },
+  { label: 'ISO 27001:2022', score: 80 },
 ]
 
 const securitySummaryTiles = [
@@ -103,30 +102,30 @@ const FEATURES = [
   {
     icon: Zap, color: 'text-teal-600 dark:text-teal-400',
     bg: 'bg-teal-500/8 dark:bg-teal-500/10', border: 'border-teal-500/20',
-    title: 'AI Anomaly Detection',
-    desc: "TekWatch's AI engine learns your normal baseline and flags genuine anomalies on its own, with no manual thresholds or specialist configuration required.",
-    points: ['Zero-configuration, self-learning', 'Cost, performance & security', 'Plain-English explanations'],
+    title: 'Anomaly Detection',
+    desc: 'TekWatch builds a 7-day statistical baseline for every metric it collects and flags readings that break from it, with no thresholds to set. Each alert then comes with a plain-English explanation.',
+    points: ['No thresholds to configure', 'Cost, performance & security', 'Plain-English explanations'],
   },
   {
     icon: Shield, color: 'text-blue-600 dark:text-blue-400',
     bg: 'bg-blue-500/8 dark:bg-blue-500/10', border: 'border-blue-500/20',
     title: 'UK Compliance Intelligence',
-    desc: 'Built-in mapping to the UK regulatory frameworks SMEs actually face, with automated evidence instead of a generic US compliance checklist.',
-    points: ['UK GDPR & Cyber Essentials Plus', 'FCA PS21/3 resilience module', 'GuardDuty & Security Hub findings'],
+    desc: 'Automated checks of your AWS setup, mapped to the UK frameworks SMEs actually face, naming each failing resource and how to fix it.',
+    points: ['UK GDPR, Cyber Essentials & ISO 27001', 'Incidents traced to who changed what', 'GuardDuty & Security Hub findings'],
   },
   {
     icon: DollarSign, color: 'text-emerald-600 dark:text-emerald-400',
     bg: 'bg-emerald-500/8 dark:bg-emerald-500/10', border: 'border-emerald-500/20',
     title: 'Cost Intelligence',
-    desc: 'MTD spend, 30-day trends, per-service breakdowns, and AI-flagged cost anomalies before the bill arrives.',
-    points: ['Daily spend trends', 'Per-service breakdown', 'AI cost anomaly alerts'],
+    desc: 'MTD spend, 30-day trends, per-service breakdowns, and daily cost spikes flagged against your own baseline before the bill arrives.',
+    points: ['Daily spend trends', 'Per-service breakdown', 'Cost spike alerts'],
   },
   {
     icon: Server, color: 'text-amber-600 dark:text-amber-400',
     bg: 'bg-amber-500/8 dark:bg-amber-500/10', border: 'border-amber-500/20',
     title: 'Managed Service Option',
     desc: "Don't want to DIY? Tek Tribe's own engineers monitor and manage it for you, from £500/month, with TekWatch included.",
-    points: ['Continuous monitoring & patching', 'Compliance reporting included', '20–30% typical cost savings'],
+    points: ['Continuous monitoring & patching', 'Compliance reporting included', 'Regular cost reviews'],
   },
   {
     icon: Radio, color: 'text-rose-600 dark:text-rose-400',
@@ -140,7 +139,7 @@ const FEATURES = [
 const ONBOARDING_STEPS = [
   {
     title: 'See it running instantly',
-    desc: 'Launch the live demo, no signup or credit card needed. You will be looking at real infrastructure data within seconds.',
+    desc: 'Launch the live demo, no signup or credit card needed. You will be looking at a fully populated sample dashboard within seconds.',
   },
   {
     title: 'Deploy in under 30 minutes',
@@ -148,7 +147,7 @@ const ONBOARDING_STEPS = [
   },
   {
     title: 'See what’s really going on',
-    desc: 'Your dashboard populates with live infrastructure data immediately: anomalies, compliance gaps and cost overruns, all explained in plain English.',
+    desc: 'Your dashboard fills with your own data from the agent’s first run: anomalies, compliance gaps and cost trends, all explained in plain English.',
   },
 ]
 
@@ -169,19 +168,19 @@ const pricingTiers = [
   {
     name: 'Starter', monthly: 79, discount: 0.10,
     desc: 'For micro-businesses, startups and charities getting started with AWS.',
-    features: ['Up to 2 AWS accounts', '50 monitored resources', 'AI anomaly detection', 'UK GDPR compliance module'],
+    features: ['Up to 2 AWS accounts', '50 monitored resources', 'Anomaly detection', 'UK GDPR compliance checks'],
     highlight: false,
   },
   {
     name: 'Business', monthly: 199, discount: 0.10,
     desc: 'For growing SMEs, FinTech firms and professional services.',
-    features: ['Up to 5 AWS accounts', '500 monitored resources', 'Full AI engine + cost anomaly detection', 'UK GDPR + Cyber Essentials Plus', 'Slack & Microsoft Teams alerts'],
+    features: ['Up to 5 AWS accounts', '500 monitored resources', 'AI assistant + cost spike alerts', 'UK GDPR, Cyber Essentials & ISO 27001 checks', 'Email & Slack alerts'],
     highlight: true,
   },
   {
     name: 'Enterprise', monthly: 499, discount: 0.15,
     desc: 'For mid-market and regulated businesses with complex environments.',
-    features: ['Unlimited accounts & resources', 'All five UK compliance frameworks', 'Full API access', 'Dedicated 2-hour support'],
+    features: ['Unlimited accounts & resources', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
     highlight: false,
   },
 ]
@@ -399,7 +398,7 @@ export default function LandingPage() {
         <section className="relative pt-20 pb-16 px-6">
           <div className="relative max-w-4xl mx-auto text-center">
             <p className="animate-fade-in-up text-xs font-mono font-semibold uppercase tracking-[0.2em] text-cyan-400 mb-6">
-              AI-powered cloud intelligence, built for UK SMEs
+              Cloud monitoring and compliance, built for UK SMEs
             </p>
 
             <h1
@@ -408,7 +407,7 @@ export default function LandingPage() {
             >
               Your AWS estate.<br />
               <span className="text-cyan-400">
-                Fully visible. Always compliant.
+                Fully visible. Risks caught early.
               </span>
             </h1>
 
@@ -418,8 +417,8 @@ export default function LandingPage() {
             >
               Know the moment something&apos;s wrong in your AWS estate. TekWatch watches your
               infrastructure around the clock, catching cost spikes, performance issues and
-              security risks as they happen, with UK GDPR and Cyber Essentials Plus
-              compliance built in from day one.
+              security risks as they happen, and checking your setup against UK GDPR,
+              Cyber Essentials and ISO 27001 from day one.
             </p>
 
             <div
@@ -647,7 +646,7 @@ export default function LandingPage() {
 
                 {/* Compliance posture bars */}
                 <div className="rounded-xl border border-cyan-500/20 bg-cyan-500/5 p-4">
-                  <div className="text-xs text-muted-foreground mb-3">Compliance Posture (4 frameworks)</div>
+                  <div className="text-xs text-muted-foreground mb-3">Compliance checks (3 frameworks)</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
                     {compliancePreview.map(c => (
                       <div key={c.label}>
@@ -784,7 +783,7 @@ export default function LandingPage() {
           <div className="text-center mb-14">
             <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-red-400 mb-3">The Problem</p>
             <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4 tracking-tight">
-              UK SMEs spend £28bn a year on AWS.<br className="hidden md:block" /> Most of it runs unmonitored.
+              Monitoring is priced for enterprises.<br className="hidden md:block" /> Most UK SMEs go without.
             </h2>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Enterprise tools like Datadog cost £800–£5,000/month and need a specialist to run.
@@ -989,7 +988,7 @@ export default function LandingPage() {
                   <span className="font-semibold text-foreground text-base">TekWatch</span>
                 </div>
                 <p className="text-sm text-muted-foreground leading-relaxed mb-5">
-                  AI-powered AWS monitoring and UK compliance intelligence, built for SMEs by Tek Tribe Ltd,
+                  AWS monitoring and UK compliance checks, built for SMEs by Tek Tribe Ltd,
                   the commercial evolution of an 8,000+ strong UK &amp; Nigeria tech community.
                 </p>
                 <div className="flex items-center gap-3">

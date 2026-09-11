@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from auth.dependencies import CustomerContext, get_current_customer
 from services.dynamodb import DynamoDBService
+from services.notifications import is_slack_webhook
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -42,11 +43,19 @@ async def update_preferences(
     customer: CustomerContext = Depends(get_current_customer),
 ):
     """Update notification preferences for the authenticated customer."""
+    from fastapi import HTTPException, status
+
     if prefs.min_severity not in VALID_SEVERITIES:
-        from fastapi import HTTPException, status
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=f"min_severity must be one of: {', '.join(sorted(VALID_SEVERITIES))}",
+        )
+    # The API POSTs to this URL. Anything other than a Slack webhook would let
+    # a customer make the API send requests to an address of their choosing.
+    if prefs.slack_webhook_url and not is_slack_webhook(prefs.slack_webhook_url):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="slack_webhook_url must be a Slack incoming webhook (https://hooks.slack.com/services/...)",
         )
 
     db = DynamoDBService()

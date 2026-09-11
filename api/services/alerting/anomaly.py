@@ -1,43 +1,107 @@
-"""AI anomaly detection engine — uses Claude to detect unusual patterns."""
+"""Anomaly detection loop.
+
+What counts as an anomaly is decided by TekWatch's own statistics in
+detector.py: a z-score and a step-change test over every metric's 7-day
+baseline. Claude is used for one thing only, and only when a key is
+configured: turning the anomalies the detector already found into plain
+English. It is told it may not add, remove or re-grade them, and its answer is
+discarded unless it returns exactly one explanation per anomaly.
+
+This used to be the other way round. The whole decision was a prompt, the loop
+switched itself off entirely when no Anthropic key was set, and it only ever
+sent the first 100 rows of each input, so most of a real account's metrics
+were never looked at.
+"""
 import asyncio
 import json
 import logging
-from typing import Any, Dict, List
-
-from anthropic import Anthropic
+from decimal import Decimal
+from typing import Any, Dict, List, Optional, Tuple
 
 from config import load_config
+from services.alerting.detector import Anomaly, describe, detect
 from services.dynamodb import DynamoDBService
 from services.notifications import NotificationService
 from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
 
-ANOMALY_DETECTION_SYSTEM_PROMPT = """You are a cloud infrastructure anomaly detector for Tek Watch, a managed cloud service platform.
-You will be given a JSON object containing:
-- "baseline": 7-day hourly averages and standard deviations for key metrics per resource
-- "recent": metric values from the last 1 hour for the same resources
+EXPLAIN_MODEL = "claude-sonnet-4-20250514"
+EXPLAIN_LIMIT = 20          # anomalies explained per call; the rest use built-in wording
+INTERVAL_SECONDS = 15 * 60
 
-Analyse the recent values against the baseline and identify genuine anomalies — unusual deviations that could indicate a problem.
+EXPLAIN_SYSTEM_PROMPT = """You write short plain-English explanations of cloud monitoring anomalies for UK business owners who are not engineers.
 
-Rules:
-- Only flag statistically significant anomalies (> 2 standard deviations from mean, or step-change patterns)
-- Do not flag normal business-hours traffic patterns
-- Do not flag metrics with insufficient baseline data (< 24 hours of history)
-- Focus on actionable issues, not noise
+You are given a JSON array of anomalies that have ALREADY been detected by statistical tests. Do not decide whether they are anomalies. Do not add, remove, merge or reorder items, and do not change their severity.
 
-Respond ONLY with a valid JSON array. No preamble, no explanation, no markdown. Example format:
-[
-  {
-    "resource_id": "i-0abc123",
-    "service": "ec2",
-    "severity": "high",
-    "description": "CPU utilisation has jumped from a 7-day average of 23% to 91% in the last hour, suggesting an unexpected workload spike or runaway process.",
-    "recommendation": "Check running processes on this instance. If no known deployment or batch job is scheduled, investigate for unauthorised activity."
-  }
-]
+For each item, in the same order, return an object with:
+- "description": one or two sentences on what changed, using the numbers given
+- "recommendation": one concrete next step
 
-If no anomalies are detected, respond with an empty array: []"""
+Respond ONLY with a JSON array containing exactly the same number of items. No preamble, no markdown."""
+
+
+def _dec(value: Optional[float]) -> Optional[Decimal]:
+    """DynamoDB rejects Python floats, so every number stored is a Decimal."""
+    if value is None:
+        return None
+    return Decimal(str(round(float(value), 6)))
+
+
+def _explain_with_claude(client: Any, batch: List[Anomaly]) -> Optional[List[Tuple[str, str]]]:
+    payload = [
+        {
+            "service": a.service,
+            "resource_id": a.resource_id,
+            "metric": a.metric_name,
+            "kind": a.kind,
+            "severity": a.severity,
+            "last_hour_average": a.recent_value,
+            "seven_day_average": a.baseline_mean,
+            "standard_deviations_from_normal": a.z_score,
+        }
+        for a in batch
+    ]
+    response = client.messages.create(
+        model=EXPLAIN_MODEL,
+        max_tokens=1500,
+        system=EXPLAIN_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": json.dumps(payload)}],
+    )
+    parsed = json.loads(response.content[0].text)
+    if not isinstance(parsed, list) or len(parsed) != len(batch):
+        return None
+    out = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            return None
+        description = str(item.get("description") or "").strip()
+        recommendation = str(item.get("recommendation") or "").strip()
+        if not description or not recommendation:
+            return None
+        out.append((description[:600], recommendation[:400]))
+    return out
+
+
+async def explain(anomalies: List[Anomaly], client: Any = None) -> List[Tuple[str, str]]:
+    """(description, recommendation) for each anomaly, in order.
+
+    Built-in wording is the default and the fallback. Claude's version is used
+    only if it comes back well-formed and one-for-one; any failure at all
+    leaves the built-in text in place, so an outage there never costs an alert.
+    """
+    texts = [describe(a) for a in anomalies]
+    if client is None or not anomalies:
+        return texts
+    batch = anomalies[:EXPLAIN_LIMIT]
+    try:
+        worded = await asyncio.to_thread(_explain_with_claude, client, batch)
+    except Exception as exc:  # noqa: BLE001 — any failure falls back to built-in text
+        logger.warning("Anomaly explanation unavailable, using built-in wording: %s", exc)
+        return texts
+    if worded:
+        texts[: len(worded)] = worded
+    return texts
 
 
 async def detect_anomalies_for_customer(
@@ -45,135 +109,123 @@ async def detect_anomalies_for_customer(
     ts_service: TimestreamQueryService,
     db_service: DynamoDBService,
     notif_service: NotificationService,
-    claude_client: Anthropic,
+    claude_client: Any = None,
+    customer: Optional[Dict[str, Any]] = None,
 ) -> int:
-    """Run anomaly detection for a single customer using Claude.
+    """Detect, explain, record and deliver anomalies for one customer.
 
-    Returns:
-        Number of new anomaly alerts created.
+    Returns the number of new alerts created.
     """
-    # Get 7-day baseline
     baseline = ts_service.get_7day_summary(customer_id)
-    if not baseline:
-        logger.debug("No baseline data for customer %s", customer_id)
-        return 0
-
-    # Get last hour data
     recent = ts_service.get_last_hour(customer_id)
-    if not recent:
-        logger.debug("No recent data for customer %s", customer_id)
+    if not baseline or not recent:
         return 0
 
-    # Build prompt payload
-    payload = {
-        "customer_id": customer_id,
-        "baseline": baseline[:100],  # Limit to avoid token overflow
-        "recent": recent[:100],
-    }
-
-    try:
-        response = claude_client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=1000,
-            system=ANOMALY_DETECTION_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": json.dumps(payload)}],
-        )
-
-        content = response.content[0].text
-        anomalies = json.loads(content)
-
-        if not isinstance(anomalies, list):
-            logger.warning("Claude returned non-list response for %s", customer_id)
-            return 0
-
-    except json.JSONDecodeError as exc:
-        logger.error("Failed to parse Claude response for %s: %s", customer_id, exc)
-        return 0
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Claude API error for %s: %s", customer_id, exc)
+    anomalies = detect(baseline, recent)
+    if not anomalies:
         return 0
 
-    # Get existing active AI anomaly alerts
-    active_alerts = db_service.get_alerts(customer_id, status_filter="active")
-    active_ai_keys = {
-        f"{a.get('service')}#{a.get('resource_id')}"
-        for a in active_alerts
+    active = db_service.get_alerts(customer_id, status_filter="active")
+    active_keys = {
+        f"{a.get('service')}#{a.get('resource_id')}#{a.get('metric_name')}"
+        for a in active
         if a.get("type") == "ai_anomaly"
     }
+    fresh = [a for a in anomalies if f"{a.service}#{a.resource_id}#{a.metric_name}" not in active_keys]
+    if not fresh:
+        return 0
+
+    texts = await explain(fresh, claude_client)
+    if customer is None:
+        customer = db_service.get_customer(customer_id) or {"customer_id": customer_id}
 
     new_alerts = 0
-
-    for anomaly in anomalies:
-        resource_id = anomaly.get("resource_id", "")
-        service = anomaly.get("service", "")
-        severity = anomaly.get("severity", "medium")
-        description = anomaly.get("description", "")
-        recommendation = anomaly.get("recommendation", "")
-
-        if not resource_id or not service:
-            continue
-
-        # Check for duplicate
-        alert_key = f"{service}#{resource_id}"
-        if alert_key in active_ai_keys:
-            continue
-
-        # Create alert
+    for anomaly, (description, recommendation) in zip(fresh, texts):
+        key = f"{anomaly.service}#{anomaly.resource_id}#{anomaly.metric_name}"
         alert_id = db_service.create_alert(customer_id, {
+            # The type string is kept for compatibility with stored alerts;
+            # detection itself is statistical, see the module docstring.
             "type": "ai_anomaly",
-            "severity": severity,
-            "service": service,
-            "resource_id": resource_id,
-            "metric_name": "anomaly",
+            "severity": anomaly.severity,
+            "service": anomaly.service,
+            "resource_id": anomaly.resource_id,
+            "metric_name": anomaly.metric_name,
+            "current_value": _dec(anomaly.recent_value),
             "description": description,
             "recommendation": recommendation,
-        })
+            "detection": {
+                "method": anomaly.kind,
+                "z_score": _dec(anomaly.z_score),
+                "baseline_mean": _dec(anomaly.baseline_mean),
+                "baseline_stddev": _dec(anomaly.baseline_stddev),
+                "samples": anomaly.samples,
+            },
+        }, dedupe_key=f"anomaly:{key}")
 
-        if alert_id:
-            new_alerts += 1
-            active_ai_keys.add(alert_key)
-            await notif_service.send_ops_alert(
-                customer_id=customer_id,
-                service=service,
-                resource_id=resource_id,
-                metric_name="AI Anomaly",
-                severity=severity,
-                description=description,
+        if not alert_id:
+            continue
+        new_alerts += 1
+        active_keys.add(key)
+        await notif_service.send_ops_alert(
+            customer_id=customer_id,
+            service=anomaly.service,
+            resource_id=anomaly.resource_id,
+            metric_name="Anomaly",
+            severity=anomaly.severity,
+            description=description,
+        )
+        try:
+            await notif_service.deliver_to_customer(
+                customer,
+                service=anomaly.service,
+                resource_id=anomaly.resource_id,
+                metric_name=anomaly.metric_name,
+                severity=anomaly.severity,
+                current_value=anomaly.recent_value,
+                description=f"{description}\n\n{recommendation}",
             )
+        except Exception as exc:  # noqa: BLE001 — delivery must not stop detection
+            logger.warning("Customer delivery failed for %s: %s", customer_id, exc)
 
     return new_alerts
 
 
-async def anomaly_detection_loop() -> None:
-    """Background task — runs anomaly detection every 15 minutes."""
+def _claude_client() -> Any:
     config = load_config()
-    
     if not config.anthropic_api_key:
-        logger.warning("Anthropic API key not configured — anomaly detection disabled")
-        return
+        logger.info("No Anthropic key configured: anomalies will use built-in wording")
+        return None
+    from anthropic import Anthropic
+    return Anthropic(api_key=config.anthropic_api_key)
 
-    claude_client = Anthropic(api_key=config.anthropic_api_key)
+
+async def run_anomaly_detection_for_customer(customer_id: str) -> int:
+    """One detection pass for one customer, with fresh services."""
+    db = DynamoDBService()
+    return await detect_anomalies_for_customer(
+        customer_id, TimestreamQueryService(), db, NotificationService(),
+        _claude_client(), db.get_customer(customer_id),
+    )
+
+
+async def anomaly_detection_loop() -> None:
+    """Background task: detection every 15 minutes for every active customer."""
+    client = _claude_client()
     ts_service = TimestreamQueryService()
     db_service = DynamoDBService()
     notif_service = NotificationService()
-
     logger.info("Anomaly detection loop started (interval: 15 min)")
 
     while True:
         try:
-            customers = db_service.list_customers()
-            active = [c for c in customers if c.get("status") == "active"]
-
-            for customer in active:
+            for customer in db_service.list_customers():
+                if customer.get("status") != "active":
+                    continue
                 await detect_anomalies_for_customer(
-                    customer["customer_id"],
-                    ts_service,
-                    db_service,
-                    notif_service,
-                    claude_client,
+                    customer["customer_id"], ts_service, db_service,
+                    notif_service, client, customer,
                 )
-
         except Exception as exc:  # noqa: BLE001
             logger.error("Anomaly detection loop error: %s", exc)
 
-        await asyncio.sleep(15 * 60)  # 15 minutes
+        await asyncio.sleep(INTERVAL_SECONDS)

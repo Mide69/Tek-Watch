@@ -2,7 +2,7 @@
 import asyncio
 import json
 import logging
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import boto3
 import httpx
@@ -11,6 +11,19 @@ from botocore.exceptions import ClientError
 from config import load_config
 
 logger = logging.getLogger(__name__)
+
+# Customers paste a Slack webhook into their notification settings, and the
+# API POSTs to it. Accepting any URL there would let a customer point the API
+# at internal addresses (the instance metadata service, private services) and
+# have it make requests on their behalf. Only Slack's own webhook host is
+# accepted, both when the URL is saved and again before anything is sent.
+SLACK_WEBHOOK_PREFIX = "https://hooks.slack.com/services/"
+
+_SEVERITY_RANK = {"info": 0, "low": 0, "medium": 1, "warning": 1, "high": 2, "critical": 3}
+
+
+def is_slack_webhook(url: Optional[str]) -> bool:
+    return isinstance(url, str) and url.startswith(SLACK_WEBHOOK_PREFIX) and len(url) < 300
 
 
 class NotificationService:
@@ -193,6 +206,64 @@ class NotificationService:
         """
 
         await self.send_customer_email(to_address, subject, text_body, html_body)
+
+    # ── Customer delivery ─────────────────────────────────────────────────────
+
+    async def deliver_to_customer(
+        self,
+        customer: Dict[str, Any],
+        *,
+        service: str,
+        resource_id: str,
+        metric_name: str,
+        severity: str,
+        current_value: Optional[float] = None,
+        threshold_value: Optional[float] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Send an alert to the customer the way they asked to receive it.
+
+        Customers could save an email address, a Slack webhook and a minimum
+        severity, but nothing ever read those settings: every alert went only
+        to Tek Tribe's internal ops topic, and send_slack_alert had no caller
+        at all. This is the one place customer-facing delivery happens.
+        """
+        prefs = (customer or {}).get("notification_preferences") or {}
+        minimum = str(prefs.get("min_severity") or "warning")
+        if _SEVERITY_RANK.get(severity, 1) < _SEVERITY_RANK.get(minimum, 1):
+            return
+
+        customer_id = str((customer or {}).get("customer_id") or "")
+        if prefs.get("email_enabled", True):
+            to_address = prefs.get("email_address") or (customer or {}).get("email")
+            if to_address:
+                await self.send_alert_email(
+                    to_address=to_address,
+                    customer_id=customer_id,
+                    service=service,
+                    resource_id=resource_id,
+                    severity=severity,
+                    metric_name=metric_name,
+                    current_value=current_value,
+                    threshold_value=threshold_value,
+                    description=description,
+                )
+
+        webhook = prefs.get("slack_webhook_url")
+        if webhook and is_slack_webhook(webhook):
+            await self.send_slack_alert(
+                customer_id=customer_id,
+                service=service,
+                resource_id=resource_id,
+                metric_name=metric_name,
+                severity=severity,
+                current_value=current_value,
+                threshold_value=threshold_value,
+                description=description,
+                webhook_url=webhook,
+            )
+        elif webhook:
+            logger.warning("Ignoring non-Slack webhook for %s", customer_id)
 
     # ── Slack webhook ─────────────────────────────────────────────────────────
 

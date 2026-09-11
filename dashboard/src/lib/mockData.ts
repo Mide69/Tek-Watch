@@ -403,13 +403,160 @@ export const MOCK_CW_ALARMS = [
   { alarm_name: 'lambda-error-rate',          state: 'INSUFFICIENT_DATA', metric: 'Errors',                threshold: 100, value: 0,    region: 'eu-west-2', namespace: 'AWS/Lambda' },
 ]
 
-export function getMockComplianceScore(timeRange: TimeRange) {
-  const base = { gdpr: 84, cyber_essentials: 76, fca: 91, iso27001: 68 }
-  const delta = timeRange === '30d' ? -8 : timeRange === '7d' ? -4 : 0
-  return Object.fromEntries(
-    Object.entries(base).map(([k, v]) => [k, Math.min(100, Math.max(0, v + delta))])
-  ) as typeof base
+// ─── Compliance checks and incidents ──────────────────────────────────────────
+//
+// Shapes match GET /api/v1/security/compliance and /incidents. The demo's
+// results are consistent with the demo's own fixtures above: three users
+// without MFA, two old keys, two certificates inside 30 days, one HIGH
+// GuardDuty finding against deploy-bot. The scores are computed from the
+// checks, the same way the API computes them, never typed in.
+
+export type ControlStatus = 'pass' | 'fail' | 'unknown' | 'not_applicable'
+
+export interface ComplianceControl {
+  id: string
+  title: string
+  severity: string
+  status: ControlStatus
+  detail: string
+  remediation: string
+  references: { framework: string; reference: string }[]
+  findings: { resource: string; detail: string }[]
 }
+
+export interface ComplianceFramework {
+  id: string
+  name: string
+  score: number | null
+  passed: number
+  failed: number
+  unknown: number
+  total: number
+}
+
+export interface ComplianceReport {
+  evaluated_at: string
+  frameworks: ComplianceFramework[]
+  controls: ComplianceControl[]
+  disclaimer: string
+}
+
+export interface Incident {
+  id: string
+  type: string
+  title: string
+  severity: string
+  correlated: boolean
+  summary: string
+  detected_at: string | null
+  affected: { service: string; resource: string; region: string }[]
+  chain: { service: string; time: string | null; detail: string }[]
+  regulatory_impact: { framework: string; reference: string; why: string }[]
+  remediation: { order: number; action: string; command: string | null }[]
+}
+
+export const COMPLIANCE_FRAMEWORK_NAMES: Record<string, string> = {
+  uk_gdpr: 'UK GDPR',
+  cyber_essentials: 'Cyber Essentials',
+  iso27001: 'ISO 27001:2022',
+}
+
+const ref = (framework: string, reference: string) => ({ framework, reference })
+const ACCESS_REFS = [
+  ref('uk_gdpr', 'Art. 32(1)(b) confidentiality of processing systems'),
+  ref('cyber_essentials', 'User access control'),
+  ref('iso27001', 'A.8.5 Secure authentication'),
+]
+
+const DEMO_CONTROLS: ComplianceControl[] = [
+  { id: 'S3-01', title: 'S3 buckets block public access', severity: 'high', status: 'fail',
+    detail: '1 of 6 buckets fail this check.',
+    remediation: 'Turn on all four S3 Block Public Access settings for each bucket, or for the whole account.',
+    references: [ref('uk_gdpr', 'Art. 32(1)(b) confidentiality of processing systems'), ref('cyber_essentials', 'Secure configuration'), ref('iso27001', 'A.8.3 Information access restriction')],
+    findings: [{ resource: 'acme-marketing-assets', detail: 'S3 Block Public Access is not fully enabled on this bucket.' }] },
+  { id: 'IAM-01', title: 'Every IAM user with a password uses MFA', severity: 'high', status: 'fail',
+    detail: '3 IAM users can sign in without MFA.',
+    remediation: 'Assign an MFA device to each IAM user that can sign in to the console, and add an IAM policy that denies access without MFA.',
+    references: ACCESS_REFS, findings: [{ resource: 'IAM users', detail: '3 without MFA' }] },
+  { id: 'GD-02', title: 'No open high or critical GuardDuty findings', severity: 'high', status: 'fail',
+    detail: '1 high or critical finding open.',
+    remediation: 'Investigate each high or critical finding, contain the affected resource, and archive the finding once it is resolved.',
+    references: [ref('uk_gdpr', 'Art. 33 assessing and notifying personal data breaches'), ref('iso27001', 'A.5.26 Response to information security incidents')],
+    findings: [{ resource: 'GuardDuty', detail: '1 high/critical finding' }] },
+  { id: 'IAM-03', title: 'No access keys older than 90 days', severity: 'medium', status: 'fail',
+    detail: '2 access keys are older than 90 days.',
+    remediation: 'Rotate each old key: create a new key, update whatever uses it, then deactivate and delete the old one.',
+    references: [ref('cyber_essentials', 'User access control'), ref('iso27001', 'A.5.17 Authentication information')],
+    findings: [{ resource: 'IAM access keys', detail: '2 older than 90 days' }] },
+  { id: 'ACM-01', title: 'TLS certificates in use are not about to expire', severity: 'medium', status: 'fail',
+    detail: '2 of 4 certificates expire within 30 days.',
+    remediation: 'Renew or replace certificates before they expire.',
+    references: [ref('uk_gdpr', 'Art. 32(1)(a) encryption of personal data in transit'), ref('iso27001', 'A.8.24 Use of cryptography')],
+    findings: [{ resource: 'api.acme-tech.co.uk', detail: 'Expires in 22 days' }, { resource: 'legacy.acme-tech.co.uk', detail: 'Expires in 14 days' }] },
+  { id: 'IAM-02', title: 'The root account uses MFA', severity: 'critical', status: 'pass',
+    detail: 'The root account has MFA.', remediation: '', references: ACCESS_REFS, findings: [] },
+  { id: 'S3-02', title: 'S3 buckets encrypt data at rest', severity: 'medium', status: 'pass',
+    detail: 'All 6 buckets pass.', remediation: '',
+    references: [ref('uk_gdpr', 'Art. 32(1)(a) encryption of personal data'), ref('iso27001', 'A.8.24 Use of cryptography')], findings: [] },
+  { id: 'S3-03', title: 'S3 buckets keep previous versions', severity: 'low', status: 'pass',
+    detail: 'All 6 buckets pass.', remediation: '',
+    references: [ref('uk_gdpr', 'Art. 32(1)(c) ability to restore availability and access'), ref('iso27001', 'A.8.13 Information backup')], findings: [] },
+  { id: 'GD-01', title: 'GuardDuty threat detection is switched on', severity: 'high', status: 'pass',
+    detail: 'Enabled in eu-west-2.', remediation: '',
+    references: [ref('uk_gdpr', 'Art. 32(1)(d) testing and assessing security measures'), ref('iso27001', 'A.8.16 Monitoring activities')], findings: [] },
+  { id: 'CT-01', title: 'A CloudTrail trail is recording activity', severity: 'medium', status: 'pass',
+    detail: 'At least one trail is logging.', remediation: '',
+    references: [ref('uk_gdpr', 'Art. 5(2) accountability'), ref('iso27001', 'A.8.15 Logging')], findings: [] },
+]
+
+function scoreFrameworks(controls: ComplianceControl[]): ComplianceFramework[] {
+  return Object.entries(COMPLIANCE_FRAMEWORK_NAMES).map(([id, name]) => {
+    const relevant = controls.filter(c => c.references.some(r => r.framework === id))
+    const passed = relevant.filter(c => c.status === 'pass').length
+    const failed = relevant.filter(c => c.status === 'fail').length
+    const unknown = relevant.filter(c => c.status === 'unknown').length
+    const evaluated = passed + failed
+    return { id, name, score: evaluated ? Math.round((100 * passed) / evaluated) : null, passed, failed, unknown, total: relevant.length }
+  })
+}
+
+export const MOCK_COMPLIANCE: ComplianceReport = {
+  evaluated_at: minsAgo(1),
+  frameworks: scoreFrameworks(DEMO_CONTROLS),
+  controls: DEMO_CONTROLS,
+  disclaimer:
+    'These are automated checks of the AWS technical controls TekWatch can see. ' +
+    'They help you gather evidence and spot gaps. They are not a certification, an audit, or legal advice.',
+}
+
+export const MOCK_INCIDENTS: Incident[] = [
+  {
+    id: 's3-exposure:acme-marketing-assets',
+    type: 's3_public_exposure',
+    title: 'acme-marketing-assets was exposed by DeleteBucketPublicAccessBlock',
+    severity: 'critical',
+    correlated: true,
+    summary: 'deploy-bot changed the access settings of acme-marketing-assets with DeleteBucketPublicAccessBlock, and the bucket no longer blocks public access.',
+    detected_at: hoursAgo(3),
+    affected: [{ service: 'S3', resource: 'acme-marketing-assets', region: 'eu-west-2' }],
+    chain: [
+      { service: 'CloudTrail', time: hoursAgo(3), detail: 'DeleteBucketPublicAccessBlock on acme-marketing-assets by deploy-bot from 91.108.xx.xx.' },
+      { service: 'S3', time: minsAgo(4), detail: 'acme-marketing-assets no longer has S3 Block Public Access fully enabled.' },
+    ],
+    regulatory_impact: [
+      { framework: 'UK GDPR', reference: 'Art. 32 Security of processing', why: 'A bucket that does not block public access is not an appropriate technical measure for personal data.' },
+      { framework: 'UK GDPR', reference: 'Art. 33 Notification of a personal data breach', why: 'If this bucket holds personal data and was accessed while exposed, the ICO must be told within 72 hours of you becoming aware, unless the breach is unlikely to result in a risk to individuals.' },
+      { framework: 'Cyber Essentials', reference: 'Secure configuration', why: 'Cloud storage must not be left reachable by the public by default.' },
+    ],
+    remediation: [
+      { order: 1, action: 'Block public access on the bucket now.', command: 'aws s3api put-public-access-block --bucket acme-marketing-assets --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true' },
+      { order: 2, action: "Review the bucket's policy and ACL for grants to everyone.", command: 'aws s3api get-bucket-policy --bucket acme-marketing-assets && aws s3api get-bucket-acl --bucket acme-marketing-assets' },
+      { order: 3, action: 'Confirm with deploy-bot that the change was authorised. If it was not, rotate their credentials.', command: null },
+      { order: 4, action: 'Check whether the bucket holds personal data.', command: null },
+      { order: 5, action: 'If it does, check access logs for the exposure window and decide whether the ICO must be notified within 72 hours.', command: 'aws cloudtrail lookup-events --lookup-attributes AttributeKey=ResourceName,AttributeValue=acme-marketing-assets' },
+    ],
+  },
+]
 
 // ─── Cost ─────────────────────────────────────────────────────────────────────
 
@@ -475,7 +622,7 @@ export const MOCK_ALERTS = [
     type: 'ai_anomaly',
     service: 'Lambda',
     resource: 'acme-image-processor',
-    description: 'AI anomaly detected: cold-start (init) duration for acme-image-processor increased 340% over the last 2 hours (avg 3.4 s vs baseline 0.8 s).',
+    description: 'Anomaly detected: cold-start (init) duration for acme-image-processor averaged 3.4 s over the last hour, 6.1 standard deviations above its 7-day baseline of 0.8 s.',
     triggered_at: hoursAgo(2),
     current_value: 3400,
     threshold_value: 800,
@@ -488,7 +635,7 @@ export const MOCK_ALERTS = [
     type: 'threshold',
     service: 'S3',
     resource: 'acme-static-website',
-    description: 'S3 bucket acme-static-website has public access enabled. This may expose data and violates Cyber Essentials Plus requirements.',
+    description: 'S3 bucket acme-static-website has public access enabled. This may expose data and fails the Cyber Essentials secure configuration control.',
     triggered_at: hoursAgo(6),
     current_value: 1,
     threshold_value: 0,

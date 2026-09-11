@@ -21,6 +21,7 @@ def collector():
     session = MagicMock()
     gd = MagicMock()
     session.client.return_value = gd
+    gd.get_detector.return_value = {"Status": "ENABLED"}
     c = GuardDutyCollector(session, "eu-west-1", "TT-0001")
     c._gd = gd
     return c, gd
@@ -31,10 +32,28 @@ class TestGuardDutyCollector:
         c, _ = collector
         assert c.SERVICE_NAME == "guardduty"
 
-    def test_no_detectors_returns_empty(self, collector):
+    def test_no_detectors_reports_guardduty_off(self, collector):
         c, gd = collector
         gd.list_detectors.return_value = {"DetectorIds": []}
-        assert c.collect() == []
+        records = c.collect()
+        assert [(r.metric_name, r.metric_value) for r in records] == [("detector_enabled", 0)]
+        assert records[0].resource_id == "guardduty-eu-west-1"
+
+    def test_enabled_detector_reported(self, collector):
+        c, gd = collector
+        gd.list_detectors.return_value = {"DetectorIds": ["det-abc"]}
+        gd.get_paginator.return_value.paginate.return_value = [{"FindingIds": []}]
+        rec = next(r for r in c.collect() if r.metric_name == "detector_enabled")
+        assert rec.metric_value == 1
+        assert rec.resource_id == "det-abc"
+
+    def test_suspended_detector_reported_as_off(self, collector):
+        c, gd = collector
+        gd.list_detectors.return_value = {"DetectorIds": ["det-abc"]}
+        gd.get_detector.return_value = {"Status": "DISABLED"}
+        gd.get_paginator.return_value.paginate.return_value = [{"FindingIds": []}]
+        rec = next(r for r in c.collect() if r.metric_name == "detector_enabled")
+        assert rec.metric_value == 0
 
     def test_zero_findings_emits_zero_counts(self, collector):
         c, gd = collector
@@ -46,7 +65,7 @@ class TestGuardDutyCollector:
         assert "findings_low_count" in names
         assert "findings_high_count" in names
         assert "findings_critical_count" in names
-        assert all(r.metric_value == 0 for r in records)
+        assert all(r.metric_value == 0 for r in records if r.metric_name.startswith("findings_"))
 
     def test_high_severity_finding_counted_correctly(self, collector):
         c, gd = collector

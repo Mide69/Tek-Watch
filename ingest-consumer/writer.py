@@ -27,8 +27,12 @@ from processor import ValidatedRecord
 
 logger = logging.getLogger(__name__)
 
-# Matches the old Timestream tables' magnetic-store retention (7 days).
-_RETENTION_DAYS = 7
+# How long a metric or event is kept before DynamoDB's TTL deletes it. This
+# was 7 days, carried over from the old Timestream tables, while the site
+# promised a 90-day history and the dashboard offered a 90-day range that
+# could only ever show one week. It also bounds how far back an incident's
+# cause can be found in CloudTrail history.
+_RETENTION_DAYS = 90
 
 
 class MetricsWriter:

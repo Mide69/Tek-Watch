@@ -59,6 +59,7 @@ async def evaluate_thresholds_for_customer(
     }
 
     new_alerts = 0
+    customer_record = None   # fetched once, only if an alert actually fires
 
     for threshold_key, threshold in threshold_map.items():
         if not threshold.get("enabled", True):
@@ -121,6 +122,22 @@ async def evaluate_thresholds_for_customer(
                     current_value=current_value,
                     threshold_value=threshold_value,
                 )
+                # Tell the customer too. Alerts used to reach only our own ops
+                # topic; the settings customers saved were never read.
+                try:
+                    if customer_record is None:
+                        customer_record = db_service.get_customer(customer_id) or {"customer_id": customer_id}
+                    await notif_service.deliver_to_customer(
+                        customer_record,
+                        service=service,
+                        resource_id=resource_id,
+                        metric_name=metric_name,
+                        severity=severity,
+                        current_value=float(current_value) if current_value is not None else None,
+                        threshold_value=float(threshold_value) if threshold_value is not None else None,
+                    )
+                except Exception as exc:  # noqa: BLE001 — delivery must not stop evaluation
+                    logger.warning("Customer delivery failed for %s: %s", customer_id, exc)
 
     return new_alerts
 

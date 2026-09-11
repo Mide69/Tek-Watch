@@ -21,7 +21,7 @@ import {
   MOCK_ALERTS, MOCK_AGENT, MOCK_ECS, MOCK_DYNAMODB, MOCK_VPCS,
   MOCK_ELBS, MOCK_CLOUDFRONT, MOCK_S3, MOCK_SQS, MOCK_SNS,
   MOCK_GUARDDUTY, MOCK_IAM, MOCK_ACM_CERTS, MOCK_CW_ALARMS,
-  getMockComplianceScore,
+  MOCK_COMPLIANCE, MOCK_INCIDENTS,
 } from '@/lib/mockData'
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -281,15 +281,19 @@ export function useMessaging() {
 export function useSecurity() {
   const { timeRange, region, refreshKey } = useDashboard()
   const key = `security|${timeRange}|${region}|${refreshKey}`
-  const fallbackCompliance = getMockComplianceScore(timeRange)
+  // Compliance used to be getMockComplianceScore(): four fixed percentages
+  // shown to every signed-in customer as if they were theirs. It now comes
+  // from the API's rule engine, and only the demo sees fixtures.
   return useSWR(key, async () => {
-    const [guardduty, iam, certs, alarms] = await Promise.all([
+    const [guardduty, iam, certs, alarms, compliance, incidents] = await Promise.all([
       apiFetch(`/api/v1/security/guardduty?region=${region}`, MOCK_GUARDDUTY, 'findings'),
       apiFetch('/api/v1/security/iam', MOCK_IAM, 'summary'),
       apiFetch('/api/v1/security/acm', MOCK_ACM_CERTS, 'certificates'),
       apiFetch(`/api/v1/security/alarms?region=${region}`, MOCK_CW_ALARMS, 'alarms'),
+      apiFetch('/api/v1/security/compliance', MOCK_COMPLIANCE),
+      apiFetch('/api/v1/security/incidents', MOCK_INCIDENTS, 'incidents'),
     ])
-    return { guardduty, iam, certs, alarms, compliance: fallbackCompliance }
+    return { guardduty, iam, certs, alarms, compliance, incidents }
   }, {
     revalidateOnFocus: false,
     fallbackData: initial({
@@ -297,7 +301,8 @@ export function useSecurity() {
       iam: MOCK_IAM,
       certs: MOCK_ACM_CERTS,
       alarms: MOCK_CW_ALARMS,
-      compliance: fallbackCompliance,
+      compliance: MOCK_COMPLIANCE,
+      incidents: MOCK_INCIDENTS,
     }),
   })
 }

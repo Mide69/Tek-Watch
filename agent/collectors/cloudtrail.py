@@ -1,7 +1,7 @@
 """CloudTrail high-risk event collector."""
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 import boto3
 from botocore.exceptions import ClientError, EndpointResolutionError
@@ -23,7 +23,7 @@ HIGH_RISK_EVENTS = {
     "CreateSecurityGroup", "DeleteSecurityGroup",
     # S3 policy changes
     "PutBucketPolicy", "DeleteBucketPolicy", "PutBucketAcl",
-    "PutBucketPublicAccessBlock",
+    "PutBucketPublicAccessBlock", "DeleteBucketPublicAccessBlock",
     # Network changes
     "CreateVpc", "DeleteVpc", "ModifyVpcAttribute",
     "CreateInternetGateway", "AttachInternetGateway",
@@ -119,4 +119,49 @@ class CloudTrailCollector(BaseCollector):
                 logger.error("CloudTrail collection failed in %s: %s", self.region, exc)
         except EndpointResolutionError as exc:
             logger.warning("CloudTrail endpoint not available in %s: %s", self.region, exc)
+
+        trails = self._trail_status()
+        if trails is not None:
+            records.append(trails)
         return records
+
+    def _trail_status(self) -> Optional[MetricRecord]:
+        """How many trails visible from this region are actually logging.
+
+        Events alone cannot show that audit logging is off: a stopped trail
+        simply produces no more events. This is the fact the compliance check
+        and the "logging was switched off" incident read. Shadow trails are
+        included so a multi-region trail counts in every region it covers.
+
+        Returns None when the answer could not be determined, so a permissions
+        gap is reported as "unknown" rather than "nothing is logging".
+        """
+        try:
+            trails = self._ct.describe_trails(includeShadowTrails=True).get("trailList", [])
+        except (ClientError, EndpointResolutionError) as exc:
+            logger.warning("Could not list CloudTrail trails in %s: %s", self.region, exc)
+            return None
+
+        logging_count = checked = 0
+        for trail in trails:
+            name = trail.get("TrailARN") or trail.get("Name")
+            if not name:
+                continue
+            try:
+                if self._ct.get_trail_status(Name=name).get("IsLogging"):
+                    logging_count += 1
+                checked += 1
+            except (ClientError, EndpointResolutionError) as exc:
+                logger.warning("Could not read status of trail %s: %s", name, exc)
+        if trails and not checked:
+            return None
+
+        return self._make_record(
+            resource_type="summary",
+            resource_id=f"cloudtrail-trails-{self.region}",
+            resource_name=f"cloudtrail-trails-{self.region}",
+            metric_name="trails_logging_count",
+            metric_value=logging_count,
+            unit="count",
+            dimensions={"trails_total": str(len(trails))},
+        )

@@ -65,9 +65,9 @@ export default function SignupPage() {
           <ul className="space-y-3">
             {[
               'Real-time metrics across all regions',
-              'AI anomaly detection powered by Claude',
-              'UK GDPR & Cyber Essentials Plus compliance',
-              'Threshold alerts & notifications',
+              'Anomaly detection with plain-English explanations',
+              'UK GDPR, Cyber Essentials & ISO 27001 checks',
+              'Email and Slack alerts',
             ].map(f => (
               <li key={f} className="flex items-center gap-3 text-sm text-slate-300">
                 <div className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center flex-shrink-0">

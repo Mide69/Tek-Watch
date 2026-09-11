@@ -160,10 +160,16 @@ class TimestreamQueryService:
         rows = self._query_metrics_by_customer(cid, self._since_iso("7d"))
 
         groups: Dict[tuple, List[float]] = {}
+        first_seen: Dict[tuple, str] = {}
         for r in rows:
             key = (r.get("service"), r.get("resource_id"), r.get("metric_name"))
             groups.setdefault(key, []).append(float(r["value"]))
+            t = str(r.get("time") or "")
+            if t and (key not in first_seen or t < first_seen[key]):
+                first_seen[key] = t
 
+        # samples and first_time let the detector refuse to judge a metric it
+        # has barely seen: a resource created an hour ago has no "normal" yet.
         return [
             {
                 "service": service,
@@ -171,6 +177,8 @@ class TimestreamQueryService:
                 "metric_name": metric_name,
                 "avg_value": statistics.mean(values),
                 "stddev_value": statistics.stdev(values) if len(values) > 1 else 0.0,
+                "samples": len(values),
+                "first_time": first_seen.get((service, resource_id, metric_name)),
             }
             for (service, resource_id, metric_name), values in groups.items()
         ]

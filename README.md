@@ -23,6 +23,29 @@ Customer AWS Account
                                                .io            .io
 ```
 
+## What is our code, and what is Claude
+
+Every monitoring decision (what is anomalous, what fails a check, what counts
+as an incident) is made by TekWatch's own deterministic code. The Claude API is
+used for language only, never to decide what is wrong.
+
+| Capability | Where it runs | How it works |
+|---|---|---|
+| Data collection | Our agent (`agent/collectors/`) | 23 read-only boto3 collectors, every 5 minutes |
+| Baselines | Our API (`api/services/timestream.py`) | 7-day mean, standard deviation and sample count per resource metric |
+| Anomaly detection | Our API (`api/services/alerting/detector.py`) | z-score against the 7-day baseline (3σ medium, 5σ high), plus step-change detection for metrics that are normally flat. Needs 24 hours and 12 samples of history first |
+| Threshold alerts | Our API (`api/services/alerting/threshold.py`) | Default or customer thresholds, every 5 minutes |
+| Compliance checks | Our API (`api/services/compliance.py`) | 10 rule-based checks (S3, IAM, ACM, GuardDuty, CloudTrail) mapped to UK GDPR, Cyber Essentials and ISO 27001:2022. A check with no data is reported as not measured and left out of the score, never counted as a pass |
+| Incident correlation | Our API (`api/services/correlation.py`) | Joins CloudTrail changes to current S3 and trail state: who changed what and when, the UK GDPR impact, and ordered remediation |
+| Alert delivery | Our API (`api/services/notifications.py`) | Email (SES) and Slack, filtered by each customer's minimum severity |
+| Alert wording | Claude API, optional | Rewrites anomalies the detector already found in plain English. It cannot add, remove or re-grade them. Without a key, built-in wording is used and detection runs unchanged |
+| AI assistant | Claude API | Answers questions by calling our API's tools over the customer's own data |
+
+Compliance results are automated evidence about AWS technical controls. They
+are not a certification, an audit or legal advice. FCA PS21/3 operational
+resilience is not covered: it depends on business services and impact
+tolerances that cannot be judged from AWS configuration.
+
 ## Repository Structure
 
 ```
@@ -109,7 +132,7 @@ uvicorn main:app --reload
 | API | Python 3.12, FastAPI, Anthropic SDK |
 | Dashboard | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
 | Admin Portal | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
-| Metrics Store | Amazon DynamoDB (metrics + events tables, TTL) |
+| Metrics Store | Amazon DynamoDB (metrics + events tables, 90-day TTL) |
 | App Data | Amazon DynamoDB |
 | Queue | Amazon SQS |
 | Auth | AWS Cognito |
@@ -127,7 +150,10 @@ Live in production on AWS (eu-west-2), serving from `app.tekwatch.io`.
       Alarms, Cost Explorer, Trusted Advisor
 - [x] SQS publisher with batching; ingest consumer writing to DynamoDB
 - [x] FastAPI service with Cognito JWT auth and all customer/admin routers
-- [x] Threshold alerting engine and AI anomaly detection (Claude)
+- [x] Threshold alerting, statistical anomaly detection, compliance checks and
+      incident correlation (our code); plain-English alert wording and the chat
+      assistant (Claude API)
+- [x] Customer alert delivery by email and Slack, per notification preferences
 - [x] Agent silence-detection Lambda on a 10-minute EventBridge schedule
 - [x] Customer dashboard and admin portal (Next.js static exports on
       S3 + CloudFront), both with password reset and TOTP MFA enrolment
@@ -196,6 +222,9 @@ See `infrastructure/terraform/README.md` for Terraform deployment instructions.
 - `GET /api/v1/compute/lambda` - Lambda functions
 - `GET /api/v1/databases/rds` - RDS instances
 - `GET /api/v1/security/guardduty` - GuardDuty findings
+- `GET /api/v1/security/compliance` - Automated compliance check results
+- `GET /api/v1/security/incidents` - Correlated security incidents
+- `GET|PUT /api/v1/notifications/preferences` - Email, Slack and minimum severity
 - `GET /api/v1/cost/summary` - Cost overview
 - `GET /api/v1/alerts` - Active alerts
 - `GET /api/v1/metrics/{resource_id}` - Time-series data

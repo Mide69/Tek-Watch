@@ -23,12 +23,19 @@ class GuardDutyCollector(BaseCollector):
         """Collect GuardDuty finding counts and top 10 findings."""
         records: List[MetricRecord] = []
         try:
+            # Whether GuardDuty is on at all is reported explicitly, 1 or 0.
+            # Before, a region with no detector sent nothing, which looks the
+            # same as a region the agent could not read, so "GuardDuty is off"
+            # could never be reported as a finding.
             detectors = self._gd.list_detectors().get("DetectorIds", [])
             if not detectors:
                 logger.info("No GuardDuty detectors in %s", self.region)
+                records.append(self._detector_record(f"guardduty-{self.region}", False))
                 return records
 
             detector_id = detectors[0]
+            status = self._gd.get_detector(DetectorId=detector_id).get("Status", "")
+            records.append(self._detector_record(detector_id, status == "ENABLED"))
             records.extend(self._collect_findings(detector_id))
         except ClientError as exc:
             error_code = exc.response.get("Error", {}).get("Code", "")
@@ -39,6 +46,16 @@ class GuardDutyCollector(BaseCollector):
         except EndpointResolutionError as exc:
             logger.warning("GuardDuty endpoint not available in %s: %s", self.region, exc)
         return records
+
+    def _detector_record(self, resource_id: str, enabled: bool) -> MetricRecord:
+        return self._make_record(
+            resource_type="detector",
+            resource_id=resource_id,
+            resource_name=f"guardduty-{self.region}",
+            metric_name="detector_enabled",
+            metric_value=1 if enabled else 0,
+            unit="none",
+        )
 
     def _collect_findings(self, detector_id: str) -> List[MetricRecord]:
         """Collect finding counts by severity and top 10 findings."""

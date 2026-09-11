@@ -1,10 +1,11 @@
-"""Security router — GuardDuty, IAM, ACM, CloudWatch Alarms."""
+"""Security router — GuardDuty, IAM, ACM, CloudWatch Alarms, compliance, incidents."""
 import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
 from auth.dependencies import CustomerContext, get_current_customer
+from services import compliance, correlation
 from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
@@ -12,29 +13,57 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
+def _guardduty_severity(score: Optional[float]) -> str:
+    """GuardDuty's numeric severity as the label the page shows.
+
+    Same bands the collector uses when it counts findings by severity.
+    """
+    if score is None:
+        return "UNKNOWN"
+    if score >= 9:
+        return "CRITICAL"
+    if score >= 7:
+        return "HIGH"
+    if score >= 4:
+        return "MEDIUM"
+    return "LOW"
+
+
 @router.get("/guardduty")
 async def get_guardduty_findings(
     customer: CustomerContext = Depends(get_current_customer),
     severity: Optional[str] = Query(None),
+    region: Optional[str] = Query(None),
 ):
-    """Get GuardDuty findings."""
+    """Get GuardDuty findings.
+
+    The collector reports each finding as a `finding_severity` score with
+    `type`, `resource_type` and `created_at` dimensions, plus one per-region
+    detector row carrying counts. This read `finding_type`, `severity` and
+    `description` dimensions that no collector sends, and listed the detector
+    rows as findings, so a real account saw one "UNKNOWN" finding per region
+    and none of the real ones' details.
+    """
     ts = TimestreamQueryService()
-    findings = [
-        {
+    findings = []
+    for f in ts.get_service_inventory(customer.customer_id, "guardduty"):
+        if "finding_severity" not in (f.get("metrics") or {}):
+            continue
+        findings.append({
             "finding_id": f["resource_id"],
-            "type": dim(f, "finding_type") or f["resource_name"],
-            "severity": dim(f, "severity") or "UNKNOWN",
+            "type": dim(f, "type") or f["resource_name"],
+            "severity": _guardduty_severity(num(f, "finding_severity")),
             "region": f.get("region") or "",
-            "resource": dim(f, "resource_name") or dim(f, "resource"),
-            "description": dim(f, "description"),
-            "updated_at": dim(f, "updated_at") or f.get("last_seen"),
-            "count": num(f, "finding_count") or 1,
-        }
-        for f in ts.get_service_inventory(customer.customer_id, "guardduty")
-    ]
+            "resource": dim(f, "resource_type"),
+            "description": f.get("resource_name") or "",
+            "updated_at": dim(f, "created_at") or f.get("last_seen"),
+            "count": 1,
+        })
     if severity:
         wanted = severity.upper()
         findings = [f for f in findings if str(f["severity"]).upper() == wanted]
+    if wants_region_filter(region):
+        findings = [f for f in findings if f["region"] == region]
     return {"findings": findings}
 
 
@@ -55,10 +84,10 @@ async def get_cloudtrail_events(
             "region": e.get("region") or "",
         }
         for e in ts.get_service_inventory(customer.customer_id, "cloudtrail", "24h")
-        # The collector also emits a per-region rollup count under
-        # high_risk_events_24h. That is a number about the region, not an
-        # event, and listing it as one put a row named "cloudtrail-eu-west-2"
-        # in among the audit events.
+        # The collector also emits per-region rollups (high_risk_events_24h,
+        # trails_logging_count). Those are numbers about the region, not
+        # events, and listing them as one put a row named
+        # "cloudtrail-eu-west-2" in among the audit events.
         if "high_risk_event" in (e.get("metrics") or {})
     ]
     events.sort(key=lambda e: str(e.get("event_time") or ""), reverse=True)
@@ -81,7 +110,10 @@ async def get_iam_summary(
 
     users_total = num(iam, "total_users")
     without_mfa = num(iam, "users_without_mfa_count")
-    root_mfa = num(iam, "root_mfa_active")
+    # Sent as the text "true"/"false", so it lands in the events table as a
+    # string. num() on it was always None, and root MFA read as "not measured"
+    # for every customer even though the agent had measured it.
+    root_mfa = compliance.bool_metric(iam, "root_mfa_active")
 
     return {
         "summary": {
@@ -94,7 +126,7 @@ async def get_iam_summary(
             ),
             "roles_total": num(iam, "total_roles"),
             "old_access_keys": num(iam, "access_keys_older_than_90_days"),
-            "root_mfa_enabled": None if root_mfa is None else bool(root_mfa),
+            "root_mfa_enabled": root_mfa,
             # Not collected by any agent collector yet. None keeps the page
             # honest about that rather than showing a reassuring zero for a
             # risk nobody has actually checked.
@@ -172,3 +204,28 @@ async def get_cloudwatch_alarms(
     if wants_region_filter(region):
         alarms = [a for a in alarms if a["region"] == region]
     return {"alarms": alarms}
+
+
+@router.get("/compliance")
+async def get_compliance(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Automated compliance checks, evaluated from the customer's own data.
+
+    Replaces four fixed percentages the dashboard used to show every customer.
+    See services/compliance.py for what is checked and how it is scored.
+    """
+    ts = TimestreamQueryService()
+    return compliance.evaluate(compliance.load_inventory(ts, customer.customer_id))
+
+
+@router.get("/incidents")
+async def get_incidents(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Security incidents built by joining CloudTrail changes to current state.
+
+    See services/correlation.py.
+    """
+    ts = TimestreamQueryService()
+    return {"incidents": correlation.correlate(correlation.load_inventory(ts, customer.customer_id))}

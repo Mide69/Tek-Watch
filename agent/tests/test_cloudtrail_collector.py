@@ -23,9 +23,14 @@ def collector():
     session = MagicMock()
     ct = MagicMock()
     session.client.return_value = ct
+    ct.describe_trails.return_value = {"trailList": []}
     c = CloudTrailCollector(session, "eu-west-1", "TT-0001")
     c._ct = ct
     return c, ct
+
+
+def trail(name):
+    return {"Name": name, "TrailARN": f"arn:aws:cloudtrail:eu-west-1:111111111111:trail/{name}"}
 
 
 class TestCloudTrailCollector:
@@ -82,18 +87,62 @@ class TestCloudTrailCollector:
         event_rec = next(r for r in records if r.metric_name == "high_risk_event")
         assert event_rec.dimensions["username"] == "bob"
 
-    def test_access_denied_returns_empty(self, collector):
+    # Event lookup failing must not stop the trail status check, and vice
+    # versa: they answer different questions.
+    def test_access_denied_emits_no_events(self, collector):
         c, ct = collector
         ct.get_paginator.side_effect = ClientError(
             {"Error": {"Code": "AccessDeniedException", "Message": "denied"}},
             "LookupEvents",
         )
-        assert c.collect() == []
+        assert [r.metric_name for r in c.collect()] == ["trails_logging_count"]
 
-    def test_endpoint_error_returns_empty(self, collector):
+    def test_endpoint_error_emits_no_events(self, collector):
         c, ct = collector
         ct.get_paginator.side_effect = EndpointResolutionError(msg="endpoint not available")
-        assert c.collect() == []
+        assert [r.metric_name for r in c.collect()] == ["trails_logging_count"]
+
+    def test_delete_public_access_block_is_high_risk(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [
+            {"Events": [make_event("DeleteBucketPublicAccessBlock")]}
+        ]
+        records = c.collect()
+        assert any(r.metric_value == "DeleteBucketPublicAccessBlock" for r in records)
+
+    def test_counts_only_trails_that_are_logging(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
+        ct.describe_trails.return_value = {"trailList": [trail("org"), trail("old")]}
+        ct.get_trail_status.side_effect = lambda Name: {"IsLogging": Name.endswith("/org")}
+
+        rec = next(r for r in c.collect() if r.metric_name == "trails_logging_count")
+        assert rec.metric_value == 1
+        assert rec.dimensions["trails_total"] == "2"
+        ct.describe_trails.assert_called_once_with(includeShadowTrails=True)
+
+    def test_no_trails_reports_zero_logging(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
+        rec = next(r for r in c.collect() if r.metric_name == "trails_logging_count")
+        assert rec.metric_value == 0
+
+    def test_unreadable_trail_status_is_unknown_not_zero(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
+        ct.describe_trails.return_value = {"trailList": [trail("org")]}
+        ct.get_trail_status.side_effect = ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "denied"}}, "GetTrailStatus",
+        )
+        assert all(r.metric_name != "trails_logging_count" for r in c.collect())
+
+    def test_describe_trails_denied_is_unknown(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
+        ct.describe_trails.side_effect = ClientError(
+            {"Error": {"Code": "AccessDeniedException", "Message": "denied"}}, "DescribeTrails",
+        )
+        assert all(r.metric_name != "trails_logging_count" for r in c.collect())
 
     def test_customer_id_propagated(self, collector):
         c, ct = collector

@@ -114,7 +114,7 @@ TOOLS = [
     },
     {
         "name": "get_security_summary",
-        "description": "Get security posture summary: GuardDuty findings, IAM issues, compliance flags, and security alert counts by severity.",
+        "description": "Get security posture summary: active security alerts by severity, the results of TekWatch's automated compliance checks (UK GDPR, Cyber Essentials, ISO 27001:2022) with failing resources, and correlated security incidents (who changed what, and the fix).",
         "input_schema": {"type": "object", "properties": {}},
     },
 ]
@@ -236,11 +236,34 @@ async def _execute_tool(tool_name: str, tool_input: dict, customer_id: str) -> A
                 a for a in alerts
                 if a.get("service") in ["guardduty", "security_hub", "iam", "config", "acm"]
             ]
+            # The assistant used to have only alert counts to go on, so asked
+            # "am I GDPR compliant?" it had nothing real to answer from. It
+            # now gets the same check results and incidents the Security page
+            # shows, so its answer and the page cannot disagree.
+            from services import compliance, correlation
+
+            report = compliance.evaluate(compliance.load_inventory(ts, customer_id))
+            incidents = correlation.correlate(correlation.load_inventory(ts, customer_id))
             return {
                 "total_findings": len(security),
                 "critical": len([a for a in security if a.get("severity") == "critical"]),
                 "high": len([a for a in security if a.get("severity") == "high"]),
                 "findings": security[:10],
+                "compliance": {
+                    "frameworks": report["frameworks"],
+                    "failing_checks": [
+                        {k: c[k] for k in ("id", "title", "severity", "detail", "remediation")}
+                        | {"findings": c["findings"][:5]}
+                        for c in report["controls"] if c["status"] == "fail"
+                    ],
+                    "not_measured": [c["title"] for c in report["controls"] if c["status"] == "unknown"],
+                    "disclaimer": report["disclaimer"],
+                },
+                "incidents": [
+                    {k: i[k] for k in ("title", "severity", "correlated", "summary", "detected_at")}
+                    | {"first_step": i["remediation"][0] if i["remediation"] else None}
+                    for i in incidents[:5]
+                ],
             }
 
         return {"error": f"Unknown tool: {tool_name}"}

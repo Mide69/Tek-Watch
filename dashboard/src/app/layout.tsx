@@ -7,8 +7,8 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-sans' })
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'TekWatch: AI-Powered Cloud Intelligence for UK SMEs',
-  description: 'Real-time AWS monitoring, AI anomaly detection, and built-in UK GDPR & Cyber Essentials Plus compliance, priced for SMEs, not enterprises.',
+  title: 'TekWatch: AWS Monitoring and UK Compliance Checks for SMEs',
+  description: 'AWS monitoring with anomaly detection, plain-English alerts, and automated checks mapped to UK GDPR, Cyber Essentials and ISO 27001, priced for SMEs, not enterprises.',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
