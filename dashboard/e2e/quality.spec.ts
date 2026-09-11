@@ -9,8 +9,14 @@ test.describe('Landing page navigation', () => {
   test('every in-page link reaches its section', async ({ page }) => {
     await page.goto('/')
 
-    // The Platform menu only renders its links while open.
-    await page.getByRole('button', { name: /^platform/i }).first().click()
+    // The Platform menu only renders its links while open, and it is desktop
+    // only: at phone width the same links sit behind the hamburger.
+    const platform = page.getByRole('button', { name: /^platform/i }).first()
+    if (await platform.isVisible()) {
+      await platform.click()
+    } else {
+      await page.getByRole('button', { name: /open menu/i }).first().click()
+    }
 
     // Checked against whatever the page links to, not a fixed list, so a
     // renamed section fails here instead of silently leaving a dead link.
