@@ -107,6 +107,17 @@ class TestDetectForCustomer:
         assert await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {}) == 0
         notif.deliver_to_customer.assert_not_awaited()
 
+    async def test_heavy_reads_run_off_the_event_loop(self):
+        import threading
+
+        ts, db, notif = services()
+        loop_thread = threading.get_ident()
+        seen = []
+        week = ts.get_7day_summary.return_value
+        ts.get_7day_summary.side_effect = lambda cid: seen.append(threading.get_ident()) or week
+        await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {})
+        assert seen and seen[0] != loop_thread
+
     async def test_numbers_stored_as_decimals(self):
         from decimal import Decimal
         ts, db, notif = services()

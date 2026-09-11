@@ -29,6 +29,10 @@ logger = logging.getLogger(__name__)
 EXPLAIN_MODEL = "claude-sonnet-4-20250514"
 EXPLAIN_LIMIT = 20          # anomalies explained per call; the rest use built-in wording
 INTERVAL_SECONDS = 15 * 60
+# The first pass reads a week of every metric. Starting it the instant the
+# process boots put that load on top of startup, while the load balancer was
+# still deciding whether the new task was healthy.
+STARTUP_DELAY_SECONDS = 120
 
 EXPLAIN_SYSTEM_PROMPT = """You write short plain-English explanations of cloud monitoring anomalies for UK business owners who are not engineers.
 
@@ -116,8 +120,11 @@ async def detect_anomalies_for_customer(
 
     Returns the number of new alerts created.
     """
-    baseline = ts_service.get_7day_summary(customer_id)
-    recent = ts_service.get_last_hour(customer_id)
+    # Blocking DynamoDB reads, a week of data for the baseline. Run on the
+    # event loop, they froze every request this worker was serving, health
+    # checks included, for as long as the read took.
+    baseline = await asyncio.to_thread(ts_service.get_7day_summary, customer_id)
+    recent = await asyncio.to_thread(ts_service.get_last_hour, customer_id)
     if not baseline or not recent:
         return 0
 
@@ -215,10 +222,11 @@ async def anomaly_detection_loop() -> None:
     db_service = DynamoDBService()
     notif_service = NotificationService()
     logger.info("Anomaly detection loop started (interval: 15 min)")
+    await asyncio.sleep(STARTUP_DELAY_SECONDS)
 
     while True:
         try:
-            for customer in db_service.list_customers():
+            for customer in await asyncio.to_thread(db_service.list_customers):
                 if customer.get("status") != "active":
                     continue
                 await detect_anomalies_for_customer(

@@ -15,10 +15,11 @@ input-validation behavior (raises ValueError on malformed IDs) and costs
 nothing.
 """
 import logging
+import math
 import re
 import statistics
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -155,18 +156,44 @@ class TimestreamQueryService:
         ]
 
     def get_7day_summary(self, customer_id: str) -> List[Dict[str, Any]]:
-        """Get 7-day averages and std devs for anomaly detection."""
-        cid = _safe(customer_id)
-        rows = self._query_metrics_by_customer(cid, self._since_iso("7d"))
+        """Get 7-day averages and std devs for anomaly detection.
 
-        groups: Dict[tuple, List[float]] = {}
-        first_seen: Dict[tuple, str] = {}
-        for r in rows:
-            key = (r.get("service"), r.get("resource_id"), r.get("metric_name"))
-            groups.setdefault(key, []).append(float(r["value"]))
-            t = str(r.get("time") or "")
-            if t and (key not in first_seen or t < first_seen[key]):
-                first_seen[key] = t
+        Computed while the pages stream in (Welford's method), keeping four
+        numbers per metric rather than every row. A week at one sample every
+        five minutes is about 2,000 rows per metric; holding them all as
+        Python dicts for a whole account, in each of the API's two workers,
+        outgrew the 512 MB task and took the API down on deploy.
+        """
+        cid = _safe(customer_id)
+        # key -> [count, mean, sum of squared deviations, earliest time]
+        stats: Dict[tuple, List[Any]] = {}
+        try:
+            for r in self._iter_query(
+                self._metrics_table,
+                Key("customer_id").eq(cid) & Key("time").gte(self._since_iso("7d")),
+                index_name="gsi_customer_time",
+                scan_forward=True,
+            ):
+                try:
+                    value = float(r["value"])
+                except (KeyError, TypeError, ValueError):
+                    continue
+                key = (r.get("service"), r.get("resource_id"), r.get("metric_name"))
+                entry = stats.get(key)
+                if entry is None:
+                    entry = stats[key] = [0, 0.0, 0.0, ""]
+                entry[0] += 1
+                delta = value - entry[1]
+                entry[1] += delta / entry[0]
+                entry[2] += delta * (value - entry[1])
+                t = str(r.get("time") or "")
+                if t and (not entry[3] or t < entry[3]):
+                    entry[3] = t
+        except ClientError as exc:
+            # A baseline built from part of the week would make ordinary
+            # readings look anomalous. No baseline at all is the safe answer.
+            logger.error("DynamoDB GSI query failed: %s", exc)
+            return []
 
         # samples and first_time let the detector refuse to judge a metric it
         # has barely seen: a resource created an hour ago has no "normal" yet.
@@ -175,12 +202,12 @@ class TimestreamQueryService:
                 "service": service,
                 "resource_id": resource_id,
                 "metric_name": metric_name,
-                "avg_value": statistics.mean(values),
-                "stddev_value": statistics.stdev(values) if len(values) > 1 else 0.0,
-                "samples": len(values),
-                "first_time": first_seen.get((service, resource_id, metric_name)),
+                "avg_value": mean,
+                "stddev_value": math.sqrt(m2 / (n - 1)) if n > 1 else 0.0,
+                "samples": n,
+                "first_time": first_time or None,
             }
-            for (service, resource_id, metric_name), values in groups.items()
+            for (service, resource_id, metric_name), (n, mean, m2, first_time) in stats.items()
         ]
 
     def get_last_hour(self, customer_id: str) -> List[Dict[str, Any]]:
@@ -431,13 +458,13 @@ class TimestreamQueryService:
             return []
 
     @staticmethod
-    def _paginated_query(
+    def _iter_query(
         table,
         key_condition,
         index_name: Optional[str] = None,
         scan_forward: bool = True,
-    ) -> List[Dict[str, Any]]:
-        items: List[Dict[str, Any]] = []
+    ) -> Iterator[Dict[str, Any]]:
+        """Every item a query matches, one page in memory at a time."""
         kwargs: Dict[str, Any] = {
             "KeyConditionExpression": key_condition,
             "ScanIndexForward": scan_forward,
@@ -447,12 +474,20 @@ class TimestreamQueryService:
 
         while True:
             resp = table.query(**kwargs)
-            items.extend(resp.get("Items", []))
+            yield from resp.get("Items", [])
             last_key = resp.get("LastEvaluatedKey")
             if not last_key:
                 break
             kwargs["ExclusiveStartKey"] = last_key
-        return items
+
+    @staticmethod
+    def _paginated_query(
+        table,
+        key_condition,
+        index_name: Optional[str] = None,
+        scan_forward: bool = True,
+    ) -> List[Dict[str, Any]]:
+        return list(TimestreamQueryService._iter_query(table, key_condition, index_name, scan_forward))
 
     @staticmethod
     def _get_bin_size(time_range: str) -> Optional[timedelta]:
