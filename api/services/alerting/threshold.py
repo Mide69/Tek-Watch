@@ -11,6 +11,11 @@ from services.timestream import TimestreamQueryService
 
 logger = logging.getLogger(__name__)
 
+# Wait before the first pass so a starting task can answer health checks
+# first. The anomaly loop waits 120s; staggering them keeps the two from
+# hitting DynamoDB at the same moment.
+STARTUP_DELAY_SECONDS = 90
+
 _OPERATOR_MAP = {
     "gt":  lambda v, t: v > t,
     "gte": lambda v, t: v >= t,
@@ -48,9 +53,10 @@ async def evaluate_thresholds_for_customer(
     Returns:
         Number of new alerts created.
     """
-    # Get effective thresholds (customer overrides + defaults)
-    customer_thresholds = db_service.get_thresholds(customer_id)
-    default_thresholds = db_service.get_thresholds("DEFAULT")
+    # Every DynamoDB call here is blocking boto3. Run on the event loop they
+    # freeze this worker's requests, health checks included.
+    customer_thresholds = await asyncio.to_thread(db_service.get_thresholds, customer_id)
+    default_thresholds = await asyncio.to_thread(db_service.get_thresholds, "DEFAULT")
 
     # Customer overrides take precedence
     threshold_map: Dict[str, Dict[str, Any]] = {}
@@ -65,11 +71,23 @@ async def evaluate_thresholds_for_customer(
         return 0
 
     # Get existing active alerts to avoid duplicates
-    active_alerts = db_service.get_alerts(customer_id, status_filter="active")
+    active_alerts = await asyncio.to_thread(db_service.get_alerts, customer_id, "active")
     active_keys = {
         f"{a.get('service')}#{a.get('resource_id')}#{a.get('metric_name')}"
         for a in active_alerts
     }
+
+    # One query for the whole window, indexed by service and metric. This was
+    # a query per threshold, which multiplied the reads by the number of
+    # thresholds on every pass.
+    readings = await asyncio.to_thread(
+        ts_service.get_latest_numeric_metrics, customer_id, None, "5m"
+    )
+    by_service_metric: Dict[tuple, List[Dict[str, Any]]] = {}
+    for row in readings:
+        by_service_metric.setdefault(
+            (row.get("service"), row.get("metric_name")), []
+        ).append(row)
 
     new_alerts = 0
     customer_record = None   # fetched once, only if an alert actually fires
@@ -84,16 +102,12 @@ async def evaluate_thresholds_for_customer(
         threshold_value = float(threshold.get("threshold_value", 0))
         severity = threshold.get("severity", "medium")
 
-        # Latest numeric readings for this service. This used to call
-        # get_resources_by_service, which reads the events table — string
-        # states only — so float() failed on every row and no threshold could
-        # fire. See TimestreamQueryService.get_latest_numeric_metrics.
-        resources = ts_service.get_latest_numeric_metrics(customer_id, service, "5m")
-
-        for resource in resources:
+        # Readings for this service and metric, from the single query above.
+        # This used to call get_resources_by_service, which reads the events
+        # table — string states only — so float() failed on every row and no
+        # threshold could fire.
+        for resource in by_service_metric.get((service, metric_name), []):
             resource_id = resource.get("resource_id", "")
-            if resource.get("metric_name") != metric_name:
-                continue
 
             try:
                 current_value = float(resource.get("value", 0))
@@ -111,7 +125,7 @@ async def evaluate_thresholds_for_customer(
             # Create new alert. The active_keys check above is a cheap local
             # filter; dedupe_key is what actually prevents two API replicas from
             # both raising this alert, since each holds its own active_keys.
-            alert_id = db_service.create_alert(customer_id, {
+            alert = {
                 "type": "threshold",
                 "severity": severity,
                 "service": service,
@@ -124,7 +138,10 @@ async def evaluate_thresholds_for_customer(
                     f"{metric_name} is {current_value:.2f} "
                     f"({operator} {threshold_value})"
                 ),
-            }, dedupe_key=alert_key)
+            }
+            alert_id = await asyncio.to_thread(
+                db_service.create_alert, customer_id, alert, dedupe_key=alert_key
+            )
 
             if alert_id:
                 new_alerts += 1
@@ -142,7 +159,9 @@ async def evaluate_thresholds_for_customer(
                 # topic; the settings customers saved were never read.
                 try:
                     if customer_record is None:
-                        customer_record = db_service.get_customer(customer_id) or {"customer_id": customer_id}
+                        customer_record = await asyncio.to_thread(
+                            db_service.get_customer, customer_id
+                        ) or {"customer_id": customer_id}
                     await notif_service.deliver_to_customer(
                         customer_record,
                         service=service,
@@ -165,10 +184,15 @@ async def threshold_evaluation_loop() -> None:
     notif_service = NotificationService()
 
     logger.info("Threshold evaluation loop started (interval: 5 min)")
+    # The first pass used to start the moment the process booted, inside the
+    # load balancer's 60-second grace period, with every read on the event
+    # loop. A task that cannot answer health checks in time is replaced, and
+    # the deployment is rolled back.
+    await asyncio.sleep(STARTUP_DELAY_SECONDS)
 
     while True:
         try:
-            customers = db_service.list_customers()
+            customers = await asyncio.to_thread(db_service.list_customers)
             active = [c for c in customers if c.get("status") == "active"]
 
             for customer in active:

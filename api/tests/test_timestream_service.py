@@ -243,7 +243,7 @@ class TestGetLatestNumericMetrics:
         result = s.get_latest_numeric_metrics("TT-0001", "ec2", "5m")
 
         assert result == [{
-            "resource_id": "i-abc", "resource_name": "web",
+            "service": "ec2", "resource_id": "i-abc", "resource_name": "web",
             "metric_name": "cpu_utilization_percent", "value": Decimal("91"),
             "time": "2026-01-01T00:05:00+00:00",
         }]

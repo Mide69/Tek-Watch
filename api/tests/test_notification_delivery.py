@@ -107,7 +107,7 @@ class TestPreferencesRouter:
 async def test_threshold_alert_reaches_the_customer():
     ts = MagicMock()
     ts.get_latest_numeric_metrics.return_value = [
-        {"resource_id": "i-1", "resource_name": "web", "metric_name": "cpu_utilization_percent", "value": 97},
+        {"service": "ec2", "resource_id": "i-1", "resource_name": "web", "metric_name": "cpu_utilization_percent", "value": 97},
     ]
     db = MagicMock()
     db.get_thresholds.side_effect = lambda cid: (
@@ -132,8 +132,8 @@ async def test_threshold_alert_reaches_the_customer():
 async def test_delivery_failure_does_not_stop_evaluation():
     ts = MagicMock()
     ts.get_latest_numeric_metrics.return_value = [
-        {"resource_id": "i-1", "metric_name": "cpu_utilization_percent", "value": 97},
-        {"resource_id": "i-2", "metric_name": "cpu_utilization_percent", "value": 99},
+        {"service": "ec2", "resource_id": "i-1", "metric_name": "cpu_utilization_percent", "value": 97},
+        {"service": "ec2", "resource_id": "i-2", "metric_name": "cpu_utilization_percent", "value": 99},
     ]
     db = MagicMock()
     db.get_thresholds.side_effect = lambda cid: (

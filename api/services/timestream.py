@@ -156,9 +156,12 @@ class TimestreamQueryService:
         ]
 
     def get_latest_numeric_metrics(
-        self, customer_id: str, service: str, time_range: str = "5m"
+        self, customer_id: str, service: Optional[str] = None, time_range: str = "5m"
     ) -> List[Dict[str, Any]]:
-        """The latest numeric reading per resource and metric for one service.
+        """The latest numeric reading per resource and metric.
+
+        One service, or every service when `service` is None: threshold
+        evaluation asks once per pass rather than once per threshold.
 
         Threshold evaluation used get_resources_by_service, which reads the
         events table. That table holds only the string-valued rows — a
@@ -171,20 +174,21 @@ class TimestreamQueryService:
         events table can never produce.
         """
         cid = _safe(customer_id)
-        svc = _safe(service)
+        svc = _safe(service) if service else None
         _safe(time_range, _SAFE_RANGE_RE)
 
         latest: Dict[tuple, Dict[str, Any]] = {}
         for row in self._query_metrics_by_customer(cid, self._since_iso(time_range)):
-            if row.get("service") != svc:
+            if svc is not None and row.get("service") != svc:
                 continue
-            key = (row.get("resource_id"), row.get("metric_name"))
+            key = (row.get("service"), row.get("resource_id"), row.get("metric_name"))
             current = latest.get(key)
             if current is None or str(row.get("time") or "") >= str(current.get("time") or ""):
                 latest[key] = row
 
         return [
             {
+                "service": r.get("service"),
                 "resource_id": r.get("resource_id"),
                 "resource_name": r.get("resource_name"),
                 "metric_name": r.get("metric_name"),
