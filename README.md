@@ -191,24 +191,36 @@ roll the service back to whatever revision terraform last created.
 
 ### Customer Agent Deployment
 
-1. **Admin creates customer in Admin Portal**
-   - Generates Customer ID (e.g., TT-0042)
-   - Generates API key
-   - Downloads pre-filled CloudFormation template
+There is one template, generated per customer by the API
+(`api/services/cfn_template.py`). A static copy used to live in
+`infrastructure/cloudformation/` and had drifted: its SQS grant named a queue
+pattern the real queue does not match, so an agent deployed from it collected
+data and was then refused at the send step.
 
-2. **Deploy CloudFormation stack in customer AWS account**
+1. **The customer signs in and opens the Agent page**, then downloads their
+   template. It is pre-filled with their Customer ID, the ingest queue and the
+   agent image. On the first download a fresh agent key is issued and embedded
+   (it is only ever shown once; later downloads leave it blank unless a new
+   key is requested). An admin can download the same template from the admin
+   portal.
+
+2. **They create the stack in their own AWS account.** In the console: upload
+   the file, pick a VPC and subnets, and acknowledge the named IAM roles. Or:
 ```bash
 aws cloudformation create-stack \
   --stack-name tek-watch-agent \
-  --template-body file://customer-agent-template.yaml \
+  --template-body file://tek-watch-agent-TT-XXXXXXXX.yaml \
   --parameters \
-    ParameterKey=CustomerID,ParameterValue=TT-0042 \
-    ParameterKey=IngestQueueURL,ParameterValue=https://sqs.eu-west-2.amazonaws.com/... \
-    ParameterKey=APIKey,ParameterValue=your-api-key \
+    ParameterKey=VpcId,ParameterValue=vpc-0123456789abcdef0 \
+    ParameterKey=SubnetIds,ParameterValue=subnet-0123456789abcdef0 \
   --capabilities CAPABILITY_NAMED_IAM
 ```
+   It creates an ECS cluster and task, a read-only task role, the key in
+   Secrets Manager, an outbound-only security group and an EventBridge
+   schedule. No inbound access is opened.
 
-3. **Agent begins collecting metrics every 5 minutes**
+3. **The agent runs every 5 minutes** and sends read-only metrics to the
+   ingest queue. Data appears on the dashboard within about ten minutes.
 
 ### Central Platform Deployment
 

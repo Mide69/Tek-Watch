@@ -600,7 +600,7 @@ resource "aws_iam_role_policy" "agent_task" {
     Statement = [
       {
         Effect   = "Allow"
-        Action   = ["sqs:SendMessage", "sqs:SendMessageBatch"]
+        Action   = ["sqs:SendMessage"]
         Resource = [var.sqs_ingest_queue_arn]
       },
       {

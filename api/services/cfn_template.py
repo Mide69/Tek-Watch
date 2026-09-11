@@ -117,7 +117,9 @@ def generate_agent_template(
                             "Version": "2012-10-17",
                             "Statement": [{
                                 "Effect": "Allow",
-                                "Action": ["sqs:SendMessage", "sqs:SendMessageBatch"],
+                                # SendMessage also authorises SendMessageBatch;
+                                # "sqs:SendMessageBatch" is not an IAM action.
+                                "Action": ["sqs:SendMessage"],
                                 # The exact queue, derived from the url this
                                 # deployment actually publishes to.
                                 #
