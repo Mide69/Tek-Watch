@@ -6,12 +6,20 @@ import { test, expect } from '@playwright/test'
  */
 
 test.describe('Landing page navigation', () => {
-  test('the header anchors reach their sections', async ({ page }) => {
+  test('every in-page link reaches its section', async ({ page }) => {
     await page.goto('/')
 
-    for (const [label, id] of [['Platform', 'features'], ['How it works', 'how-it-works'], ['Pricing', 'pricing']]) {
-      const target = page.locator(`#${id}`)
-      await expect(target, `#${id} should exist for the "${label}" link`).toHaveCount(1)
+    // The Platform menu only renders its links while open.
+    await page.getByRole('button', { name: /^platform/i }).first().click()
+
+    // Checked against whatever the page links to, not a fixed list, so a
+    // renamed section fails here instead of silently leaving a dead link.
+    const ids = await page.locator('a[href^="#"]').evaluateAll(as =>
+      Array.from(new Set(as.map(a => (a.getAttribute('href') || '').slice(1)).filter(Boolean))),
+    )
+    expect(ids).toEqual(expect.arrayContaining(['platform', 'capabilities', 'how-it-works', 'pricing']))
+    for (const id of ids) {
+      await expect(page.locator(`#${id}`), `#${id} should exist for its link`).toHaveCount(1)
     }
   })
 
@@ -32,17 +40,30 @@ test.describe('Theme', () => {
 
     const isDark = () => page.evaluate(() => document.documentElement.classList.contains('dark'))
 
-    // The theme is applied by an effect after hydration. Reading before it has
-    // run gives "light" for a moment on a page that is about to be dark, which
-    // made this flaky and told us nothing about the toggle.
-    await expect.poll(isDark, { timeout: 5000 }).toBe(true)
+    // A fresh visitor gets the soft light theme. Polled because the saved
+    // preference is applied after hydration.
+    await expect.poll(isDark, { timeout: 5000 }).toBe(false)
 
     await toggle.click()
-    await expect.poll(isDark, { timeout: 4000 }).toBe(false)
+    await expect.poll(isDark, { timeout: 4000 }).toBe(true)
 
     // Persistence is the half a user actually notices.
     await page.reload()
-    await expect.poll(isDark, { timeout: 5000 }).toBe(false)
+    await expect.poll(isDark, { timeout: 5000 }).toBe(true)
+
+    // And it goes back the other way.
+    await page.getByRole('button', { name: /light mode|dark mode/i }).first().click()
+    await expect.poll(isDark, { timeout: 4000 }).toBe(false)
+  })
+
+  test('the toggle is on every public page', async ({ page }) => {
+    for (const path of ['/', '/login', '/signup', '/contact']) {
+      await page.goto(path)
+      await expect(
+        page.getByRole('button', { name: /light mode|dark mode/i }).first(),
+        `theme toggle on ${path}`,
+      ).toBeVisible()
+    }
   })
 })
 
