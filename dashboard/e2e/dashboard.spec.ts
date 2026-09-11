@@ -26,8 +26,16 @@ test.describe('Dashboard pages (demo mode)', () => {
       await expect(page.locator('body')).not.toContainText('Application error')
       await expect(page.locator('body')).not.toContainText('DashboardProvider')
 
-      // Sidebar navigation should be present
-      await expect(page.getByRole('navigation')).toBeVisible()
+      // Navigation must be reachable. The sidebar is desktop only: below lg it
+      // lives behind the hamburger, so at phone width that button is what has
+      // to be there. Asserting the sidebar at every width failed all eleven
+      // pages on a phone while the app was behaving correctly.
+      const viewport = page.viewportSize()
+      if (viewport && viewport.width < 1024) {
+        await expect(page.getByRole('button', { name: /open navigation/i })).toBeVisible()
+      } else {
+        await expect(page.getByRole('navigation')).toBeVisible()
+      }
 
       // At least one heading matching the page topic is visible
       await expect(
@@ -38,6 +46,14 @@ test.describe('Dashboard pages (demo mode)', () => {
 
   test('sidebar navigation links route correctly', async ({ page }) => {
     await page.goto('/overview')
+
+    // Below lg the sidebar is a drawer, so open it before clicking through.
+    const hamburger = page.getByRole('button', { name: /open navigation/i })
+    if (await hamburger.isVisible()) {
+      await hamburger.click()
+      await expect(page.getByRole('navigation')).toBeVisible()
+    }
+
     // Click the "Cost" nav link and verify we land on /cost
     await page.getByRole('link', { name: /cost/i }).first().click()
     await expect(page).toHaveURL(/\/cost/)
