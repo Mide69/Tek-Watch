@@ -161,6 +161,15 @@
 }
 .animate-step-activate { animation: step-activate 4.5s ease-in-out infinite; }
 
+/* ── Marketing page: data flowing along diagram connectors ── */
+@keyframes flow-dash {
+  to { stroke-dashoffset: -20; }
+}
+.animate-flow {
+  stroke-dasharray: 4 6;
+  animation: flow-dash 1.2s linear infinite;
+}
+
 /* ── Respect reduced-motion preference ────────────────── */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
