@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Check } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import {
   configureAmplify,
   authSignIn,
@@ -110,13 +111,14 @@ export default function LoginPage() {
     }
   }
 
-  const inputCls = 'w-full px-3.5 py-2.5 rounded-lg border border-white/[0.1] bg-white/[0.05] text-slate-200 placeholder-slate-600 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition'
+  const inputCls = 'w-full px-3.5 py-2.5 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground/70 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition'
 
   return (
-    <div className="min-h-screen bg-[#070c18] flex">
+    <div className="min-h-screen bg-background flex">
+      <ThemeToggle className="fixed top-4 right-4 z-50 bg-card/80 backdrop-blur" />
       {/* Left — branding panel */}
-      <div className="hidden lg:flex lg:w-[42%] flex-col justify-center px-12 border-r border-white/[0.06] relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-indigo-900/30 via-transparent to-violet-900/20 pointer-events-none" />
+      <div className="hidden lg:flex lg:w-[42%] flex-col justify-center px-12 border-r border-border relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-transparent to-violet-500/10 dark:from-indigo-900/30 dark:to-violet-900/20 pointer-events-none" />
         <div className="relative">
           {/* The brand goes home. Without it this page was a dead end: the only
               way back to the site was the browser's back button, and anyone
@@ -125,26 +127,26 @@ export default function LoginPage() {
             <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center">
               <LogoMark className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-white group-hover:text-indigo-300 transition-colors">Tek Watch</span>
+            <span className="text-xl font-bold text-foreground group-hover:text-indigo-600 dark:group-hover:text-indigo-300 transition-colors">TekWatch</span>
           </Link>
-          <h2 className="text-3xl font-bold text-white mb-3 leading-snug">
+          <h2 className="text-3xl font-bold text-foreground mb-3 leading-snug">
             AWS infrastructure<br />intelligence, unified.
           </h2>
-          <p className="text-slate-400 text-sm leading-relaxed mb-10">
+          <p className="text-muted-foreground text-sm leading-relaxed mb-10">
             Real-time monitoring across every AWS service and region,
-            with AI that spots problems before your customers do.
+            catching problems before your customers do.
           </p>
           <ul className="space-y-3">
             {[
               'Real-time metrics across all regions',
-              'AI anomaly detection powered by Claude',
+              'Anomaly detection with plain-English explanations',
               'Threshold alerts & notifications',
               'Cost intelligence & optimisation',
-              'Security & compliance visibility',
+              'UK GDPR, Cyber Essentials & ISO 27001 checks',
             ].map(f => (
-              <li key={f} className="flex items-center gap-3 text-sm text-slate-300">
+              <li key={f} className="flex items-center gap-3 text-sm text-foreground/80">
                 <div className="w-5 h-5 rounded-full bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center flex-shrink-0">
-                  <Check className="w-3 h-3 text-indigo-400" />
+                  <Check className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                 </div>
                 {f}
               </li>
@@ -163,32 +165,32 @@ export default function LoginPage() {
             <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
               <LogoMark className="w-4 h-4 text-white" />
             </div>
-            <span className="font-bold text-white">Tek Watch</span>
+            <span className="font-bold text-foreground">TekWatch</span>
           </Link>
 
           {view === 'login' && (
             <>
               <div className="mb-8">
-                <h1 className="text-2xl font-bold text-white">Welcome back</h1>
-                <p className="text-slate-400 mt-1.5 text-sm">Sign in to your Tek Watch account</p>
+                <h1 className="text-2xl font-bold text-foreground">Welcome back</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">Sign in to your TekWatch account</p>
               </div>
 
               <form onSubmit={handleLogin} className="space-y-5">
                 <div>
-                  <label htmlFor="customer-id" className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
+                  <label htmlFor="customer-id" className="block text-sm font-medium text-foreground/80 mb-1.5">Customer ID</label>
                   <input id="customer-id" type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())}
                     className={inputCls} />
                 </div>
                 <div>
-                  <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1.5">Password</label>
+                  <label htmlFor="password" className="block text-sm font-medium text-foreground/80 mb-1.5">Password</label>
                   <input id="password" type="password" required value={password}
                     onChange={e => setPassword(e.target.value)}
                     className={inputCls} />
                 </div>
 
                 {error && (
-                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                  <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
                 )}
 
                 <button type="submit" disabled={loading}
@@ -198,16 +200,16 @@ export default function LoginPage() {
 
                 <div className="flex items-center justify-between text-sm">
                   <button type="button" onClick={() => { setView('forgot'); setError('') }}
-                    className="text-indigo-400 hover:text-indigo-300 transition-colors">
+                    className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
                     Forgot password?
                   </button>
-                  <Link href="/overview/?demo=1" className="text-slate-500 hover:text-slate-300 transition-colors text-xs">
+                  <Link href="/overview/?demo=1" className="text-muted-foreground hover:text-foreground transition-colors text-xs">
                     Try demo instead →
                   </Link>
                 </div>
-                <p className="text-center text-sm text-slate-500">
+                <p className="text-center text-sm text-muted-foreground">
                   Don&apos;t have an account?{' '}
-                  <Link href="/signup" className="text-indigo-400 hover:text-indigo-300 transition-colors">Sign up</Link>
+                  <Link href="/signup" className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">Sign up</Link>
                 </p>
               </form>
             </>
@@ -216,30 +218,30 @@ export default function LoginPage() {
           {view === 'new-password' && (
             <>
               <div className="mb-8">
-                <h1 className="text-2xl font-bold text-white">Choose your password</h1>
-                <p className="text-slate-400 mt-1.5 text-sm">
-                  Welcome to Tek Watch. Your temporary password worked — pick a
+                <h1 className="text-2xl font-bold text-foreground">Choose your password</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
+                  Welcome to TekWatch. Your temporary password worked — pick a
                   permanent one to finish setting up {customerId}.
                 </p>
               </div>
               <form onSubmit={handleNewPassword} className="space-y-5">
                 <div>
-                  <label htmlFor="new-password" className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <label htmlFor="new-password" className="block text-sm font-medium text-foreground/80 mb-1.5">New password</label>
                   <input id="new-password" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={newPassword} autoFocus
                     onChange={e => setNewPassword(e.target.value)} className={inputCls} />
-                  <p className="mt-1.5 text-xs text-slate-500">
+                  <p className="mt-1.5 text-xs text-muted-foreground">
                     At least 7 characters, with upper and lower case and a number.
                   </p>
                 </div>
                 <div>
-                  <label htmlFor="confirm-new-password" className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <label htmlFor="confirm-new-password" className="block text-sm font-medium text-foreground/80 mb-1.5">Confirm new password</label>
                   <input id="confirm-new-password" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
                 </div>
                 {error && (
-                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                  <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
                 )}
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
@@ -252,21 +254,21 @@ export default function LoginPage() {
           {view === 'forgot' && (
             <>
               <button onClick={() => { setView('login'); setError('') }}
-                className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-8 transition-colors">
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Back to login
               </button>
               <div className="mb-8">
-                <h1 className="text-2xl font-bold text-white">Reset password</h1>
-                <p className="text-slate-400 mt-1.5 text-sm">Enter your Customer ID and we&apos;ll email you a 6-digit code.</p>
+                <h1 className="text-2xl font-bold text-foreground">Reset password</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">Enter your Customer ID and we&apos;ll email you a 6-digit code.</p>
               </div>
               <form onSubmit={handleForgot} className="space-y-5">
                 <div>
-                  <label htmlFor="customer-id-2" className="block text-sm font-medium text-slate-300 mb-1.5">Customer ID</label>
+                  <label htmlFor="customer-id-2" className="block text-sm font-medium text-foreground/80 mb-1.5">Customer ID</label>
                   <input id="customer-id-2" type="text" required placeholder="TT-XXXXXXXX" value={customerId}
                     onChange={e => setCustomerId(e.target.value.toUpperCase())} className={inputCls} />
                 </div>
                 {error && (
-                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                  <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
                 )}
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
@@ -279,40 +281,40 @@ export default function LoginPage() {
           {view === 'forgot-sent' && (
             <>
               <button onClick={() => { setView('forgot'); setError('') }}
-                className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-8 transition-colors">
+                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-8 transition-colors">
                 <ArrowLeft className="w-4 h-4" /> Use a different Customer ID
               </button>
               <div className="mb-8">
-                <h1 className="text-2xl font-bold text-white">Enter your code</h1>
-                <p className="text-slate-400 mt-1.5 text-sm">
+                <h1 className="text-2xl font-bold text-foreground">Enter your code</h1>
+                <p className="text-muted-foreground mt-1.5 text-sm">
                   If an account exists for {customerId}, a 6-digit code is on its way.
                 </p>
               </div>
               <form onSubmit={handleForgotConfirm} className="space-y-5">
                 <div>
-                  <label htmlFor="reset-code" className="block text-sm font-medium text-slate-300 mb-1.5">Reset code</label>
+                  <label htmlFor="reset-code" className="block text-sm font-medium text-foreground/80 mb-1.5">Reset code</label>
                   <input id="reset-code" type="text" required maxLength={6} inputMode="numeric" autoComplete="one-time-code"
                     placeholder="000000" value={resetCode}
                     onChange={e => setResetCode(e.target.value.replace(/\D/g, ''))}
                     className={`${inputCls} text-center font-mono text-2xl tracking-[0.5em]`} />
                 </div>
                 <div>
-                  <label htmlFor="new-password-2" className="block text-sm font-medium text-slate-300 mb-1.5">New password</label>
+                  <label htmlFor="new-password-2" className="block text-sm font-medium text-foreground/80 mb-1.5">New password</label>
                   <input id="new-password-2" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={newPassword}
                     onChange={e => setNewPassword(e.target.value)} className={inputCls} />
-                  <p className="mt-1.5 text-xs text-slate-500">
+                  <p className="mt-1.5 text-xs text-muted-foreground">
                     At least 7 characters, with upper and lower case and a number.
                   </p>
                 </div>
                 <div>
-                  <label htmlFor="confirm-new-password-2" className="block text-sm font-medium text-slate-300 mb-1.5">Confirm new password</label>
+                  <label htmlFor="confirm-new-password-2" className="block text-sm font-medium text-foreground/80 mb-1.5">Confirm new password</label>
                   <input id="confirm-new-password-2" type="password" required minLength={7} autoComplete="new-password"
                     placeholder="•••••••" value={confirmPassword}
                     onChange={e => setConfirmPassword(e.target.value)} className={inputCls} />
                 </div>
                 {error && (
-                  <div className="p-3 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
+                  <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">{error}</div>
                 )}
                 <button type="submit" disabled={loading}
                   className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
@@ -325,22 +327,22 @@ export default function LoginPage() {
           {view === 'forgot-done' && (
             <div className="text-center">
               <div className="w-16 h-16 bg-emerald-500/15 border border-emerald-500/25 rounded-full flex items-center justify-center mx-auto mb-5">
-                <Check className="w-7 h-7 text-emerald-400" />
+                <Check className="w-7 h-7 text-emerald-600 dark:text-emerald-400" />
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Password updated</h2>
-              <p className="text-slate-400 text-sm mb-6">
+              <h2 className="text-xl font-bold text-foreground mb-2">Password updated</h2>
+              <p className="text-muted-foreground text-sm mb-6">
                 You can now sign in with your new password.
               </p>
               <button onClick={() => { setView('login'); setError('') }}
-                className="text-sm text-indigo-400 hover:text-indigo-300 transition-colors">
+                className="text-sm text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors">
                 Back to login
               </button>
             </div>
           )}
 
-          <p className="mt-10 text-center text-xs text-slate-600">
+          <p className="mt-10 text-center text-xs text-muted-foreground/80">
             Need help signing in?{' '}
-            <a href="mailto:support@tekwatch.io" className="text-indigo-500 hover:text-indigo-400">
+            <a href="mailto:support@tekwatch.io" className="text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">
               support@tekwatch.io
             </a>
           </p>

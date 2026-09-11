@@ -3,6 +3,7 @@
 import { useState, useId, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { LogoMark } from '@/components/ui/Logo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, ShieldCheck, Cloud, GitMerge,
@@ -263,11 +264,11 @@ function Reveal({ children, delay = 0, className = '' }: { children: React.React
 function SectionHeading({ title, accent, lead, center = false }: { title: string; accent?: string; lead?: string; center?: boolean }) {
   return (
     <div className={center ? 'text-center max-w-3xl mx-auto' : 'max-w-3xl'}>
-      <h2 className="text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-slate-900">
+      <h2 className="text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
         {title}
-        {accent && (<><br /><span className="text-indigo-700">{accent}</span></>)}
+        {accent && (<><br /><span className="text-indigo-700 dark:text-indigo-400">{accent}</span></>)}
       </h2>
-      {lead && <p className="mt-5 text-base md:text-lg text-slate-600 leading-relaxed">{lead}</p>}
+      {lead && <p className="mt-5 text-base md:text-lg text-muted-foreground leading-relaxed">{lead}</p>}
     </div>
   )
 }
@@ -279,7 +280,7 @@ function Wordmark({ small = false }: { small?: boolean }) {
         <LogoMark className={`${small ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-white`} />
       </span>
       <span className={`${small ? 'text-base' : 'text-lg'} font-bold tracking-tight`}>
-        <span className="text-slate-900">Tek</span><span className="text-indigo-600">Watch</span>
+        <span className="text-foreground">Tek</span><span className="text-indigo-600 dark:text-indigo-400">Watch</span>
       </span>
     </span>
   )
@@ -301,22 +302,22 @@ function PlatformMenu() {
         onClick={() => setOpen(o => !o)}
         aria-expanded={open}
         aria-haspopup="true"
-        className="flex items-center gap-1 hover:text-indigo-700 transition-colors"
+        className="flex items-center gap-1 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors"
       >
         Platform <ChevronDown className={`w-4 h-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="absolute left-1/2 -translate-x-1/2 top-full pt-3 w-80">
-          <div className="rounded-xl bg-white p-2 shadow-xl shadow-slate-900/10 ring-1 ring-slate-200">
+          <div className="rounded-xl bg-card p-2 shadow-xl shadow-slate-900/10 ring-1 ring-border">
             {PLATFORM_LINKS.map(l => (
               <a
                 key={l.label}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="block rounded-lg px-3 py-2.5 hover:bg-indigo-50 transition-colors"
+                className="block rounded-lg px-3 py-2.5 hover:bg-indigo-50 dark:hover:bg-indigo-500/15 transition-colors"
               >
-                <span className="block text-sm font-semibold text-slate-900">{l.label}</span>
-                <span className="block text-xs text-slate-500 mt-0.5">{l.desc}</span>
+                <span className="block text-sm font-semibold text-foreground">{l.label}</span>
+                <span className="block text-xs text-muted-foreground mt-0.5">{l.desc}</span>
               </a>
             ))}
           </div>
@@ -336,13 +337,14 @@ function FlowNode({ x, y, w, title, sub, icon: Icon, accent = false }: {
   const h = 56
   return (
     <g>
-      <rect x={x} y={y} width={w} height={h} rx={10} fill="#ffffff" stroke={accent ? '#818cf8' : '#cbd5e1'} strokeWidth={accent ? 1.5 : 1} />
-      <rect x={x + 10} y={y + 12} width={32} height={32} rx={8} fill={accent ? '#4f46e5' : '#eef2ff'} />
-      <Icon x={x + 18} y={y + 20} width={16} height={16} color={accent ? '#ffffff' : '#4f46e5'} strokeWidth={2} />
-      <text x={x + 52} y={y + 25} fontSize={12.5} fontWeight={600} fill="#0f172a">{title}</text>
-      <text x={x + 52} y={y + 42} fontSize={10.5} fill="#64748b">{sub}</text>
-      <circle cx={x} cy={y + h / 2} r={3.5} fill="#ffffff" stroke="#94a3b8" />
-      <circle cx={x + w} cy={y + h / 2} r={3.5} fill="#ffffff" stroke="#94a3b8" />
+      {/* Theme colours as classes, so the diagram follows light and dark. */}
+      <rect x={x} y={y} width={w} height={h} rx={10} className={accent ? 'fill-card stroke-indigo-400' : 'fill-card stroke-border'} strokeWidth={accent ? 1.5 : 1} />
+      <rect x={x + 10} y={y + 12} width={32} height={32} rx={8} className={accent ? 'fill-indigo-600' : 'fill-indigo-50 dark:fill-indigo-500/15'} />
+      <Icon x={x + 18} y={y + 20} width={16} height={16} className={accent ? 'text-white' : 'text-indigo-600 dark:text-indigo-300'} strokeWidth={2} />
+      <text x={x + 52} y={y + 25} fontSize={12.5} fontWeight={600} className="fill-foreground">{title}</text>
+      <text x={x + 52} y={y + 42} fontSize={10.5} className="fill-muted-foreground">{sub}</text>
+      <circle cx={x} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
+      <circle cx={x + w} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
     </g>
   )
 }
@@ -358,14 +360,14 @@ function HeroFlow() {
   const ax = 8, aw = 162, bx = 214, bw = 172, ox = 432, ow = 200, cy = 174
   return (
     <div
-      className="relative rounded-2xl border-2 border-slate-300/80 bg-white p-4 shadow-xl shadow-slate-900/5"
-      style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '16px 16px' }}
+      className="relative rounded-2xl border-2 border-border bg-card p-4 shadow-xl shadow-slate-900/5"
+      style={{ backgroundImage: 'radial-gradient(hsl(var(--border)) 1px, transparent 1px)', backgroundSize: '16px 16px' }}
     >
       <div className="flex items-center justify-between mb-2 px-1">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-white/90 px-2 py-1 text-[11px] font-semibold text-slate-600 ring-1 ring-slate-200">
+        <span className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-1 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live pipeline
         </span>
-        <span className="rounded-md bg-white/90 px-2 py-1 text-[11px] text-slate-500 ring-1 ring-slate-200">every 5 minutes</span>
+        <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 5 minutes</span>
       </div>
       <svg viewBox="0 0 640 332" className="w-full h-auto" role="img" aria-label="Your AWS account sends read-only data to the TekWatch agent, which feeds anomaly detection, compliance checks and incident correlation">
         <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#a5b4fc" strokeWidth={1.5} />
@@ -385,8 +387,8 @@ function HeroFlow() {
           <FlowNode key={o.title} x={ox} y={o.y} w={ow} title={o.title} sub={o.sub} icon={o.icon} />
         ))}
       </svg>
-      <div className="mt-2 flex items-center gap-2 rounded-lg bg-white/95 px-3 py-2 text-xs text-slate-600 ring-1 ring-slate-200">
-        <Mail className="w-3.5 h-3.5 text-indigo-600 flex-shrink-0" />
+      <div className="mt-2 flex items-center gap-2 rounded-lg bg-card/95 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border">
+        <Mail className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
         Anything that needs you arrives by email or Slack, explained in plain English.
       </div>
     </div>
@@ -412,18 +414,18 @@ function CoverageDiagram() {
       {top.map(t => (
         <g key={t.title}>
           <rect x={t.x - 78} y={10} width={156} height={48} rx={8} fill="#312e81" />
-          <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#ffffff">{t.title}</text>
+          <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fbfbfd">{t.title}</text>
           <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} fill="#c7d2fe">{t.sub}</text>
         </g>
       ))}
-      <rect x={160} y={106} width={200} height={50} rx={10} fill="#eef2ff" stroke="#a5b4fc" />
-      <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} fill="#312e81">TekWatch agent</text>
-      <text x={260} y={144} textAnchor="middle" fontSize={10} fill="#4f46e5">Read-only · outbound only</text>
+      <rect x={160} y={106} width={200} height={50} rx={10} className="fill-indigo-50 stroke-indigo-300 dark:fill-indigo-500/15 dark:stroke-indigo-500/50" />
+      <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} className="fill-indigo-900 dark:fill-indigo-200">TekWatch agent</text>
+      <text x={260} y={144} textAnchor="middle" fontSize={10} className="fill-indigo-600 dark:fill-indigo-300">Read-only · outbound only</text>
       {bottom.map(b => (
         <g key={b.title}>
-          <rect x={b.x - 78} y={204} width={156} height={48} rx={8} fill="#ecfdf5" stroke="#6ee7b7" />
-          <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} fill="#065f46">{b.title}</text>
-          <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} fill="#047857">{b.sub}</text>
+          <rect x={b.x - 78} y={204} width={156} height={48} rx={8} className="fill-emerald-50 stroke-emerald-300 dark:fill-emerald-500/10 dark:stroke-emerald-500/40" />
+          <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-emerald-800 dark:fill-emerald-300">{b.title}</text>
+          <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-emerald-700 dark:fill-emerald-400">{b.sub}</text>
         </g>
       ))}
     </svg>
@@ -451,25 +453,26 @@ export default function LandingPage() {
   const activePath = previewTabs.find(t => t.id === activeTab)?.path ?? '/overview'
 
   const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-600/25 hover:bg-indigo-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
-  const secondaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-900 hover:border-slate-400 hover:bg-slate-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
+  const secondaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground hover:border-muted-foreground/40 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 font-sans antialiased overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground font-sans antialiased overflow-x-hidden">
 
       {/* ── Nav ──────────────────────────────────────────── */}
-      <header className="sticky top-0 z-50 border-b border-slate-200/80 bg-white/90 backdrop-blur-md">
+      <header className="sticky top-0 z-50 border-b border-border bg-background/90 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" aria-label="TekWatch home"><Wordmark /></Link>
 
-          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-700" aria-label="Main">
+          <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-foreground/80" aria-label="Main">
             <PlatformMenu />
-            <a href="#how-it-works" className="hover:text-indigo-700 transition-colors">How it works</a>
-            <a href="#pricing" className="hover:text-indigo-700 transition-colors">Pricing</a>
-            <Link href="/contact" className="hover:text-indigo-700 transition-colors">Contact</Link>
+            <a href="#how-it-works" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">How it works</a>
+            <a href="#pricing" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Pricing</a>
+            <Link href="/contact" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Contact</Link>
           </nav>
 
           <div className="flex items-center gap-2">
-            <Link href="/login" className="hidden sm:inline-flex px-3 py-2 text-sm font-semibold text-slate-900 hover:text-indigo-700 transition-colors">
+            <ThemeToggle />
+            <Link href="/login" className="hidden sm:inline-flex px-3 py-2 text-sm font-semibold text-foreground hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">
               Sign in
             </Link>
             <Link href="/overview/?demo=1" className="hidden sm:inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors">
@@ -480,7 +483,7 @@ export default function LandingPage() {
               onClick={() => setMenuOpen(o => !o)}
               aria-expanded={menuOpen}
               aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-              className="md:hidden p-2 -mr-2 text-slate-700"
+              className="md:hidden p-2 -mr-2 text-foreground/80"
             >
               {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
@@ -488,15 +491,15 @@ export default function LandingPage() {
         </div>
 
         {menuOpen && (
-          <div className="md:hidden border-t border-slate-200 bg-white px-6 py-4 space-y-1">
+          <div className="md:hidden border-t border-border bg-background px-6 py-4 space-y-1">
             {[...PLATFORM_LINKS.slice(0, 3).map(l => ({ label: l.label, href: l.href })),
               { label: 'How it works', href: '#how-it-works' },
               { label: 'Pricing', href: '#pricing' }].map(l => (
-              <a key={l.label} href={l.href} onClick={() => setMenuOpen(false)} className="block rounded-lg px-2 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              <a key={l.label} href={l.href} onClick={() => setMenuOpen(false)} className="block rounded-lg px-2 py-2.5 text-sm font-medium text-foreground/80 hover:bg-accent">
                 {l.label}
               </a>
             ))}
-            <Link href="/contact" className="block rounded-lg px-2 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50">Contact</Link>
+            <Link href="/contact" className="block rounded-lg px-2 py-2.5 text-sm font-medium text-foreground/80 hover:bg-accent">Contact</Link>
             <div className="grid grid-cols-2 gap-2 pt-3">
               <Link href="/login" className={secondaryBtn}>Sign in</Link>
               <Link href="/overview/?demo=1" className={primaryBtn}>Live demo</Link>
@@ -510,19 +513,19 @@ export default function LandingPage() {
       <section className="px-6 pt-14 pb-20 md:pt-20 md:pb-24">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-14 items-center">
           <div>
-            <p className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 mb-6">
+            <p className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-indigo-100 dark:border-indigo-500/25 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
               Cloud monitoring and compliance, built for UK SMEs
             </p>
             <h1
-              className="animate-fade-in-up text-[2.4rem] sm:text-5xl lg:text-[3.1rem] font-bold leading-[1.08] tracking-tight text-slate-900"
+              className="animate-fade-in-up text-[2.4rem] sm:text-5xl lg:text-[3.1rem] font-bold leading-[1.08] tracking-tight text-foreground"
               style={{ animationDelay: '80ms' }}
             >
               Your AWS estate.<br />
-              <span className="text-indigo-700">Fully visible.<br className="hidden sm:block" /> Risks caught early.</span>
+              <span className="text-indigo-700 dark:text-indigo-400">Fully visible.<br className="hidden sm:block" /> Risks caught early.</span>
             </h1>
             <p
-              className="animate-fade-in-up mt-6 text-base md:text-lg text-slate-600 leading-relaxed max-w-xl"
+              className="animate-fade-in-up mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl"
               style={{ animationDelay: '160ms' }}
             >
               Know the moment something&apos;s wrong in your AWS estate. TekWatch watches your
@@ -536,7 +539,7 @@ export default function LandingPage() {
               </Link>
               <Link href="/signup" className={secondaryBtn}>Start free trial</Link>
             </div>
-            <dl className="animate-fade-in-up mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-slate-200 pt-6" style={{ animationDelay: '320ms' }}>
+            <dl className="animate-fade-in-up mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6" style={{ animationDelay: '320ms' }}>
               {[
                 ['20+', 'AWS services monitored'],
                 ['<30 min', 'to first dashboard'],
@@ -545,8 +548,8 @@ export default function LandingPage() {
               ].map(([val, label]) => (
                 <div key={label}>
                   <dt className="sr-only">{label}</dt>
-                  <dd className="text-2xl font-bold text-slate-900 tabular-nums whitespace-nowrap">{val}</dd>
-                  <dd className="text-xs text-slate-500 mt-1 leading-snug">{label}</dd>
+                  <dd className="text-2xl font-bold text-foreground tabular-nums whitespace-nowrap">{val}</dd>
+                  <dd className="text-xs text-muted-foreground mt-1 leading-snug">{label}</dd>
                 </div>
               ))}
             </dl>
@@ -559,7 +562,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Platform: two engines + product preview ────────── */}
-      <section id="platform" className="px-6 py-20 md:py-24 bg-slate-50 border-y border-slate-200/80 scroll-mt-16">
+      <section id="platform" className="px-6 py-20 md:py-24 bg-secondary border-y border-border scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <SectionHeading
@@ -582,13 +585,13 @@ export default function LandingPage() {
               },
             ].map((c, i) => (
               <Reveal key={c.title} delay={i * 80}>
-                <div className="h-full flex gap-5 rounded-xl bg-white p-6 ring-1 ring-slate-200 shadow-sm">
-                  <div className="w-11 h-11 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                    <c.icon className="w-5 h-5 text-indigo-600" />
+                <div className="h-full flex gap-5 rounded-xl bg-card p-6 ring-1 ring-border shadow-sm">
+                  <div className="w-11 h-11 rounded-lg bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                    <c.icon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">{c.title}</h3>
-                    <p className="mt-2 text-sm text-slate-600 leading-relaxed">{c.desc}</p>
+                    <h3 className="text-lg font-semibold text-foreground">{c.title}</h3>
+                    <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{c.desc}</p>
                   </div>
                 </div>
               </Reveal>
@@ -597,7 +600,7 @@ export default function LandingPage() {
 
           {/* Product preview: a dark screenshot of the real app */}
           <Reveal className="mt-10">
-            <div className="dark rounded-2xl ring-1 ring-slate-300 shadow-2xl shadow-slate-900/20 overflow-hidden">
+            <div className="dark rounded-2xl ring-1 ring-border shadow-2xl shadow-slate-900/20 overflow-hidden">
               <div className="bg-card text-foreground">
                 {/* Fake browser tab strip, doubles as the view switcher */}
                 <div className="flex items-center gap-1 px-3 pt-3 bg-black/20 border-b border-border overflow-x-auto">
@@ -902,17 +905,17 @@ export default function LandingPage() {
           <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
             {problemStats.map((s, i) => (
               <Reveal key={s.label} delay={i * 60}>
-                <div className="h-full rounded-xl bg-white p-5 ring-1 ring-slate-200 shadow-sm">
-                  <s.icon className="w-5 h-5 text-indigo-600 mb-4" />
-                  <div className="text-3xl font-bold text-slate-900 tabular-nums">{s.value}</div>
-                  <p className="mt-2 text-sm text-slate-600 leading-snug">{s.label}</p>
-                  <p className="mt-3 text-[11px] text-slate-400">{s.source}</p>
+                <div className="h-full rounded-xl bg-card p-5 ring-1 ring-border shadow-sm">
+                  <s.icon className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-4" />
+                  <div className="text-3xl font-bold text-foreground tabular-nums">{s.value}</div>
+                  <p className="mt-2 text-sm text-muted-foreground leading-snug">{s.label}</p>
+                  <p className="mt-3 text-[11px] text-muted-foreground/70">{s.source}</p>
                 </div>
               </Reveal>
             ))}
           </div>
           <Reveal className="mt-8">
-            <p className="rounded-xl border-l-4 border-indigo-600 bg-indigo-50/60 px-6 py-5 text-base md:text-lg font-medium text-slate-800">
+            <p className="rounded-xl border-l-4 border-indigo-600 bg-indigo-50/60 dark:bg-indigo-500/10 px-6 py-5 text-base md:text-lg font-medium text-foreground/90">
               Built by engineers who monitor AWS for a living. Made for the businesses who don&apos;t have one on staff.
             </p>
           </Reveal>
@@ -920,7 +923,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── Capabilities (top-border cards) ──────────────── */}
-      <section id="capabilities" className="px-6 py-20 md:py-24 bg-slate-50 border-y border-slate-200/80 scroll-mt-16">
+      <section id="capabilities" className="px-6 py-20 md:py-24 bg-secondary border-y border-border scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <SectionHeading
@@ -931,16 +934,16 @@ export default function LandingPage() {
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {FEATURES.map((f, i) => (
               <Reveal key={f.title} delay={(i % 3) * 70}>
-                <div className="group h-full rounded-xl border-t-4 border-t-indigo-600 bg-white p-6 ring-1 ring-slate-200 shadow-sm transition-shadow hover:shadow-lg hover:shadow-slate-900/5">
+                <div className="group h-full rounded-xl border-t-4 border-t-indigo-600 bg-card p-6 ring-1 ring-border shadow-sm transition-shadow hover:shadow-lg hover:shadow-slate-900/5">
                   <div className="flex items-center gap-3">
-                    <f.icon className="w-5 h-5 text-indigo-600" />
-                    <h3 className="text-lg font-semibold text-slate-900">{f.title}</h3>
+                    <f.icon className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                    <h3 className="text-lg font-semibold text-foreground">{f.title}</h3>
                   </div>
-                  <p className="mt-3 text-sm text-slate-600 leading-relaxed">{f.desc}</p>
+                  <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{f.desc}</p>
                   <ul className="mt-4 space-y-1.5">
                     {f.points.map(p => (
-                      <li key={p} className="flex items-center gap-2 text-sm text-slate-700">
-                        <Check className="w-4 h-4 text-indigo-600 flex-shrink-0" />
+                      <li key={p} className="flex items-center gap-2 text-sm text-foreground/80">
+                        <Check className="w-4 h-4 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
                         {p}
                       </li>
                     ))}
@@ -970,20 +973,20 @@ export default function LandingPage() {
                   '20+ AWS services across every active region',
                   'Your data stays in the UK (AWS London, eu-west-2)',
                 ].map(p => (
-                  <li key={p} className="flex items-start gap-3 text-base text-slate-700">
-                    <span className="mt-0.5 w-5 h-5 rounded-full bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                      <Check className="w-3.5 h-3.5 text-indigo-600" />
+                  <li key={p} className="flex items-start gap-3 text-base text-foreground/80">
+                    <span className="mt-0.5 w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
                     </span>
                     {p}
                   </li>
                 ))}
               </ul>
-              <Link href="/signup" className="mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 hover:text-indigo-800">
+              <Link href="/signup" className="mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
                 Connect your AWS account <ChevronRight className="w-4 h-4" />
               </Link>
             </Reveal>
             <Reveal delay={100}>
-              <div className="rounded-2xl bg-white p-5 ring-1 ring-slate-200 shadow-sm">
+              <div className="rounded-2xl bg-card p-5 ring-1 ring-border shadow-sm">
                 <CoverageDiagram />
               </div>
             </Reveal>
@@ -992,7 +995,7 @@ export default function LandingPage() {
       </section>
 
       {/* ── How it works (left-border cards) ─────────────── */}
-      <section id="how-it-works" className="px-6 py-20 md:py-24 bg-slate-50 border-y border-slate-200/80 scroll-mt-16">
+      <section id="how-it-works" className="px-6 py-20 md:py-24 bg-secondary border-y border-border scroll-mt-16">
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <SectionHeading
@@ -1004,10 +1007,10 @@ export default function LandingPage() {
           <div className="mt-10 grid md:grid-cols-3 gap-5">
             {ONBOARDING_STEPS.map((s, i) => (
               <Reveal key={s.title} delay={i * 80}>
-                <div className="h-full rounded-xl border-l-4 border-indigo-600 bg-white p-6 ring-1 ring-slate-200 shadow-sm">
-                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600">Step {i + 1}</span>
-                  <h3 className="mt-2 text-lg font-semibold text-slate-900">{s.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600 leading-relaxed">{s.desc}</p>
+                <div className="h-full rounded-xl border-l-4 border-indigo-600 bg-card p-6 ring-1 ring-border shadow-sm">
+                  <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Step {i + 1}</span>
+                  <h3 className="mt-2 text-lg font-semibold text-foreground">{s.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{s.desc}</p>
                 </div>
               </Reveal>
             ))}
@@ -1027,19 +1030,19 @@ export default function LandingPage() {
           </Reveal>
 
           <div className="mt-8 flex justify-center">
-            <div className="inline-flex items-center gap-1 rounded-lg bg-slate-100 p-1">
+            <div className="inline-flex items-center gap-1 rounded-lg bg-muted p-1">
               <button
                 onClick={() => setBilling('monthly')}
-                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${billing === 'monthly' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`px-4 py-2 rounded-md text-sm font-semibold transition-colors ${billing === 'monthly' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Monthly
               </button>
               <button
                 onClick={() => setBilling('annual')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${billing === 'annual' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+                className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-semibold transition-colors ${billing === 'annual' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
               >
                 Annual
-                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700">Save up to 15%</span>
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">Save up to 15%</span>
               </button>
             </div>
           </div>
@@ -1050,8 +1053,8 @@ export default function LandingPage() {
               return (
                 <div
                   key={p.name}
-                  className={`relative flex flex-col rounded-xl bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
-                    p.highlight ? 'ring-2 ring-indigo-600' : 'ring-1 ring-slate-200'
+                  className={`relative flex flex-col rounded-xl bg-card p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+                    p.highlight ? 'ring-2 ring-indigo-600' : 'ring-1 ring-border'
                   }`}
                 >
                   {p.highlight && (
@@ -1059,21 +1062,21 @@ export default function LandingPage() {
                       Most popular
                     </div>
                   )}
-                  <h3 className="text-lg font-semibold text-slate-900">{p.name}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">{p.name}</h3>
                   <div className="mt-2 flex items-baseline gap-1">
-                    <span className="text-4xl font-bold text-slate-900 tabular-nums">£{displayPrice}</span>
-                    <span className="text-sm text-slate-500">/month</span>
+                    <span className="text-4xl font-bold text-foreground tabular-nums">£{displayPrice}</span>
+                    <span className="text-sm text-muted-foreground">/month</span>
                   </div>
                   <div className="h-5 mt-1">
                     {billing === 'annual' && (
-                      <span className="text-xs text-emerald-700">Billed annually · save {Math.round(p.discount * 100)}%</span>
+                      <span className="text-xs text-emerald-700 dark:text-emerald-400">Billed annually · save {Math.round(p.discount * 100)}%</span>
                     )}
                   </div>
-                  <p className="mt-2 text-sm text-slate-600">{p.desc}</p>
+                  <p className="mt-2 text-sm text-muted-foreground">{p.desc}</p>
                   <ul className="mt-5 mb-6 space-y-2 flex-1">
                     {p.features.map(f => (
-                      <li key={f} className="flex items-start gap-2 text-sm text-slate-700">
-                        <Check className="w-4 h-4 mt-0.5 text-indigo-600 flex-shrink-0" />
+                      <li key={f} className="flex items-start gap-2 text-sm text-foreground/80">
+                        <Check className="w-4 h-4 mt-0.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
                         {f}
                       </li>
                     ))}
@@ -1085,20 +1088,20 @@ export default function LandingPage() {
               )
             })}
           </div>
-          <p className="text-center text-sm text-slate-600 mt-8">
+          <p className="text-center text-sm text-muted-foreground mt-8">
             Want it fully managed? Tek Tribe&apos;s Managed Cloud Services start from{' '}
-            <span className="font-semibold text-slate-900">£500/month</span>, TekWatch included.
+            <span className="font-semibold text-foreground">£500/month</span>, TekWatch included.
           </p>
         </div>
       </section>
 
       {/* ── Get started ──────────────────────────────────── */}
-      <section className="px-6 py-20 md:py-24 bg-slate-50 border-t border-slate-200/80">
+      <section className="px-6 py-20 md:py-24 bg-secondary border-t border-border">
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <div className="text-center max-w-3xl mx-auto">
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600">Get started</p>
-              <h2 className="mt-3 text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-slate-900">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Get started</p>
+              <h2 className="mt-3 text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
                 See your AWS estate clearly,<br className="hidden sm:block" /> starting today
               </h2>
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
@@ -1115,16 +1118,16 @@ export default function LandingPage() {
               { icon: Sparkles, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
             ].map((c, i) => (
               <Reveal key={c.title} delay={i * 70}>
-                <div className="h-full flex flex-col rounded-xl bg-white p-6 ring-1 ring-slate-200 shadow-sm">
-                  <c.icon className="w-7 h-7 text-indigo-600" strokeWidth={1.6} />
-                  <h3 className="mt-5 text-xl font-bold text-slate-900">{c.title}</h3>
-                  <p className="mt-2 text-sm text-slate-600 leading-relaxed flex-1">{c.desc}</p>
+                <div className="h-full flex flex-col rounded-xl bg-card p-6 ring-1 ring-border shadow-sm">
+                  <c.icon className="w-7 h-7 text-indigo-600 dark:text-indigo-400" strokeWidth={1.6} />
+                  <h3 className="mt-5 text-xl font-bold text-foreground">{c.title}</h3>
+                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">{c.desc}</p>
                   {c.href.startsWith('mailto:') ? (
-                    <a href={c.href} className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-800">
+                    <a href={c.href} className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
                       {c.cta} <ChevronRight className="w-4 h-4" />
                     </a>
                   ) : (
-                    <Link href={c.href} className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-800">
+                    <Link href={c.href} className="mt-5 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
                       {c.cta} <ChevronRight className="w-4 h-4" />
                     </Link>
                   )}
@@ -1137,60 +1140,60 @@ export default function LandingPage() {
       </main>
 
       {/* ── Footer ───────────────────────────────────────── */}
-      <footer className="bg-white px-6 pt-16 pb-8 border-t border-slate-200">
+      <footer className="bg-background px-6 pt-16 pb-8 border-t border-border">
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-12">
             <div className="col-span-2 md:col-span-1">
               <Wordmark small />
-              <p className="mt-5 text-2xl font-bold leading-snug text-slate-400">See TekWatch<br />in action</p>
-              <Link href="/overview/?demo=1" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 hover:text-indigo-800">
+              <p className="mt-5 text-2xl font-bold leading-snug text-muted-foreground/70">See TekWatch<br />in action</p>
+              <Link href="/overview/?demo=1" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
                 Launch live demo <ChevronRight className="w-4 h-4" />
               </Link>
               <div className="mt-6 flex items-center gap-3">
-                <a href="#" aria-label="TekWatch on LinkedIn" className="text-indigo-600 hover:text-indigo-800 transition-colors">
+                <a href="#" aria-label="TekWatch on LinkedIn" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors">
                   <Linkedin className="w-4 h-4" />
                 </a>
-                <a href="#" aria-label="Tek Talk on YouTube" className="text-indigo-600 hover:text-indigo-800 transition-colors">
+                <a href="#" aria-label="Tek Talk on YouTube" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors">
                   <Youtube className="w-4 h-4" />
                 </a>
               </div>
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-900 mb-4">Product</h3>
-              <ul className="space-y-3 text-sm text-slate-600">
-                <li><a href="#platform" className="hover:text-indigo-700 transition-colors">Platform</a></li>
-                <li><a href="#capabilities" className="hover:text-indigo-700 transition-colors">Capabilities</a></li>
-                <li><a href="#pricing" className="hover:text-indigo-700 transition-colors">Pricing</a></li>
-                <li><Link href="/overview/?demo=1" className="hover:text-indigo-700 transition-colors">Live demo</Link></li>
+              <h3 className="text-sm font-bold text-foreground mb-4">Product</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li><a href="#platform" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Platform</a></li>
+                <li><a href="#capabilities" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Capabilities</a></li>
+                <li><a href="#pricing" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Pricing</a></li>
+                <li><Link href="/overview/?demo=1" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Live demo</Link></li>
               </ul>
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-900 mb-4">Company</h3>
-              <ul className="space-y-3 text-sm text-slate-600">
-                <li><Link href="/signup" className="hover:text-indigo-700 transition-colors">Sign up</Link></li>
-                <li><Link href="/login" className="hover:text-indigo-700 transition-colors">Sign in</Link></li>
-                <li><Link href="/contact" className="hover:text-indigo-700 transition-colors">Contact us</Link></li>
+              <h3 className="text-sm font-bold text-foreground mb-4">Company</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
+                <li><Link href="/signup" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Sign up</Link></li>
+                <li><Link href="/login" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Sign in</Link></li>
+                <li><Link href="/contact" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">Contact us</Link></li>
               </ul>
             </div>
 
             <div>
-              <h3 className="text-sm font-bold text-slate-900 mb-4">Contact</h3>
-              <ul className="space-y-3 text-sm text-slate-600">
+              <h3 className="text-sm font-bold text-foreground mb-4">Contact</h3>
+              <ul className="space-y-3 text-sm text-muted-foreground">
                 <li className="flex items-center gap-2">
-                  <Mail className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600" />
-                  <a href="mailto:hello@tekwatch.io" className="hover:text-indigo-700 transition-colors">hello@tekwatch.io</a>
+                  <Mail className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
+                  <a href="mailto:hello@tekwatch.io" className="hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors">hello@tekwatch.io</a>
                 </li>
                 <li className="flex items-center gap-2">
-                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600" />
+                  <MapPin className="w-3.5 h-3.5 flex-shrink-0 text-indigo-600 dark:text-indigo-400" />
                   Glasgow, Scotland, UK
                 </li>
               </ul>
             </div>
           </div>
 
-          <div className="pt-8 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+          <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
             <p>© 2026 Tek Tribe Ltd. All rights reserved.</p>
             <p>AWS monitoring and UK compliance checks, built for SMEs.</p>
           </div>

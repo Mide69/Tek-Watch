@@ -11,7 +11,7 @@ import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useCost } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
 
-const SERVICE_COLORS = ['#6366f1','#3b82f6','#f59e0b','#10b981','#f97316','#a78bfa','#06b6d4','#ec4899']
+const SERVICE_COLORS = ['#6366f1','#3b82f6','#f59e0b','#10b981','#f97316','#a78bfa','#64748b','#ec4899']
 
 function DailyCostBars({ data }: { data: { cost: number; label?: string; time?: string }[] }) {
   const maxC = Math.max(...data.map(d => d.cost)) || 1

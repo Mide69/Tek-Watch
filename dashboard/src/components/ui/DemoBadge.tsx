@@ -23,18 +23,18 @@ export function DemoBadge() {
   if (!isDemo) return null
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-shrink-0 items-center gap-2">
       {/* Was hidden below the sm breakpoint, which left a phone showing the
           "Start free trial" button with nothing to say the figures beside it
           were samples. The label is the whole point of the badge, so it is the
           part that stays; only the word "Demo" is dropped when space is tight. */}
-      <span className="inline-flex items-center gap-1.5 rounded-md border border-cyan-500/25 bg-cyan-500/10 px-2 py-1 text-xs font-medium text-cyan-600 dark:text-cyan-300 whitespace-nowrap">
+      <span className="inline-flex items-center gap-1.5 rounded-md border border-indigo-500/25 bg-indigo-500/10 px-2 py-1 text-xs font-medium text-indigo-600 dark:text-indigo-300 whitespace-nowrap">
         <Sparkles className="h-3 w-3 flex-shrink-0" />
         <span className="hidden sm:inline">Demo &middot;&nbsp;</span>sample data
       </span>
       <Link
         href="/signup"
-        className="rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
+        className="whitespace-nowrap rounded-md bg-primary px-2.5 py-1 text-xs font-semibold text-primary-foreground transition-opacity hover:opacity-90"
       >
         Start free trial
       </Link>

@@ -225,7 +225,7 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
                           <Badge variant={a.severity === 'critical' ? 'error' : 'warning'}>
                             {a.severity.toUpperCase()}
                           </Badge>
-                          {a.type === 'ai_anomaly' && <Badge variant="ai">✦ AI Detected</Badge>}
+                          {a.type === 'ai_anomaly' && <Badge variant="ai">✦ Anomaly</Badge>}
                           <span className="text-xs text-muted-foreground">{a.service}</span>
                         </div>
                         <p className="text-sm text-foreground leading-snug">{a.description}</p>

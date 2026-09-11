@@ -125,7 +125,9 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
         <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0 shadow-sm">
           <LogoMark className="w-4 h-4 text-white" />
         </div>
-        <span className="text-base font-bold text-sidebar-foreground tracking-tight">Tek Watch</span>
+        <span className="text-base font-bold tracking-tight">
+          <span className="text-sidebar-foreground">Tek</span><span className="text-primary">Watch</span>
+        </span>
       </div>
 
       {/* Nav */}

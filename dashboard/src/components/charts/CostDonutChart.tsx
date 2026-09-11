@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils'
 interface ServiceCost { aws_service: string; mtd_cost: number }
 interface CostDonutChartProps { data: ServiceCost[]; height?: number; loading?: boolean }
 
-const COLORS = ['#6366f1','#8b5cf6','#06b6d4','#10b981','#f59e0b','#f97316','#ec4899','#3b82f6','#14b8a6']
+const COLORS = ['#6366f1','#8b5cf6','#0ea5e9','#10b981','#f59e0b','#f97316','#ec4899','#3b82f6','#64748b']
 const TIP_STY = { borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#0e1525', fontSize: 12, color: '#e2eaf4' }
 
 export default function CostDonutChart({ data, height = 280, loading = false }: CostDonutChartProps) {

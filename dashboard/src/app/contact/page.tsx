@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { Mail, MapPin, Copy, Check, ArrowLeft, Send } from 'lucide-react'
 import { LogoMark } from '@/components/ui/Logo'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', company: '', message: '' })
@@ -36,7 +37,7 @@ export default function ContactPage() {
   }
 
   return (
-    <div className="dark min-h-screen bg-background text-foreground overflow-x-hidden">
+    <div className="min-h-screen bg-background text-foreground overflow-x-hidden">
       <nav className="sticky top-0 z-50 border-b border-border bg-background/85 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 flex items-center justify-between h-16">
           <Link href="/" className="flex items-center gap-2.5">
@@ -45,9 +46,12 @@ export default function ContactPage() {
             </div>
             <span className="font-semibold text-foreground text-base tracking-tight">TekWatch</span>
           </Link>
-          <Link href="/" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
-            <ArrowLeft className="w-3.5 h-3.5" /> Back to home
-          </Link>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Link href="/" className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              <ArrowLeft className="w-3.5 h-3.5" /> Back to home
+            </Link>
+          </div>
         </div>
       </nav>
 
@@ -56,7 +60,7 @@ export default function ContactPage() {
 
         <section className="relative px-6 pt-16 pb-24 max-w-5xl mx-auto">
           <div className="mb-12 max-w-2xl">
-            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-400 mb-3">Contact</p>
+            <p className="text-xs font-mono font-semibold uppercase tracking-[0.2em] text-indigo-600 dark:text-indigo-400 mb-3">Contact</p>
             <h1 className="text-3xl md:text-4xl font-semibold text-foreground mb-4 tracking-tight">Talk to us</h1>
             <p className="text-muted-foreground text-lg leading-relaxed">
               Questions about TekWatch, Managed Cloud Services, or the Digital Careers Programme?
@@ -66,7 +70,7 @@ export default function ContactPage() {
 
           <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
             {/* Form */}
-            <form onSubmit={handleSubmit} className="lg:col-span-3 rounded-lg border border-border bg-white/[0.03] p-6 space-y-5">
+            <form onSubmit={handleSubmit} className="lg:col-span-3 rounded-lg border border-border bg-card p-6 space-y-5">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
                 <div>
                   <label htmlFor="name" className="block text-xs font-mono uppercase tracking-wide text-muted-foreground mb-2">Name</label>
@@ -126,24 +130,24 @@ export default function ContactPage() {
 
             {/* Direct contact */}
             <div className="lg:col-span-2 space-y-4">
-              <div className="rounded-lg border border-border bg-white/[0.03] p-6">
+              <div className="rounded-lg border border-border bg-card p-6">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-muted-foreground mb-3">
                   <Mail className="w-3.5 h-3.5" /> Email
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                  <a href={`mailto:${email}`} className="text-sm text-foreground hover:text-indigo-400 transition-colors truncate">{email}</a>
+                  <a href={`mailto:${email}`} className="text-sm text-foreground hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate">{email}</a>
                   <button
                     type="button"
                     onClick={handleCopy}
                     aria-label="Copy email address"
-                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:border-white/20 hover:bg-white/[0.05] text-xs text-muted-foreground hover:text-foreground transition-colors"
+                    className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border border-border hover:border-muted-foreground/40 hover:bg-accent text-xs text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    {copied ? <><Check className="w-3 h-3 text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
+                    {copied ? <><Check className="w-3 h-3 text-emerald-600 dark:text-emerald-400" /> Copied</> : <><Copy className="w-3 h-3" /> Copy</>}
                   </button>
                 </div>
               </div>
 
-              <div className="rounded-lg border border-border bg-white/[0.03] p-6">
+              <div className="rounded-lg border border-border bg-card p-6">
                 <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-wide text-muted-foreground mb-3">
                   <MapPin className="w-3.5 h-3.5" /> Location
                 </div>

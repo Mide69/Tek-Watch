@@ -9,18 +9,29 @@ interface ThemeContextValue {
   toggleTheme: () => void
 }
 
+// The app opens in the soft light theme that matches the marketing site. The
+// key was renamed when that became the default: browsers that had stored
+// "dark" under the old one start on the new look, and a visitor's own choice
+// from here on still persists.
+const STORAGE_KEY = 'tw-theme-v2'
+
 const ThemeContext = createContext<ThemeContextValue>({
-  theme: 'dark',
+  theme: 'light',
   toggleTheme: () => {},
 })
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('dark')
+  const [theme, setTheme] = useState<Theme>('light')
 
-  // On mount, read persisted preference (default: dark)
+  // On mount, read persisted preference (default: light)
   useEffect(() => {
-    const stored = localStorage.getItem('tw-theme') as Theme | null
-    const preferred = stored ?? 'dark'
+    let stored: Theme | null = null
+    try {
+      stored = localStorage.getItem(STORAGE_KEY) as Theme | null
+    } catch {
+      // Storage blocked: fall back to the default.
+    }
+    const preferred = stored === 'dark' ? 'dark' : 'light'
     setTheme(preferred)
     applyTheme(preferred)
   }, [])
@@ -37,7 +48,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   function toggleTheme() {
     setTheme(prev => {
       const next: Theme = prev === 'dark' ? 'light' : 'dark'
-      localStorage.setItem('tw-theme', next)
+      try {
+        localStorage.setItem(STORAGE_KEY, next)
+      } catch {
+        // Storage blocked: the choice lasts for this page only.
+      }
       applyTheme(next)
       return next
     })

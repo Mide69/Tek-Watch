@@ -163,7 +163,7 @@ function AlertsContent() {
                         </Badge>
                         {alert.type === 'ai_anomaly' && (
                           <Badge variant="ai">
-                            <Zap className="w-3 h-3 mr-1 inline" />AI Detected
+                            <Zap className="w-3 h-3 mr-1 inline" />Anomaly
                           </Badge>
                         )}
                         <Badge variant="default">{alert.service}</Badge>
