@@ -20,4 +20,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health', timeout=5)" || exit 1
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# One worker per task. With two, each worker started its own copy of the
+# threshold and anomaly loops, so two tasks ran four of each against
+# DynamoDB, and each worker carried its own Python heap on a 512 MB task.
+# Redundancy comes from running two tasks, not two workers.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

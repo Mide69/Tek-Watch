@@ -22,7 +22,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Iterator, List, Optional
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 
 from config import load_config
@@ -178,7 +178,7 @@ class TimestreamQueryService:
         _safe(time_range, _SAFE_RANGE_RE)
 
         latest: Dict[tuple, Dict[str, Any]] = {}
-        for row in self._query_metrics_by_customer(cid, self._since_iso(time_range)):
+        for row in self._iter_metrics_by_customer(cid, self._since_iso(time_range), service=svc):
             if svc is not None and row.get("service") != svc:
                 continue
             key = (row.get("service"), row.get("resource_id"), row.get("metric_name"))
@@ -256,7 +256,7 @@ class TimestreamQueryService:
     def get_last_hour(self, customer_id: str) -> List[Dict[str, Any]]:
         """Get all metric values from the last hour for anomaly detection."""
         cid = _safe(customer_id)
-        rows = self._query_metrics_by_customer(cid, self._since_iso("1h"))
+        rows = self._iter_metrics_by_customer(cid, self._since_iso("1h"))
         return [
             {
                 "service": r.get("service"),
@@ -271,11 +271,12 @@ class TimestreamQueryService:
     def get_daily_costs(self, customer_id: str) -> List[Dict[str, Any]]:
         """Get daily cost records for the last 30 days."""
         cid = _safe(customer_id)
-        rows = self._query_metrics_by_customer(cid, self._since_iso("30d"))
-        filtered = [
-            r for r in rows
-            if r.get("service") == "cost_explorer" and r.get("metric_name") == "daily_blended_cost"
-        ]
+        stream = self._iter_metrics_by_customer(
+            cid,
+            self._since_iso("30d"),
+            service="cost_explorer",
+            metric_name="daily_blended_cost",
+        )
 
         # One row per calendar day, not one per collection.
         #
@@ -287,9 +288,14 @@ class TimestreamQueryService:
         # roughly the collection frequency, growing worse the longer the agent
         # ran. Keeping the last reading for each day gives the day's total once.
         by_day: Dict[str, Dict[str, Any]] = {}
-        for r in sorted(filtered, key=lambda r: str(r.get("time", ""))):
+        for r in stream:
+            if r.get("service") != "cost_explorer" or r.get("metric_name") != "daily_blended_cost":
+                continue
             day = str(r.get("time", ""))[:10]
-            if day:
+            if not day:
+                continue
+            kept = by_day.get(day)
+            if kept is None or str(r.get("time", "")) >= str(kept.get("time", "")):
                 by_day[day] = r
         return [
             {"time": r["time"], "cost": float(r["value"])}
@@ -299,18 +305,23 @@ class TimestreamQueryService:
     def get_service_costs(self, customer_id: str) -> List[Dict[str, Any]]:
         """Get month-to-date cost breakdown by AWS service."""
         cid = _safe(customer_id)
-        rows = self._query_metrics_by_customer(cid, self._since_iso("24h"))
-        filtered = [
-            r for r in rows
-            if r.get("service") == "cost_explorer" and r.get("metric_name") == "mtd_blended_cost"
-        ]
+        stream = self._iter_metrics_by_customer(
+            cid,
+            self._since_iso("24h"),
+            service="cost_explorer",
+            metric_name="mtd_blended_cost",
+        )
         # Latest reading per service. Same duplication as the daily costs:
         # every collection re-reports month-to-date for each service, so the
         # breakdown table listed each service once per cycle.
         latest: Dict[str, Dict[str, Any]] = {}
-        for r in sorted(filtered, key=lambda r: str(r.get("time", ""))):
-            name = r.get("resource_name") or r.get("resource_id") or "unknown"
-            latest[str(name)] = r
+        for r in stream:
+            if r.get("service") != "cost_explorer" or r.get("metric_name") != "mtd_blended_cost":
+                continue
+            name = str(r.get("resource_name") or r.get("resource_id") or "unknown")
+            kept = latest.get(name)
+            if kept is None or str(r.get("time", "")) >= str(kept.get("time", "")):
+                latest[name] = r
 
         result = [
             {"aws_service": name, "mtd_cost": float(r["value"])}
@@ -417,7 +428,7 @@ class TimestreamQueryService:
             logger.error("DynamoDB events query failed: %s", exc)
 
         rows.extend(
-            r for r in self._query_metrics_by_customer(cid, since)
+            r for r in self._iter_metrics_by_customer(cid, since, service=svc)
             if r.get("service") == svc
         )
 
@@ -439,7 +450,7 @@ class TimestreamQueryService:
         _safe(time_range, _SAFE_RANGE_RE)
         since = self._since_iso(time_range)
 
-        rows = self._query_metrics_by_customer(cid, since)
+        rows = self._iter_metrics_by_customer(cid, since)
 
         by_region: Dict[str, set] = {}
         by_service: Dict[str, set] = {}
@@ -488,17 +499,41 @@ class TimestreamQueryService:
             logger.error("DynamoDB query failed: %s", exc)
             return []
 
-    def _query_metrics_by_customer(self, customer_id: str, since_iso: str) -> List[Dict[str, Any]]:
+    def _iter_metrics_by_customer(
+        self,
+        customer_id: str,
+        since_iso: str,
+        service: Optional[str] = None,
+        metric_name: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Stream this customer's metric rows, one page at a time.
+
+        `service` and `metric_name` are applied by DynamoDB, not here. The cost
+        pages want a handful of cost_explorer rows out of a 30-day window, and
+        materialising that whole window took a 512 MB task to 99.5% memory in
+        production, where it was replaced as unhealthy.
+        """
+        condition = Key("customer_id").eq(customer_id) & Key("time").gte(since_iso)
+        filters = None
+        if service is not None:
+            filters = Attr("service").eq(service)
+        if metric_name is not None:
+            clause = Attr("metric_name").eq(metric_name)
+            filters = clause if filters is None else filters & clause
+
         try:
-            return self._paginated_query(
+            yield from self._iter_query(
                 self._metrics_table,
-                Key("customer_id").eq(customer_id) & Key("time").gte(since_iso),
+                condition,
                 index_name="gsi_customer_time",
                 scan_forward=True,
+                filter_expression=filters,
             )
         except ClientError as exc:
             logger.error("DynamoDB GSI query failed: %s", exc)
-            return []
+
+    def _query_metrics_by_customer(self, customer_id: str, since_iso: str) -> List[Dict[str, Any]]:
+        return list(self._iter_metrics_by_customer(customer_id, since_iso))
 
     @staticmethod
     def _iter_query(
@@ -506,6 +541,7 @@ class TimestreamQueryService:
         key_condition,
         index_name: Optional[str] = None,
         scan_forward: bool = True,
+        filter_expression=None,
     ) -> Iterator[Dict[str, Any]]:
         """Every item a query matches, one page in memory at a time."""
         kwargs: Dict[str, Any] = {
@@ -514,6 +550,8 @@ class TimestreamQueryService:
         }
         if index_name:
             kwargs["IndexName"] = index_name
+        if filter_expression is not None:
+            kwargs["FilterExpression"] = filter_expression
 
         while True:
             resp = table.query(**kwargs)
