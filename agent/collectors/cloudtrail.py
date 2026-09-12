@@ -24,6 +24,8 @@ HIGH_RISK_EVENTS = {
     # S3 policy changes
     "PutBucketPolicy", "DeleteBucketPolicy", "PutBucketAcl",
     "PutBucketPublicAccessBlock", "DeleteBucketPublicAccessBlock",
+    # Database exposure
+    "CreateDBInstance", "ModifyDBInstance",
     # Network changes
     "CreateVpc", "DeleteVpc", "ModifyVpcAttribute",
     "CreateInternetGateway", "AttachInternetGateway",

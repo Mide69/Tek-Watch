@@ -51,6 +51,10 @@ class RDSCollector(BaseCollector):
             "multi_az": str(multi_az),
             "az": az,
             "allocated_storage_gb": allocated_storage_gb,
+            # Whether the database has a public endpoint. Nothing collected
+            # this, so a database reachable from the internet looked exactly
+            # like one that is not.
+            "publicly_accessible": str(db.get("PubliclyAccessible", False)),
         }
 
         # Inventory record

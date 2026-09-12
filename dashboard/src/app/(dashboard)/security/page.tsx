@@ -108,6 +108,18 @@ function IncidentCard({ incident }: { incident: Incident }) {
                     ))}
                   </ol>
                 </div>
+                {incident.operational_impact && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-1.5">
+                      {incident.operational_impact.headline}
+                    </h4>
+                    <ul className="space-y-1.5">
+                      {incident.operational_impact.points.map(p => (
+                        <li key={p} className="text-muted-foreground">{p}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <div>
                   <h4 className="font-semibold text-foreground mb-1.5">Why it matters</h4>
                   <ul className="space-y-1.5">

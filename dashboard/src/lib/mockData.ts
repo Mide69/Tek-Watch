@@ -452,6 +452,7 @@ export interface Incident {
   affected: { service: string; resource: string; region: string }[]
   chain: { service: string; time: string | null; detail: string }[]
   regulatory_impact: { framework: string; reference: string; why: string }[]
+  operational_impact: { headline: string; points: string[] }
   remediation: { order: number; action: string; command: string | null }[]
 }
 
@@ -548,6 +549,14 @@ export const MOCK_INCIDENTS: Incident[] = [
       { framework: 'UK GDPR', reference: 'Art. 33 Notification of a personal data breach', why: 'If this bucket holds personal data and was accessed while exposed, the ICO must be told within 72 hours of you becoming aware, unless the breach is unlikely to result in a risk to individuals.' },
       { framework: 'Cyber Essentials', reference: 'Secure configuration', why: 'Cloud storage must not be left reachable by the public by default.' },
     ],
+    operational_impact: {
+      headline: 'Public access is no longer prevented on acme-marketing-assets',
+      points: [
+        'The bucket holds 1,240 objects.',
+        'That is 3.0 GB of data.',
+        'Block Public Access is what stops a policy or ACL from granting access to everyone. With it off, such a grant now takes effect.',
+      ],
+    },
     remediation: [
       { order: 1, action: 'Block public access on the bucket now.', command: 'aws s3api put-public-access-block --bucket acme-marketing-assets --public-access-block-configuration BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true' },
       { order: 2, action: "Review the bucket's policy and ACL for grants to everyone.", command: 'aws s3api get-bucket-policy --bucket acme-marketing-assets && aws s3api get-bucket-acl --bucket acme-marketing-assets' },
