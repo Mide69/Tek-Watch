@@ -130,3 +130,45 @@ class TestDetectForCustomer:
 def test_no_key_means_no_client_not_no_loop():
     with patch("services.alerting.anomaly.load_config", return_value=MagicMock(anthropic_api_key="")):
         assert anomaly._claude_client() is None
+
+
+# ── Baseline caching ─────────────────────────────────────────────────────────
+#
+# Computing the 7-day baseline reads a week of every metric: 133,626 rows for
+# the first real customer, 95 seconds of CPU. Running that every pass pinned a
+# 0.25 vCPU task and ECS replaced it as unhealthy 14 times in one day.
+
+@pytest.mark.asyncio
+class TestBaselineCache:
+    async def test_a_fresh_stored_baseline_is_not_recomputed(self):
+        from datetime import datetime, timezone
+        ts, db, notif = services()
+        db.get_baseline.return_value = {
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+            "series": ts.get_7day_summary.return_value,
+        }
+        await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {})
+        ts.get_7day_summary.assert_not_called()
+        db.put_baseline.assert_not_called()
+
+    async def test_a_stale_baseline_is_recomputed_and_stored(self):
+        ts, db, notif = services()
+        db.get_baseline.return_value = {
+            "computed_at": "2026-01-01T00:00:00+00:00",
+            "series": [{"service": "ec2"}],
+        }
+        await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {})
+        ts.get_7day_summary.assert_called_once()
+        db.put_baseline.assert_called_once()
+
+    async def test_no_stored_baseline_computes_one(self):
+        ts, db, notif = services()
+        db.get_baseline.return_value = None
+        await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {})
+        ts.get_7day_summary.assert_called_once()
+
+    async def test_unreadable_timestamp_is_treated_as_stale(self):
+        ts, db, notif = services()
+        db.get_baseline.return_value = {"computed_at": "not a date", "series": [{"x": 1}]}
+        await anomaly.detect_anomalies_for_customer("TT-1", ts, db, notif, None, {})
+        ts.get_7day_summary.assert_called_once()

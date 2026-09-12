@@ -15,6 +15,7 @@ were never looked at.
 import asyncio
 import json
 import logging
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -28,7 +29,11 @@ logger = logging.getLogger(__name__)
 
 EXPLAIN_MODEL = "claude-sonnet-4-20250514"
 EXPLAIN_LIMIT = 20          # anomalies explained per call; the rest use built-in wording
-INTERVAL_SECONDS = 15 * 60
+INTERVAL_SECONDS = 30 * 60
+# How old a stored baseline may be before it is recomputed. A week of
+# history barely moves in six hours, and recomputing it is the most
+# expensive thing this service does.
+BASELINE_MAX_AGE = timedelta(hours=6)
 # The first pass reads a week of every metric. Starting it the instant the
 # process boots put that load on top of startup, while the load balancer was
 # still deciding whether the new task was healthy.
@@ -108,6 +113,39 @@ async def explain(anomalies: List[Anomaly], client: Any = None) -> List[Tuple[st
     return texts
 
 
+def _is_fresh(computed_at: Any, now: datetime) -> bool:
+    if not computed_at:
+        return False
+    try:
+        when = datetime.fromisoformat(str(computed_at).replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if not when.tzinfo:
+        when = when.replace(tzinfo=timezone.utc)
+    return now - when < BASELINE_MAX_AGE
+
+
+async def _baseline(
+    customer_id: str,
+    ts_service: TimestreamQueryService,
+    db_service: DynamoDBService,
+) -> List[Dict[str, Any]]:
+    """The 7-day baseline, computed at most every few hours.
+
+    Blocking DynamoDB work, so it runs on a worker thread: on the event loop it
+    froze every request this worker was serving, health checks included.
+    """
+    now = datetime.now(timezone.utc)
+    stored = await asyncio.to_thread(db_service.get_baseline, customer_id)
+    if stored and _is_fresh(stored.get("computed_at"), now) and stored.get("series"):
+        return stored["series"]
+
+    series = await asyncio.to_thread(ts_service.get_7day_summary, customer_id)
+    if series:
+        await asyncio.to_thread(db_service.put_baseline, customer_id, series)
+    return series
+
+
 async def detect_anomalies_for_customer(
     customer_id: str,
     ts_service: TimestreamQueryService,
@@ -120,10 +158,7 @@ async def detect_anomalies_for_customer(
 
     Returns the number of new alerts created.
     """
-    # Blocking DynamoDB reads, a week of data for the baseline. Run on the
-    # event loop, they froze every request this worker was serving, health
-    # checks included, for as long as the read took.
-    baseline = await asyncio.to_thread(ts_service.get_7day_summary, customer_id)
+    baseline = await _baseline(customer_id, ts_service, db_service)
     recent = await asyncio.to_thread(ts_service.get_last_hour, customer_id)
     if not baseline or not recent:
         return 0

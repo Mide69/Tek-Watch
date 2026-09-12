@@ -178,7 +178,12 @@ class TimestreamQueryService:
         _safe(time_range, _SAFE_RANGE_RE)
 
         latest: Dict[tuple, Dict[str, Any]] = {}
-        for row in self._iter_metrics_by_customer(cid, self._since_iso(time_range), service=svc):
+        for row in self._iter_metrics_by_customer(
+            cid,
+            self._since_iso(time_range),
+            service=svc,
+            projection=["service", "resource_id", "resource_name", "metric_name", "value", "time"],
+        ):
             if svc is not None and row.get("service") != svc:
                 continue
             key = (row.get("service"), row.get("resource_id"), row.get("metric_name"))
@@ -216,6 +221,10 @@ class TimestreamQueryService:
                 Key("customer_id").eq(cid) & Key("time").gte(self._since_iso("7d")),
                 index_name="gsi_customer_time",
                 scan_forward=True,
+                # Only what the baseline uses. Every row also carries a
+                # dimensions map it never looks at, and parsing those was
+                # most of the work: 133,626 rows took 95 seconds.
+                projection=["service", "resource_id", "metric_name", "value", "time"],
             ):
                 try:
                     value = float(r["value"])
@@ -505,6 +514,7 @@ class TimestreamQueryService:
         since_iso: str,
         service: Optional[str] = None,
         metric_name: Optional[str] = None,
+        projection: Optional[List[str]] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Stream this customer's metric rows, one page at a time.
 
@@ -528,6 +538,7 @@ class TimestreamQueryService:
                 index_name="gsi_customer_time",
                 scan_forward=True,
                 filter_expression=filters,
+                projection=projection,
             )
         except ClientError as exc:
             logger.error("DynamoDB GSI query failed: %s", exc)
@@ -542,6 +553,7 @@ class TimestreamQueryService:
         index_name: Optional[str] = None,
         scan_forward: bool = True,
         filter_expression=None,
+        projection: Optional[List[str]] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Every item a query matches, one page in memory at a time."""
         kwargs: Dict[str, Any] = {
@@ -552,6 +564,12 @@ class TimestreamQueryService:
             kwargs["IndexName"] = index_name
         if filter_expression is not None:
             kwargs["FilterExpression"] = filter_expression
+        if projection:
+            # "value" and "time" are reserved words, so every projected
+            # name goes through ExpressionAttributeNames.
+            names = {"#a%d" % i: n for i, n in enumerate(projection)}
+            kwargs["ProjectionExpression"] = ", ".join(names)
+            kwargs["ExpressionAttributeNames"] = names
 
         while True:
             resp = table.query(**kwargs)

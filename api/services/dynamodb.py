@@ -3,6 +3,7 @@ import hashlib
 import logging
 import secrets
 import uuid
+from decimal import Decimal
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -311,6 +312,66 @@ class DynamoDBService:
             return False
 
     # ── Thresholds ────────────────────────────────────────────────────────────
+
+    def get_baseline(self, customer_id: str) -> Optional[Dict[str, Any]]:
+        """The stored 7-day baseline, or None if there isn't a usable one.
+
+        Computing it reads a week of every metric — 133,626 rows for the first
+        real customer, which pinned a 0.25 vCPU task at 100% for minutes and
+        got it replaced as unhealthy. Storing it means that work happens a few
+        times a day instead of on every pass, and survives a task restart.
+        """
+        try:
+            item = self._customers.get_item(
+                Key={"customer_id": customer_id, "SK": "BASELINE"}
+            ).get("Item")
+        except ClientError as exc:
+            logger.error("Baseline read failed for %s: %s", customer_id, exc)
+            return None
+        if not item:
+            return None
+        return {
+            "computed_at": item.get("computed_at"),
+            "series": [
+                {
+                    "service": s.get("service"),
+                    "resource_id": s.get("resource_id"),
+                    "metric_name": s.get("metric_name"),
+                    "avg_value": float(s.get("avg_value", 0)),
+                    "stddev_value": float(s.get("stddev_value", 0)),
+                    "samples": int(s.get("samples", 0)),
+                    "first_time": s.get("first_time"),
+                }
+                for s in item.get("series", [])
+            ],
+        }
+
+    def put_baseline(self, customer_id: str, series: List[Dict[str, Any]]) -> None:
+        """Store a freshly computed baseline. Never fatal: it is a cache."""
+        if not series:
+            return
+        try:
+            self._customers.put_item(Item={
+                "customer_id": customer_id,
+                "SK": "BASELINE",
+                "computed_at": _now_iso(),
+                "series": [
+                    {
+                        "service": s.get("service"),
+                        "resource_id": s.get("resource_id"),
+                        "metric_name": s.get("metric_name"),
+                        "avg_value": Decimal(str(round(float(s.get("avg_value", 0)), 6))),
+                        "stddev_value": Decimal(str(round(float(s.get("stddev_value", 0)), 6))),
+                        "samples": int(s.get("samples", 0)),
+                        "first_time": s.get("first_time"),
+                    }
+                    for s in series
+                ],
+            })
+        except ClientError as exc:
+            # Too big for one item, or throttled. Detection still works, it
+            # just recomputes next pass.
+            logger.warning("Baseline not stored for %s: %s", customer_id, exc)
 
     def get_thresholds(self, customer_id: str = "DEFAULT") -> List[Dict[str, Any]]:
         """Get thresholds for a customer or the defaults."""
