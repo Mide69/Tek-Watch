@@ -10,13 +10,26 @@ Validation steps:
 import hashlib
 import json
 import logging
+import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 import boto3
 from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
+
+# How long a customer profile is trusted before it is read again.
+#
+# The cache used to have no expiry. The consumer is one long-running process,
+# so a profile read at startup was used until the next deploy: a rotated agent
+# key was rejected and the old, possibly leaked, key kept being accepted, and a
+# deleted customer kept being ingested. Found when rotating TT-0001's key.
+CUSTOMER_CACHE_SECONDS = 60
+# On a key mismatch the profile is re-read before rejecting, so a key that was
+# just replaced works straight away. Bounded, so a stream of bad keys cannot
+# turn every message into a DynamoDB read.
+MISMATCH_RECHECK_SECONDS = 5
 
 
 @dataclass
@@ -59,8 +72,8 @@ class MessageProcessor:
         self._table_name = dynamodb_table_name
         self._dynamodb = boto3.resource("dynamodb", region_name=aws_region)
         self._table = self._dynamodb.Table(dynamodb_table_name)
-        # In-memory cache to avoid DynamoDB lookup on every message
-        self._customer_cache: Dict[str, Optional[Dict]] = {}
+        # customer_id -> (profile or None, monotonic time it was read)
+        self._customer_cache: Dict[str, Tuple[Optional[Dict], float]] = {}
 
     def process(
         self, message_body: str, message_attributes: Dict[str, Any]
@@ -105,8 +118,11 @@ class MessageProcessor:
             message_attributes.get("api_key", {}).get("StringValue", "")
         )
         if not self._verify_api_key(api_key, customer.get("api_key_hash", "")):
-            logger.warning("API key mismatch for customer: %s", customer_id)
-            return None
+            # The key may have been replaced since the profile was cached.
+            customer = self._get_customer(customer_id, max_age=MISMATCH_RECHECK_SECONDS)
+            if not customer or not self._verify_api_key(api_key, customer.get("api_key_hash", "")):
+                logger.warning("API key mismatch for customer: %s", customer_id)
+                return None
 
         return ValidatedRecord(
             customer_id=customer_id,
@@ -122,17 +138,21 @@ class MessageProcessor:
             dimensions=data.get("dimensions", {}),
         )
 
-    def _get_customer(self, customer_id: str) -> Optional[Dict]:
-        """Fetch customer from DynamoDB with in-memory caching."""
-        if customer_id in self._customer_cache:
-            return self._customer_cache[customer_id]
+    def _get_customer(
+        self, customer_id: str, max_age: float = CUSTOMER_CACHE_SECONDS
+    ) -> Optional[Dict]:
+        """Fetch customer from DynamoDB, reusing a read no older than max_age seconds."""
+        now = time.monotonic()
+        cached = self._customer_cache.get(customer_id)
+        if cached is not None and now - cached[1] < max_age:
+            return cached[0]
 
         try:
             response = self._table.get_item(
                 Key={"customer_id": customer_id, "SK": "PROFILE"}
             )
             customer = response.get("Item")
-            self._customer_cache[customer_id] = customer
+            self._customer_cache[customer_id] = (customer, now)
             return customer
         except ClientError as exc:
             logger.error("DynamoDB lookup failed for %s: %s", customer_id, exc)

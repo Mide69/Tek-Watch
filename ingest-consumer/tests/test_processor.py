@@ -111,3 +111,47 @@ class TestMessageProcessor:
     def test_all_required_fields_present(self):
         body = json.loads(make_valid_body())
         assert REQUIRED_FIELDS.issubset(set(body.keys()))
+
+
+class TestCustomerCacheExpiry:
+    """The cache never expired, so a rotated key was rejected, and the old key
+    accepted, until the consumer happened to be redeployed."""
+
+    def test_new_key_works_immediately_after_rotation(self, processor):
+        proc, table = processor
+        table.get_item.return_value = {"Item": make_customer_item("TT-0001", "old-key")}
+        assert proc.process(make_valid_body(), make_api_key_attrs("old-key")) is not None
+
+        table.get_item.return_value = {"Item": make_customer_item("TT-0001", "new-key")}
+        with patch("processor.time.monotonic", return_value=10**6):
+            assert proc.process(make_valid_body(), make_api_key_attrs("new-key")) is not None
+
+    def test_old_key_rejected_once_the_cache_expires(self, processor):
+        import processor as module
+        proc, table = processor
+        with patch("processor.time.monotonic", return_value=1000.0):
+            table.get_item.return_value = {"Item": make_customer_item("TT-0001", "old-key")}
+            assert proc.process(make_valid_body(), make_api_key_attrs("old-key")) is not None
+
+        table.get_item.return_value = {"Item": make_customer_item("TT-0001", "new-key")}
+        later = 1000.0 + module.CUSTOMER_CACHE_SECONDS + 1
+        with patch("processor.time.monotonic", return_value=later):
+            assert proc.process(make_valid_body(), make_api_key_attrs("old-key")) is None
+
+    def test_bad_keys_do_not_force_a_read_per_message(self, processor):
+        proc, table = processor
+        table.get_item.return_value = {"Item": make_customer_item("TT-0001", "real-key")}
+        with patch("processor.time.monotonic", return_value=500.0):
+            for _ in range(20):
+                assert proc.process(make_valid_body(), make_api_key_attrs("wrong")) is None
+        assert table.get_item.call_count == 1
+
+    def test_deleted_profile_is_seen_within_the_cache_window(self, processor):
+        import processor as module
+        proc, table = processor
+        with patch("processor.time.monotonic", return_value=0.0):
+            table.get_item.return_value = {"Item": make_customer_item("TT-0001", "k")}
+            proc.process(make_valid_body(), make_api_key_attrs("k"))
+        table.get_item.return_value = {}
+        with patch("processor.time.monotonic", return_value=module.CUSTOMER_CACHE_SECONDS + 1.0):
+            assert proc.process(make_valid_body(), make_api_key_attrs("k")) is None
