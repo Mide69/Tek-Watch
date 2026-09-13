@@ -149,3 +149,30 @@ class TestCloudTrailCollector:
         ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
         records = c.collect()
         assert all(r.customer_id == "TT-0001" for r in records)
+
+
+class TestLookupCost:
+    """LookupEvents allows two calls a second. Paging through every read made
+    each run slower than the last, because the agent's own reads are events."""
+
+    def test_asks_cloudtrail_for_write_events_only(self, collector):
+        c, ct = collector
+        ct.get_paginator.return_value.paginate.return_value = [{"Events": []}]
+        c.collect()
+        kwargs = ct.get_paginator.return_value.paginate.call_args.kwargs
+        assert kwargs["LookupAttributes"] == [{"AttributeKey": "ReadOnly", "AttributeValue": "false"}]
+
+    def test_stops_paging_at_the_cap(self, collector):
+        from collectors import cloudtrail
+        c, ct = collector
+        seen = []
+
+        def pages():
+            for i in range(cloudtrail.MAX_PAGES + 30):
+                seen.append(i)
+                yield {"Events": [make_event("DescribeInstances", event_id=f"e{i}")]}
+
+        ct.get_paginator.return_value.paginate.return_value = pages()
+        records = c.collect()
+        assert len(seen) == cloudtrail.MAX_PAGES + 1
+        assert any(r.metric_name == "high_risk_events_24h" for r in records)

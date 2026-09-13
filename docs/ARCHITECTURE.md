@@ -48,7 +48,7 @@ Tek Watch is a **multi-tenant SaaS** AWS infrastructure monitoring platform. Eac
 ## Data Flow
 
 ### Telemetry Ingestion
-1. Agent runs on a schedule (default: every 5 min) inside the customer's AWS account
+1. Agent runs on a schedule (default: every 15 min; all regions every 30 min, costs every 6 hours) inside the customer's AWS account
 2. Agent collects metrics from 25 AWS services via boto3 ReadOnly calls
 3. Metrics are batched and sent to the Tek Watch SQS ingest queue in the central account
 4. ECS ingest consumer (Fargate) consumes the SQS messages, fans out to:

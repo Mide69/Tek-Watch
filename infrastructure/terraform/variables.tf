@@ -101,10 +101,15 @@ variable "agent_memory" {
   default     = 1024
 }
 
-variable "agent_schedule_expression" {
-  description = "EventBridge schedule for the self-hosted agent's scheduled ECS task"
-  type        = string
-  default     = "rate(5 minutes)"
+variable "agent_run_interval_minutes" {
+  description = "How often the self-hosted agent runs. The agent is told the same number, and the silence detector alarms after 20 minutes without a heartbeat."
+  type        = number
+  default     = 15
+
+  validation {
+    condition     = contains([5, 10, 15], var.agent_run_interval_minutes)
+    error_message = "agent_run_interval_minutes must be 5, 10 or 15."
+  }
 }
 
 variable "enable_self_hosted_agent" {

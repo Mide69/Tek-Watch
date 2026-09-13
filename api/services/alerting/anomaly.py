@@ -251,12 +251,12 @@ async def run_anomaly_detection_for_customer(customer_id: str) -> int:
 
 
 async def anomaly_detection_loop() -> None:
-    """Background task: detection every 15 minutes for every active customer."""
+    """Background task: detection every 30 minutes for every active customer."""
     client = _claude_client()
     ts_service = TimestreamQueryService()
     db_service = DynamoDBService()
     notif_service = NotificationService()
-    logger.info("Anomaly detection loop started (interval: 15 min)")
+    logger.info("Anomaly detection loop started (interval: %d min)", INTERVAL_SECONDS // 60)
     await asyncio.sleep(STARTUP_DELAY_SECONDS)
 
     while True:

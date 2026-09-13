@@ -37,13 +37,13 @@ const STEPS = [
   },
   {
     title: 'Wait for the first collection',
-    body: 'The stack takes two to three minutes. The agent then runs every five minutes, so your dashboard fills in within about ten minutes of the stack completing.',
+    body: 'The stack takes two to three minutes. The agent then runs every 15 minutes, so your dashboard fills in within about 20 minutes of the stack completing.',
   },
 ]
 
 const CREATES = [
   { icon: ShieldCheck, label: 'A read-only IAM role', detail: 'Scoped to describe and list calls. It cannot create, modify or delete anything in your account.' },
-  { icon: Clock, label: 'An ECS Fargate task', detail: 'Runs for a few seconds every five minutes, then stops. Nothing runs between collections.' },
+  { icon: Clock, label: 'An ECS Fargate task', detail: 'Runs for a minute or two every 15 minutes, then stops. Nothing runs between collections.' },
   { icon: Wifi, label: 'An EventBridge schedule', detail: 'Triggers that task. Outbound only, so no inbound firewall or security group changes are needed.' },
 ]
 

@@ -16,6 +16,10 @@ class AgentConfig:
     api_key: str
     log_level: str
     aws_region: str
+    # Must match the schedule that starts the agent. It decides which runs
+    # do the occasional work (see utils/schedule.py) and how long a run may
+    # take before it has to stop and publish what it has.
+    run_interval_minutes: int = 5
 
 
 def load_config() -> AgentConfig:
@@ -41,4 +45,14 @@ def load_config() -> AgentConfig:
         api_key=required["TEK_WATCH_API_KEY"],
         log_level=os.environ.get("LOG_LEVEL", "INFO").upper(),
         aws_region=os.environ.get("AWS_REGION", "eu-west-2"),
+        run_interval_minutes=_positive_int(os.environ.get("TEK_WATCH_RUN_INTERVAL_MINUTES"), 5),
     )
+
+
+def _positive_int(raw, default: int) -> int:
+    """Stacks created before this setting existed run every 5 minutes."""
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default

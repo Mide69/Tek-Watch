@@ -31,7 +31,7 @@ used for language only, never to decide what is wrong.
 
 | Capability | Where it runs | How it works |
 |---|---|---|
-| Data collection | Our agent (`agent/collectors/`) | 23 read-only boto3 collectors, every 5 minutes |
+| Data collection | Our agent (`agent/collectors/`) | 23 read-only boto3 collectors, every 15 minutes |
 | Baselines | Our API (`api/services/timestream.py`) | 7-day mean, standard deviation and sample count per resource metric |
 | Anomaly detection | Our API (`api/services/alerting/detector.py`) | z-score against the 7-day baseline (3σ medium, 5σ high), plus step-change detection for metrics that are normally flat. Needs 24 hours and 12 samples of history first |
 | Threshold alerts | Our API (`api/services/alerting/threshold.py`) | Default or customer thresholds, every 5 minutes |
@@ -219,8 +219,10 @@ aws cloudformation create-stack \
    Secrets Manager, an outbound-only security group and an EventBridge
    schedule. No inbound access is opened.
 
-3. **The agent runs every 5 minutes** and sends read-only metrics to the
-   ingest queue. Data appears on the dashboard within about ten minutes.
+3. **The agent runs every 15 minutes** and sends read-only metrics to the
+   ingest queue. Data appears on the dashboard within about 20 minutes.
+   Other regions are swept every 30 minutes and costs fetched every 6 hours,
+   because Cost Explorer bills per request.
 
 ### Central Platform Deployment
 

@@ -367,7 +367,7 @@ function HeroFlow() {
         <span className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-1 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live pipeline
         </span>
-        <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 5 minutes</span>
+        <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 15 minutes</span>
       </div>
       <svg viewBox="0 0 640 332" className="w-full h-auto" role="img" aria-label="Your AWS account sends read-only data to the TekWatch agent, which feeds anomaly detection, compliance checks and incident correlation">
         <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#a5b4fc" strokeWidth={1.5} />

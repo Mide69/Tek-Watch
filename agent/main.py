@@ -3,16 +3,26 @@ Tek Watch Agent — entry point.
 
 Execution flow:
   1. Load config from environment variables
-  2. Discover all active AWS regions
-  3. Run regional collectors in parallel (ThreadPoolExecutor)
-  4. Run global collectors (IAM, Cost Explorer)
-  5. Publish all records to SQS
-  6. Send heartbeat record
-  7. Exit (ECS task completes)
+  2. Work out what is due on this run (utils/schedule.py)
+  3. Run regional and global collectors in parallel, against a deadline
+  4. Publish all records to SQS, with a heartbeat
+  5. Exit (ECS task completes)
+
+What a run covers:
+  - every run: the home region, and the global collectors except Cost Explorer
+  - every 30 minutes: every enabled region
+  - every 6 hours: Cost Explorer
+
+Every run used to do all of it: 17 collectors in each of 17 regions plus
+Cost Explorer, every 5 minutes. Cost Explorer bills $0.01 a request, which
+came to $74 in eleven days, more than everything else in the account. The
+rest of the API calls are all written to CloudTrail, and the organisation
+trail's CloudWatch log ingestion was another $29.
 """
 import logging
+import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
 from datetime import datetime, timezone
 from typing import List
 
@@ -46,8 +56,16 @@ from config import load_config
 from publisher.sqs_publisher import SQSPublisher
 from utils.logger import configure_logging
 from utils.region_discovery import discover_active_regions
+from utils.schedule import is_due
 
 logger = logging.getLogger(__name__)
+
+ALL_REGIONS_EVERY_MINUTES = 30   # the dashboard's inventory window is 1 hour
+COST_EVERY_MINUTES = 6 * 60      # cost pages read a 24-hour window
+# A run must finish before the next one starts, or they stack up. Leave a
+# minute of the interval for startup and publishing.
+DEADLINE_MARGIN_SECONDS = 60
+MIN_DEADLINE_SECONDS = 150
 
 # Regional collectors — instantiated per region
 REGIONAL_COLLECTORS = [
@@ -120,12 +138,13 @@ def collect_region(
 def collect_global(
     session: boto3.Session,
     customer_id: str,
+    collectors=None,
 ) -> tuple[List[MetricRecord], int]:
-    """Run all global (non-regional) collectors."""
+    """Run global (non-regional) collectors, all of them unless told which."""
     records: List[MetricRecord] = []
     errors = 0
 
-    for CollectorClass in GLOBAL_COLLECTORS:
+    for CollectorClass in (GLOBAL_COLLECTORS if collectors is None else collectors):
         try:
             collector = CollectorClass(session, "global", customer_id)
             collected = collector.collect()
@@ -171,47 +190,85 @@ def build_heartbeat(
     )
 
 
+def plan_run(now: datetime, interval_minutes: int) -> tuple[bool, list]:
+    """(sweep every region?, global collectors to run) for a run starting now."""
+    all_regions = is_due(now, interval_minutes, ALL_REGIONS_EVERY_MINUTES)
+    globals_due = [
+        c for c in GLOBAL_COLLECTORS
+        if c is not CostExplorerCollector or is_due(now, interval_minutes, COST_EVERY_MINUTES)
+    ]
+    return all_regions, globals_due
+
+
+def deadline_seconds(interval_minutes: int) -> int:
+    return max(MIN_DEADLINE_SECONDS, interval_minutes * 60 - DEADLINE_MARGIN_SECONDS)
+
+
 def main() -> None:
     """Main agent entry point."""
     config = load_config()
     configure_logging(config.log_level)
 
     logger.info(
-        "Agent starting: customer_id=%s region=%s",
+        "Agent starting: customer_id=%s region=%s interval=%dm",
         config.customer_id,
         config.aws_region,
+        config.run_interval_minutes,
     )
 
     start_time = time.monotonic()
+    budget = deadline_seconds(config.run_interval_minutes)
     session = boto3.Session(region_name=config.aws_region)
 
-    # Discover active regions
-    regions = discover_active_regions(session)
-    logger.info("Running collectors across %d regions", len(regions))
+    sweep_all, globals_due = plan_run(datetime.now(timezone.utc), config.run_interval_minutes)
+    regions = discover_active_regions(session) if sweep_all else [config.aws_region]
+    logger.info(
+        "Running collectors across %d regions (%s); global: %s",
+        len(regions),
+        "all enabled" if sweep_all else "home only",
+        ", ".join(c.SERVICE_NAME for c in globals_due),
+    )
 
     all_records: List[MetricRecord] = []
     total_errors = 0
 
-    # Regional collectors — parallel
-    with ThreadPoolExecutor(max_workers=min(len(regions), 10)) as executor:
-        futures = {
-            executor.submit(collect_region, session, region, config.customer_id): region
-            for region in regions
-        }
-        for future in as_completed(futures):
-            region = futures[future]
+    # boto3 sessions are not safe to share between threads, so each job gets
+    # its own. Credentials come from the task role either way.
+    def region_job(region: str):
+        return collect_region(boto3.Session(region_name=region), region, config.customer_id)
+
+    def global_job():
+        return collect_global(boto3.Session(region_name=config.aws_region), config.customer_id, globals_due)
+
+    executor = ThreadPoolExecutor(max_workers=min(len(regions) + 1, 10))
+    futures = {executor.submit(region_job, region): region for region in regions}
+    futures[executor.submit(global_job)] = "global"
+
+    pending = set(futures)
+    timed_out = False
+    while pending:
+        remaining = budget - (time.monotonic() - start_time)
+        if remaining <= 0:
+            timed_out = True
+            break
+        done, pending = wait(pending, timeout=remaining, return_when=FIRST_COMPLETED)
+        for future in done:
+            name = futures[future]
             try:
                 records, errors = future.result()
                 all_records.extend(records)
                 total_errors += errors
             except Exception as exc:  # noqa: BLE001
-                logger.error("Region %s collection thread failed: %s", region, exc)
+                logger.error("Collection thread %s failed: %s", name, exc)
                 total_errors += 1
 
-    # Global collectors — sequential
-    global_records, global_errors = collect_global(session, config.customer_id)
-    all_records.extend(global_records)
-    total_errors += global_errors
+    if timed_out:
+        unfinished = sorted(futures[f] for f in pending)
+        logger.warning(
+            "Deadline of %ds reached; publishing without: %s", budget, ", ".join(unfinished)
+        )
+        total_errors += len(unfinished)
+    executor.shutdown(wait=False, cancel_futures=True)
 
     duration = time.monotonic() - start_time
     logger.info(
@@ -240,6 +297,11 @@ def main() -> None:
     publisher.publish_batch(all_records)
 
     logger.info("Agent run complete. Exiting.")
+    if timed_out:
+        # Threads still stuck in a slow call would otherwise keep the task,
+        # and the bill, running: Python waits for pool threads at exit.
+        logging.shutdown()
+        os._exit(0)
 
 
 if __name__ == "__main__":

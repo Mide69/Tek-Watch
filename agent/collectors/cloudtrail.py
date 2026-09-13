@@ -38,6 +38,11 @@ HIGH_RISK_EVENTS = {
 }
 
 
+# 1,000 write events in 24 hours is far beyond a normal small account; past
+# that, finish the run rather than hold it open behind the rate limit.
+MAX_PAGES = 20
+
+
 class CloudTrailCollector(BaseCollector):
     """Collects recent high-risk CloudTrail events from the last 24 hours."""
 
@@ -57,11 +62,27 @@ class CloudTrailCollector(BaseCollector):
             paginator = self._ct.get_paginator("lookup_events")
             event_count = 0
 
+            pages = 0
             for page in paginator.paginate(
                 StartTime=start_time,
                 EndTime=end_time,
                 MaxResults=50,
+                # Every event we look for is a write. Without this filter the
+                # agent paged through all of the last 24 hours, reads included,
+                # at LookupEvents' limit of two calls a second, in every region.
+                # Reads are nearly all of it, and most were the agent's own
+                # Describe and List calls, so each run made the next one longer:
+                # runs reached 88 minutes on a 5-minute schedule and piled up
+                # nine deep.
+                LookupAttributes=[{"AttributeKey": "ReadOnly", "AttributeValue": "false"}],
             ):
+                pages += 1
+                if pages > MAX_PAGES:
+                    logger.warning(
+                        "CloudTrail in %s: stopped after %d pages of write events",
+                        self.region, MAX_PAGES,
+                    )
+                    break
                 for event in page.get("Events", []):
                     event_name = event.get("EventName", "")
                     if event_name not in HIGH_RISK_EVENTS:

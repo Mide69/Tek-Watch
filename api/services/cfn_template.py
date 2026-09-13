@@ -70,10 +70,17 @@ def generate_agent_template(
                 "Default": config.agent_public_image_uri,
                 "Description": "Tek Watch agent image (public, no credentials needed)",
             },
-            "ScheduleExpression": {
-                "Type": "String",
-                "Default": "rate(5 minutes)",
-                "Description": "How often the agent runs",
+            # A number rather than a free-text schedule, because the agent has
+            # to be told the same value: it decides which runs sweep every
+            # region or fetch costs, and how long a run may take. Capped at
+            # 15 because the silence detector alarms after 20 minutes without
+            # a heartbeat. The default was 5, which with a slow run meant nine
+            # overlapping tasks and a bill of about $14 a day.
+            "RunIntervalMinutes": {
+                "Type": "Number",
+                "Default": 15,
+                "AllowedValues": [5, 10, 15],
+                "Description": "How often the agent runs, in minutes",
             },
             # Fargate tasks need awsvpc networking, so the schedule has to know
             # where to place them. Typed as EC2 resource ids so CloudFormation
@@ -226,6 +233,7 @@ def generate_agent_template(
                             {"Name": "TEK_WATCH_CUSTOMER_ID", "Value": {"Ref": "CustomerID"}},
                             {"Name": "TEK_WATCH_INGEST_QUEUE_URL", "Value": {"Ref": "IngestQueueURL"}},
                             {"Name": "LOG_LEVEL", "Value": "INFO"},
+                            {"Name": "TEK_WATCH_RUN_INTERVAL_MINUTES", "Value": {"Ref": "RunIntervalMinutes"}},
                         ],
                         # Resolved by the ECS agent at container start, using
                         # the execution role's secretsmanager:GetSecretValue
@@ -309,7 +317,7 @@ def generate_agent_template(
                 "Properties": {
                     "Name": f"tek-watch-agent-{customer_id}-schedule",
                     "Description": "Runs the Tek Watch collection agent",
-                    "ScheduleExpression": {"Ref": "ScheduleExpression"},
+                    "ScheduleExpression": {"Fn::Sub": "rate(${RunIntervalMinutes} minutes)"},
                     "State": "ENABLED",
                     "Targets": [{
                         "Id": "agent-task",

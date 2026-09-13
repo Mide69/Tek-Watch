@@ -253,12 +253,12 @@ module "ecs" {
   consumer_memory        = var.consumer_memory
   consumer_desired_count = var.consumer_desired_count
 
-  agent_cpu                 = var.agent_cpu
-  agent_memory              = var.agent_memory
-  agent_schedule_expression = var.agent_schedule_expression
-  enable_self_hosted_agent  = var.enable_self_hosted_agent
-  enable_container_insights = var.enable_container_insights
-  api_use_spot              = var.api_use_spot
+  agent_cpu                  = var.agent_cpu
+  agent_memory               = var.agent_memory
+  agent_run_interval_minutes = var.agent_run_interval_minutes
+  enable_self_hosted_agent   = var.enable_self_hosted_agent
+  enable_container_insights  = var.enable_container_insights
+  api_use_spot               = var.api_use_spot
 
   secrets_manager_arn       = module.secrets.secret_arn
   cognito_customer_pool_arn = module.cognito.customer_user_pool_arn

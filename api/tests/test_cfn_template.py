@@ -258,3 +258,23 @@ class TestApiKeyDefaultOmittedWhenNotIssued:
     def test_key_parameter_is_noecho(self, template):
         _, doc = template
         assert doc["Parameters"]["APIKey"]["NoEcho"] is True
+
+
+class TestRunInterval:
+    """The schedule and the agent must agree on the interval: the agent uses
+    it to decide which runs fetch costs and sweep every region, and when to
+    stop. A free-text schedule could not be passed to it."""
+
+    def test_default_is_15_minutes_and_capped_below_the_silence_alarm(self, template):
+        _, doc = template
+        param = doc["Parameters"]["RunIntervalMinutes"]
+        assert param["Default"] == 15
+        assert max(param["AllowedValues"]) <= 15
+        assert "ScheduleExpression" not in doc["Parameters"]
+
+    def test_schedule_and_agent_read_the_same_parameter(self, template):
+        _, doc = template
+        rule = doc["Resources"]["AgentSchedule"]["Properties"]
+        assert rule["ScheduleExpression"] == {"Fn::Sub": "rate(${RunIntervalMinutes} minutes)"}
+        env = doc["Resources"]["AgentTaskDefinition"]["Properties"]["ContainerDefinitions"][0]["Environment"]
+        assert {"Name": "TEK_WATCH_RUN_INTERVAL_MINUTES", "Value": {"Ref": "RunIntervalMinutes"}} in env

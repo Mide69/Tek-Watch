@@ -46,3 +46,18 @@ class TestAgentConfig:
             config = load_config()
             assert config.log_level == "INFO"
             assert config.aws_region == "eu-west-2"
+
+
+class TestRunInterval:
+    BASE = {"TEK_WATCH_CUSTOMER_ID": "TT-1", "TEK_WATCH_INGEST_QUEUE_URL": "q", "TEK_WATCH_API_KEY": "k"}
+
+    @pytest.mark.parametrize("raw,expected", [(None, 5), ("15", 15), (" 30 ", 30), ("0", 5), ("soon", 5)])
+    def test_interval(self, monkeypatch, raw, expected):
+        from config import load_config
+        for k, v in self.BASE.items():
+            monkeypatch.setenv(k, v)
+        if raw is None:
+            monkeypatch.delenv("TEK_WATCH_RUN_INTERVAL_MINUTES", raising=False)
+        else:
+            monkeypatch.setenv("TEK_WATCH_RUN_INTERVAL_MINUTES", raw)
+        assert load_config().run_interval_minutes == expected

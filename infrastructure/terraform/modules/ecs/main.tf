@@ -70,9 +70,9 @@ variable "agent_image_uri" { type = string }
 variable "agent_cpu" { type = number }
 variable "agent_memory" { type = number }
 
-variable "agent_schedule_expression" {
-  type    = string
-  default = "rate(5 minutes)"
+variable "agent_run_interval_minutes" {
+  type    = number
+  default = 15
 }
 
 variable "enable_self_hosted_agent" {
@@ -555,7 +555,7 @@ resource "aws_appautoscaling_policy" "api_cpu" {
 # silence-detector Lambda (modules/monitoring/main.tf) and by the per-customer
 # CloudFormation template (routers/admin/customers.py) — there, EventBridge
 # isn't used because each customer account runs its own schedule via the CFN
-# template's ScheduleExpression; here we need the equivalent for Tek Watch's
+# template's RunIntervalMinutes; here we need the equivalent for Tek Watch's
 # own account.
 #
 # Image updates: the task definition references "${agent_image_uri}:latest"
@@ -650,6 +650,7 @@ resource "aws_ecs_task_definition" "agent" {
       { name = "ENVIRONMENT", value = var.environment },
       { name = "LOG_LEVEL", value = "INFO" },
       { name = "TEK_WATCH_CUSTOMER_ID", value = var.self_hosted_agent_customer_id },
+      { name = "TEK_WATCH_RUN_INTERVAL_MINUTES", value = tostring(var.agent_run_interval_minutes) },
       # The URL, not the ARN. boto3's send_message takes a QueueUrl and
       # rejects an ARN, so the agent could never publish a single metric.
       { name = "TEK_WATCH_INGEST_QUEUE_URL", value = var.sqs_ingest_queue_url },
@@ -718,7 +719,7 @@ resource "aws_cloudwatch_event_rule" "agent_schedule" {
   count               = var.enable_self_hosted_agent ? 1 : 0
   name                = "${var.name_prefix}-agent-schedule"
   description         = "Run the self-hosted Tek Watch agent on a schedule"
-  schedule_expression = var.agent_schedule_expression
+  schedule_expression = "rate(${var.agent_run_interval_minutes} minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "agent" {
