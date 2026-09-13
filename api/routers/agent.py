@@ -3,10 +3,13 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
 
 from auth.dependencies import CustomerContext, get_current_customer
 from config import load_config
+from rate_limit import limiter
 from services.cfn_template import generate_agent_template
 from services.dynamodb import DynamoDBService
 from services.timestream import TimestreamQueryService
@@ -113,23 +116,17 @@ async def get_agent_health(
 @router.get("/cfn-template")
 async def download_own_cfn_template(
     customer: CustomerContext = Depends(get_current_customer),
-    new_key: bool = Query(
-        False,
-        description="Issue a fresh agent key and embed it. Invalidates the previous key.",
-    ),
 ):
     """Download the CloudFormation template for the logged-in customer's own agent.
 
-    The agent authenticates with a key that only ever exists in plaintext at the
-    moment it is generated: everything stored is a hash. Signup generated one
-    and showed it to nobody, and the template told the customer to obtain it
-    "from your admin", for which there was no mechanism. Onboarding could not be
-    completed without someone rotating a key by hand and emailing it.
+    It never contains the agent key, and downloading it never changes one.
 
-    So the key is issued here, on the first download, and embedded. Later
-    downloads leave it blank rather than silently rotating, because rotating
-    would stop an agent that is already running and nothing would say why.
-    Asking for new_key is the deliberate way to replace it.
+    It used to issue a key on the first download and embed it as the APIKey
+    parameter's Default. The parameter is NoEcho, but NoEcho only hides the
+    value in describe-stacks: a Default is part of the template body, which
+    CloudFormation stores and returns in plaintext to anyone in the customer's
+    account with cloudformation:GetTemplate. The key is issued by POST /key
+    instead, shown once, and pasted into the parameter.
     """
     db = DynamoDBService()
     profile = db.get_customer(customer.customer_id)
@@ -147,26 +144,66 @@ async def download_own_cfn_template(
             detail="Agent downloads are not configured on this environment.",
         )
 
-    api_key = ""
-    if new_key or not profile.get("agent_key_issued_at"):
-        api_key = db.rotate_api_key(customer.customer_id) or ""
-        if not api_key:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not issue an agent key. Please try again.",
-            )
-        db.update_customer(
-            customer.customer_id,
-            {"agent_key_issued_at": datetime.now(timezone.utc).isoformat()},
-        )
-
-    template_yaml = generate_agent_template(
-        customer.customer_id, profile.get("name", ""), config, api_key
-    )
+    template_yaml = generate_agent_template(customer.customer_id, profile.get("name", ""), config)
     filename = f"tek-watch-agent-{customer.customer_id}.yaml"
 
     return Response(
         content=template_yaml,
         media_type="application/x-yaml",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+class IssueKeyRequest(BaseModel):
+    # Replacing a key stops any agent still using the old one until its stack
+    # is updated, so it has to be asked for, not something a second click does.
+    replace: bool = False
+
+
+@router.post("/key")
+@limiter.limit("5/minute")
+async def issue_agent_key(
+    request: Request,
+    body: IssueKeyRequest = IssueKeyRequest(),
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Issue the agent key, returning it in plaintext exactly once.
+
+    Only a hash is stored, so this response is the only place the key ever
+    exists outside the customer's own stack. It is not cached, logged or
+    written into any file we produce.
+    """
+    db = DynamoDBService()
+    profile = db.get_customer(customer.customer_id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Customer profile not found",
+        )
+
+    already_issued = bool(profile.get("agent_key_issued_at"))
+    if already_issued and not body.replace:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "An agent key already exists. Replacing it stops any agent using "
+                "the old key until you update its stack with the new one."
+            ),
+        )
+
+    api_key = db.rotate_api_key(customer.customer_id)
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Could not issue an agent key. Please try again.",
+        )
+    issued_at = datetime.now(timezone.utc).isoformat()
+    db.update_customer(customer.customer_id, {"agent_key_issued_at": issued_at})
+    logger.info(
+        "Agent key %s for %s", "replaced" if already_issued else "issued", customer.customer_id
+    )
+
+    return JSONResponse(
+        {"api_key": api_key, "issued_at": issued_at, "replaced_previous": already_issued},
+        headers={"Cache-Control": "no-store", "Pragma": "no-cache"},
     )

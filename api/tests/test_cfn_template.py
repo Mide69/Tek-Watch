@@ -50,7 +50,6 @@ def template():
         customer_id="TT-9F4KQ7M2",
         customer_name="Acme Ltd",
         config=make_config(),
-        api_key="agent-key-abc123",
     )
     return yaml_text, yaml.safe_load(yaml_text)
 
@@ -237,23 +236,18 @@ class TestSecurityGroupIsOutboundOnly:
         assert egress["CidrIp"] == "0.0.0.0/0"
 
 
-class TestApiKeyDefaultOmittedWhenNotIssued:
-    """A key is only ever embedded when this download issues a brand new one.
-    Otherwise the parameter must have no Default at all, or CloudFormation
-    would silently deploy an agent authenticated as nobody.
-    """
+class TestTemplateNeverCarriesTheKey:
+    """The key used to be embedded as the APIKey Default. NoEcho hides a
+    parameter's value from describe-stacks, not a Default in the template body,
+    and CloudFormation serves the body to anyone with GetTemplate."""
 
-    def test_no_default_when_no_key_is_passed(self):
-        yaml_text = generate_agent_template(
-            customer_id="TT-9F4KQ7M2", customer_name="Acme Ltd",
-            config=make_config(), api_key="",
-        )
-        doc = yaml.safe_load(yaml_text)
-        assert "Default" not in doc["Parameters"]["APIKey"]
+    def test_generator_cannot_be_given_a_key(self):
+        import inspect
+        assert "api_key" not in inspect.signature(generate_agent_template).parameters
 
-    def test_default_present_when_a_key_is_issued(self, template):
+    def test_key_parameter_has_no_default(self, template):
         _, doc = template
-        assert doc["Parameters"]["APIKey"]["Default"] == "agent-key-abc123"
+        assert "Default" not in doc["Parameters"]["APIKey"]
 
     def test_key_parameter_is_noecho(self, template):
         _, doc = template

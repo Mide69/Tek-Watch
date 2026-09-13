@@ -31,9 +31,16 @@ def generate_agent_template(
     customer_id: str,
     customer_name: str,
     config: APIConfig,
-    api_key: str = "",
 ) -> str:
-    """Build the CloudFormation template as YAML for a customer's agent deployment."""
+    """Build the CloudFormation template as YAML for a customer's agent deployment.
+
+    Deliberately takes no agent key. It used to embed a freshly issued one as
+    the APIKey parameter's Default. NoEcho hides a parameter's value from
+    describe-stacks, but a Default is part of the template body, and
+    CloudFormation keeps the body readable by anyone with
+    cloudformation:GetTemplate in the customer's account. The key is issued
+    separately (POST /api/v1/agent/key) and pasted into the parameter.
+    """
     template = {
         "AWSTemplateFormatVersion": "2010-09-09",
         "Description": f"Tek Watch Agent: {customer_id} ({customer_name})",
@@ -52,15 +59,9 @@ def generate_agent_template(
                 "Type": "String",
                 "NoEcho": True,
                 "MinLength": 1,
-                # Filled in when the key is being issued to this customer, which
-                # is the only moment it exists in plaintext. Otherwise left blank
-                # and they paste the one they saved. It used to say "provided by
-                # your admin", and there was no way for an admin to provide it
-                # short of rotating the key by hand.
-                **({"Default": api_key} if api_key else {}),
                 "Description": (
-                    "Tek Watch agent key. Already filled in if this template was "
-                    "downloaded with a new key, otherwise paste the key you saved."
+                    "Tek Watch agent key. Paste the key shown when you created it "
+                    "on the Agent page of your dashboard."
                 ),
             },
             "AgentImageURI": {

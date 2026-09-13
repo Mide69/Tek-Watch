@@ -204,55 +204,79 @@ class TestAgentCfnTemplateEndpoint:
             assert "TT-0001" in resp.text
             assert "AgentTaskRole" in resp.text
 
-    def test_issues_the_agent_key_on_the_first_download(self, client):
-        # The key exists in plaintext only at the moment it is generated. If it
-        # is not handed over here the customer has no way to obtain one, which
-        # is what blocked onboarding: the template told them to ask an admin,
-        # and no admin path existed.
+    def test_template_never_carries_or_changes_a_key(self, client):
+        # A parameter Default is stored in the template body, which anyone with
+        # cloudformation:GetTemplate in the customer's account can read.
         with patch("routers.agent.DynamoDBService") as mock_db:
             mock_db.return_value.get_customer.return_value = {
-                "customer_id": "TT-0001", "name": "Acme Ltd",
-                "agent_key_issued_at": "",
+                "customer_id": "TT-0001", "name": "Acme Ltd", "agent_key_issued_at": "",
             }
-            mock_db.return_value.rotate_api_key.return_value = "issued-key-123"
-
-            resp = client.get("/api/v1/agent/cfn-template")
-
-            assert resp.status_code == 200
-            assert "issued-key-123" in resp.text
-            # and it is recorded, so the next download does not silently rotate
-            args = mock_db.return_value.update_customer.call_args[0]
-            assert "agent_key_issued_at" in args[1]
-
-    def test_does_not_rotate_a_key_that_is_already_in_use(self, client):
-        # Rotating here would stop a running agent, and nothing on the customer's
-        # dashboard would say why.
-        with patch("routers.agent.DynamoDBService") as mock_db:
-            mock_db.return_value.get_customer.return_value = {
-                "customer_id": "TT-0001", "name": "Acme Ltd",
-                "agent_key_issued_at": "2026-09-01T00:00:00Z",
-            }
-
-            resp = client.get("/api/v1/agent/cfn-template")
-
-            assert resp.status_code == 200
-            mock_db.return_value.rotate_api_key.assert_not_called()
-
-    def test_new_key_is_issued_when_explicitly_asked_for(self, client):
-        with patch("routers.agent.DynamoDBService") as mock_db:
-            mock_db.return_value.get_customer.return_value = {
-                "customer_id": "TT-0001", "name": "Acme Ltd",
-                "agent_key_issued_at": "2026-09-01T00:00:00Z",
-            }
-            mock_db.return_value.rotate_api_key.return_value = "replacement-key"
+            mock_db.return_value.rotate_api_key.return_value = "must-not-appear"
 
             resp = client.get("/api/v1/agent/cfn-template?new_key=true")
 
             assert resp.status_code == 200
-            assert "replacement-key" in resp.text
+            assert "must-not-appear" not in resp.text
+            mock_db.return_value.rotate_api_key.assert_not_called()
+            mock_db.return_value.update_customer.assert_not_called()
 
     def test_404_when_profile_missing(self, client):
         with patch("routers.agent.DynamoDBService") as mock_db:
             mock_db.return_value.get_customer.return_value = None
             resp = client.get("/api/v1/agent/cfn-template")
             assert resp.status_code == 404
+
+
+class TestIssueAgentKey:
+    def profile(self, issued_at=""):
+        return {"customer_id": "TT-0001", "name": "Acme Ltd", "agent_key_issued_at": issued_at}
+
+    def test_first_key_is_returned_once_and_recorded(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = self.profile()
+            mock_db.return_value.rotate_api_key.return_value = "issued-key-123"
+
+            resp = client.post("/api/v1/agent/key", json={})
+
+            assert resp.status_code == 200
+            assert resp.json()["api_key"] == "issued-key-123"
+            assert resp.json()["replaced_previous"] is False
+            assert resp.headers["cache-control"] == "no-store"
+            args = mock_db.return_value.update_customer.call_args[0]
+            assert "agent_key_issued_at" in args[1]
+
+    def test_will_not_replace_a_key_in_use_without_being_asked(self, client):
+        # Replacing stops a running agent, and nothing would say why.
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = self.profile("2026-09-01T00:00:00Z")
+
+            resp = client.post("/api/v1/agent/key", json={})
+
+            assert resp.status_code == 409
+            mock_db.return_value.rotate_api_key.assert_not_called()
+
+    def test_replaces_when_asked(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = self.profile("2026-09-01T00:00:00Z")
+            mock_db.return_value.rotate_api_key.return_value = "replacement-key"
+
+            resp = client.post("/api/v1/agent/key", json={"replace": True})
+
+            assert resp.status_code == 200
+            assert resp.json() == {
+                "api_key": "replacement-key",
+                "issued_at": resp.json()["issued_at"],
+                "replaced_previous": True,
+            }
+
+    def test_404_when_profile_missing(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = None
+            assert client.post("/api/v1/agent/key", json={}).status_code == 404
+
+    def test_500_when_the_key_cannot_be_stored(self, client):
+        with patch("routers.agent.DynamoDBService") as mock_db:
+            mock_db.return_value.get_customer.return_value = self.profile()
+            mock_db.return_value.rotate_api_key.return_value = None
+            assert client.post("/api/v1/agent/key", json={}).status_code == 500
+            mock_db.return_value.update_customer.assert_not_called()

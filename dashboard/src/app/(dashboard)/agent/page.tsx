@@ -13,6 +13,7 @@ import { useAgent } from '@/hooks/useData'
 import { formatRelativeTime, fmtCount } from '@/lib/utils'
 import { useFixtureView } from '@/hooks/useFixtureView'
 import { SetupGuide } from '@/components/agent/SetupGuide'
+import { AgentKeyPanel } from '@/components/agent/AgentKeyPanel'
 import { useShowingSampleData } from '@/lib/dataSource'
 import apiClient from '@/lib/api'
 
@@ -51,9 +52,9 @@ function DeployAgentCard({ customerId }: { customerId: string }) {
           <div>
             <h3 className="font-semibold text-foreground mb-1">Deploy your monitoring agent</h3>
             <p className="text-sm text-muted-foreground max-w-xl">
-              Download your pre-filled CloudFormation template and deploy the read-only
-              agent into your own AWS account. Takes about 30 minutes, no inbound
-              firewall changes needed.
+              Download your CloudFormation template and deploy the read-only agent into
+              your own AWS account. Takes about 30 minutes, no inbound firewall changes
+              needed.
             </p>
             {error && <p className="text-sm text-red-500 dark:text-red-400 mt-2">{error}</p>}
           </div>
@@ -72,6 +73,11 @@ function DeployAgentCard({ customerId }: { customerId: string }) {
             </button>
           )}
         </div>
+        {!fixtureView && (
+          <div className="mt-4 pt-4 border-t border-border">
+            <AgentKeyPanel />
+          </div>
+        )}
       </CardContent>
     </Card>
   )

@@ -1,7 +1,7 @@
 'use client'
 
 import { Card, CardContent } from '@/components/ui/Card'
-import { CheckCircle, Clock, Download, Eye, ShieldCheck, Trash2, Wifi } from 'lucide-react'
+import { CheckCircle, Clock, Download, Eye, KeyRound, ShieldCheck, Trash2, Wifi } from 'lucide-react'
 
 /**
  * How to install, run and remove the agent.
@@ -17,19 +17,23 @@ import { CheckCircle, Clock, Download, Eye, ShieldCheck, Trash2, Wifi } from 'lu
 const STEPS = [
   {
     title: 'Download your template',
-    body: 'Use the button above. It arrives filled in with your Customer ID, your agent key and the region to report to. Nothing needs editing.',
+    body: 'Use the button above. It comes filled in with your Customer ID and where to report to. It never contains your agent key.',
+  },
+  {
+    title: 'Create your agent key',
+    body: 'Use Create agent key above and copy the key. It is shown once, so keep it to hand for step 5.',
   },
   {
     title: 'Open CloudFormation in your AWS account',
     body: 'Sign in to the AWS console, choose the region you want to monitor from, and go to CloudFormation → Create stack → With new resources.',
   },
   {
-    title: 'Choose the VPC and subnets',
-    body: 'Two pick-lists. The default VPC and its subnets are fine. The agent only makes outbound calls, so nothing needs opening.',
-  },
-  {
     title: 'Upload the file',
     body: 'Choose "Upload a template file", select the .yaml you downloaded, and continue. Give the stack any name, "tek-watch-agent" is a sensible one.',
+  },
+  {
+    title: 'Paste the key and choose the VPC',
+    body: 'Paste your agent key into APIKey. The field hides it, and AWS stores it in Secrets Manager. Then pick a VPC and subnets: the default ones are fine, because the agent only makes outbound calls.',
   },
   {
     title: 'Acknowledge the IAM notice and create',
@@ -45,6 +49,7 @@ const CREATES = [
   { icon: ShieldCheck, label: 'A read-only IAM role', detail: 'Scoped to describe and list calls. It cannot create, modify or delete anything in your account.' },
   { icon: Clock, label: 'An ECS Fargate task', detail: 'Runs for a minute or two every 15 minutes, then stops. Nothing runs between collections.' },
   { icon: Wifi, label: 'An EventBridge schedule', detail: 'Triggers that task. Outbound only, so no inbound firewall or security group changes are needed.' },
+  { icon: KeyRound, label: 'A Secrets Manager secret', detail: 'Holds your agent key. Only the role that starts the task can read it. About $0.40 a month.' },
 ]
 
 export function SetupGuide({ customerId }: { customerId?: string }) {
@@ -79,8 +84,8 @@ export function SetupGuide({ customerId }: { customerId?: string }) {
         <CardContent className="p-5">
           <h3 className="font-semibold text-foreground mb-1">What it creates in your account</h3>
           <p className="text-sm text-muted-foreground mb-4">
-            Three resources, and nothing else. You can read the whole template before
-            running it — it is plain YAML.
+            The main pieces, plus the networking and logging they need. You can read the
+            whole template before running it. It is plain YAML.
           </p>
           <div className="space-y-3.5">
             {CREATES.map(item => (
@@ -147,8 +152,9 @@ export function SetupGuide({ customerId }: { customerId?: string }) {
             <div>
               <p className="font-medium text-foreground">You have lost the agent key</p>
               <p className="text-muted-foreground mt-0.5 leading-relaxed">
-                Download the template again with a new key. That replaces the old one, so any
-                agent still running on it stops reporting until you update its stack.
+                Create a new key on this page and choose Replace. The old key stops working at
+                once, so update the stack straight after: CloudFormation, your stack, Update, Use
+                current template, and paste the new key into APIKey.
               </p>
             </div>
           </div>

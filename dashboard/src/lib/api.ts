@@ -202,6 +202,13 @@ class APIClient {
     return response.data
   }
 
+  // The only time the agent key exists in plaintext outside the customer's
+  // stack. The API stores a hash, so it cannot be fetched again.
+  async issueAgentKey(replace = false): Promise<{ api_key: string; issued_at: string; replaced_previous: boolean }> {
+    const response = await this.client.post('/api/v1/agent/key', { replace })
+    return response.data
+  }
+
   // Chat (AI natural language)
   async chat(message: string, history: { role: string; content: string }[] = []) {
     const response = await this.client.post('/api/v1/chat/', { message, history })
