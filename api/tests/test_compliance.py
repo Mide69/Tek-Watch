@@ -21,6 +21,16 @@ def bucket(name, blocked="True", encrypted="True", versioned="True"):
     return res(name, {"bucket_state": "active"}, dims)
 
 
+def database(name, multi_az="True", backup_days=7):
+    return res(name, {"db_instance_status": "available"},
+               {"engine": "postgres", "multi_az": multi_az, "backup_retention_days": backup_days})
+
+
+def load_balancer(name, zones=2):
+    return res(name, {"load_balancer_state": "active"},
+               {"type": "application", "availability_zone_count": zones})
+
+
 def healthy_inventory():
     return {
         "s3": [bucket("data"), bucket("logs")],
@@ -32,6 +42,9 @@ def healthy_inventory():
         "acm": [res("arn:cert", {"days_until_expiry": 80}, {"status": "ISSUED", "domain": "a.example"})],
         "guardduty": [res("det-1", {"detector_enabled": 1, "findings_high_count": 0, "findings_critical_count": 0})],
         "cloudtrail": [res("cloudtrail-trails-eu-west-2", {"trails_logging_count": 1})],
+        "rds": [database("prod-db")],
+        "elb": [load_balancer("public-alb")],
+        "cloudwatch_alarms": [res("alarm-cpu", {"alarm_state": "OK"})],
     }
 
 
@@ -55,11 +68,11 @@ class TestNoData:
     def test_disclaimer_always_present(self):
         assert "not a certification" in compliance.evaluate({})["disclaimer"]
 
-    def test_fca_is_not_claimed(self):
+    def test_frameworks_are_the_four_we_can_evidence(self):
         report = compliance.evaluate(healthy_inventory())
-        names = " ".join(f["name"] for f in report["frameworks"]).lower()
-        assert "fca" not in names
-        assert {f["id"] for f in report["frameworks"]} == {"uk_gdpr", "cyber_essentials", "iso27001"}
+        assert {f["id"] for f in report["frameworks"]} == {
+            "uk_gdpr", "cyber_essentials", "iso27001", "fca_ps21_3",
+        }
 
 
 class TestHealthyAccount:
@@ -69,7 +82,7 @@ class TestHealthyAccount:
 
     def test_every_framework_scores_100(self):
         report = compliance.evaluate(healthy_inventory())
-        assert [f["score"] for f in report["frameworks"]] == [100, 100, 100]
+        assert [f["score"] for f in report["frameworks"]] == [100, 100, 100, 100]
 
 
 class TestS3:
@@ -196,3 +209,70 @@ def test_load_inventory_reads_each_service():
     inv = compliance.load_inventory(FakeTS(), "TT-1")
     assert set(inv) == set(compliance.INVENTORY_SERVICES)
     assert all(c[0] == "TT-1" and c[2] == "24h" for c in calls)
+
+
+class TestOperationalResilience:
+    """PS21/3 evidence, and the limits of it.
+
+    A configuration scan cannot judge operational resilience: impact tolerances
+    and scenario testing are governance. What it can do is evidence the
+    technical half a firm needs when it maps the resources behind a service.
+    """
+
+    def test_ps21_3_says_what_it_does_not_cover(self):
+        fw = framework(compliance.evaluate(healthy_inventory()), "fca_ps21_3")
+        assert fw["scope"] == "technical_evidence_only"
+        note = fw["scope_note"].lower()
+        assert "impact tolerance" in note and "scenario testing" in note
+
+    def test_single_zone_database_fails_and_is_named(self):
+        inv = healthy_inventory()
+        inv["rds"].append(database("reporting-db", multi_az="False"))
+        c = control(compliance.evaluate(inv), "RES-01")
+        assert c["status"] == compliance.FAIL
+        assert [f["resource"] for f in c["findings"]] == ["reporting-db"]
+
+    def test_database_without_backups_fails_as_critical(self):
+        inv = healthy_inventory()
+        inv["rds"] = [database("prod-db", backup_days=0)]
+        c = control(compliance.evaluate(inv), "RES-02")
+        assert c["status"] == compliance.FAIL
+        assert c["severity"] == "critical"
+
+    def test_unreported_backup_retention_is_unknown_not_a_pass(self):
+        inv = healthy_inventory()
+        inv["rds"] = [res("old-agent-db", {"db_instance_status": "available"},
+                          {"engine": "mysql", "multi_az": "True"})]
+        assert control(compliance.evaluate(inv), "RES-02")["status"] == compliance.UNKNOWN
+
+    def test_no_databases_is_not_applicable(self):
+        inv = healthy_inventory()
+        inv["rds"] = []
+        for cid in ("RES-01", "RES-02"):
+            assert control(compliance.evaluate(inv), cid)["status"] == compliance.NOT_APPLICABLE
+
+    def test_single_zone_load_balancer_fails(self):
+        inv = healthy_inventory()
+        inv["elb"] = [load_balancer("edge", zones=1)]
+        c = control(compliance.evaluate(inv), "RES-03")
+        assert c["status"] == compliance.FAIL
+        assert c["findings"][0]["detail"] == "1 availability zone"
+
+    def test_no_alarms_at_all_fails(self):
+        inv = healthy_inventory()
+        inv["cloudwatch_alarms"] = []
+        assert control(compliance.evaluate(inv), "RES-04")["status"] == compliance.FAIL
+
+    def test_resilience_controls_reference_ps21_3(self):
+        report = compliance.evaluate(healthy_inventory())
+        for cid in ("RES-01", "RES-02", "RES-03", "RES-04"):
+            frameworks = {r["framework"] for r in control(report, cid)["references"]}
+            assert "fca_ps21_3" in frameworks
+
+    def test_not_applicable_resources_are_left_out_of_the_score(self):
+        inv = healthy_inventory()
+        inv["rds"] = []
+        inv["elb"] = []
+        fw = framework(compliance.evaluate(inv), "fca_ps21_3")
+        assert fw["score"] == 100
+        assert fw["passed"] + fw["failed"] < fw["total"]

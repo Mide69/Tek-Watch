@@ -19,10 +19,20 @@ Two rules keep it honest:
 * A score is the share of *evaluated technical controls* that passed. It is
   not a certification, and the payload says so.
 
-FCA PS21/3 is deliberately absent. Operational resilience under PS21/3 is about
-important business services, impact tolerances and scenario testing, none of
-which can be judged from AWS configuration. Claiming a score for it would be
-exactly the kind of invented figure this module exists to remove.
+FCA PS21/3 is handled differently from the others, and on purpose. Operational
+resilience under PS21/3 is about identifying important business services,
+setting impact tolerances and testing against severe but plausible scenarios.
+None of that can be read from an AWS account, and a PS21/3 "score" from a
+configuration scan would be exactly the kind of invented figure this module
+exists to remove.
+
+What an AWS account can show is the technical half of the evidence a firm needs
+when it maps the resources behind an important business service: whether the
+database can survive losing an availability zone, whether it can be restored,
+whether the front door is spread across zones, and whether anyone is watching.
+Those checks are here, grouped under PS21/3 and labelled technical evidence
+only, with the framework carrying a scope note saying what is out of scope.
+The firm still has to do the rest.
 """
 from __future__ import annotations
 
@@ -30,17 +40,29 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from services.inventory_view import dim, flag, num, text
+from services.inventory_view import dim, dim_num, flag, num, text
 
 PASS = "pass"
 FAIL = "fail"
 UNKNOWN = "unknown"
 NOT_APPLICABLE = "not_applicable"
 
-FRAMEWORKS: List[Dict[str, str]] = [
+FRAMEWORKS: List[Dict[str, Any]] = [
     {"id": "uk_gdpr", "name": "UK GDPR"},
     {"id": "cyber_essentials", "name": "Cyber Essentials"},
     {"id": "iso27001", "name": "ISO 27001:2022"},
+    {
+        "id": "fca_ps21_3",
+        "name": "FCA PS21/3 operational resilience",
+        "scope": "technical_evidence_only",
+        "scope_note": (
+            "Technical evidence only. These checks show whether the AWS resources behind a "
+            "service can survive a failure and be restored, which supports the resource "
+            "mapping a firm must do under PS21/3. Identifying important business services, "
+            "setting impact tolerances and scenario testing are governance work that cannot "
+            "be read from AWS configuration, and are not assessed here."
+        ),
+    },
 ]
 
 DISCLAIMER = (
@@ -52,7 +74,7 @@ DISCLAIMER = (
 # Services the checks read, and how far back to look for their latest state.
 # A day rather than an hour: a compliance view should show the last known
 # state through a short agent gap instead of flipping everything to unknown.
-INVENTORY_SERVICES = ("s3", "iam", "acm", "guardduty", "cloudtrail")
+INVENTORY_SERVICES = ("s3", "iam", "acm", "guardduty", "cloudtrail", "rds", "elb", "cloudwatch_alarms")
 INVENTORY_WINDOW = "24h"
 
 Inventory = Dict[str, List[Dict[str, Any]]]
@@ -187,6 +209,7 @@ def _s3_versioning(inv: Inventory) -> ControlResult:
         references=[
             _ref("uk_gdpr", "Art. 32(1)(c) ability to restore availability and access"),
             _ref("iso27001", "A.8.13 Information backup"),
+            _ref("fca_ps21_3", "Ability to recover data supporting an important business service"),
         ],
     )
 
@@ -409,6 +432,137 @@ def _cloudtrail_logging(inv: Inventory) -> ControlResult:
     )
 
 
+# ── Operational resilience (FCA PS21/3 technical evidence) ────────────────────
+
+def _rds_instances(inv: Inventory) -> List[Dict[str, Any]]:
+    """Inventory rows for databases, one per instance."""
+    return [r for r in inv.get("rds", []) if dim(r, "engine")]
+
+
+def _rds_multi_az(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="RES-01", title="Databases run in more than one availability zone", severity="high",
+        remediation=(
+            "Turn on Multi-AZ for production databases: aws rds modify-db-instance "
+            "--db-instance-identifier <id> --multi-az --apply-immediately. AWS keeps a "
+            "standby in a second zone and fails over to it."
+        ),
+        references=[
+            _ref("fca_ps21_3", "Remaining within impact tolerance when a data centre is lost"),
+            _ref("iso27001", "A.8.14 Redundancy of information processing facilities"),
+        ],
+    )
+    databases = _rds_instances(inv)
+    if not databases:
+        return ControlResult(status=NOT_APPLICABLE, detail="No databases reported.", **base)
+
+    single = [d for d in databases if flag(d, "multi_az") is False]
+    unknown = [d for d in databases if flag(d, "multi_az") is None]
+    if single:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(single)} of {len(databases)} databases run in a single zone.",
+            findings=[{"resource": _name(d), "detail": "Single availability zone"} for d in single],
+            **base,
+        )
+    if unknown:
+        return ControlResult(status=UNKNOWN, detail="Zone configuration has not been reported for every database.", **base)
+    return ControlResult(status=PASS, detail=f"All {len(databases)} databases span two zones.", **base)
+
+
+def _rds_backups(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="RES-02", title="Databases keep automated backups", severity="critical",
+        remediation=(
+            "Set a retention period of at least 7 days: aws rds modify-db-instance "
+            "--db-instance-identifier <id> --backup-retention-period 7 --apply-immediately"
+        ),
+        references=[
+            _ref("fca_ps21_3", "Ability to restore an important business service after an incident"),
+            _ref("uk_gdpr", "Art. 32(1)(c) ability to restore availability and access"),
+            _ref("iso27001", "A.8.13 Information backup"),
+        ],
+    )
+    databases = _rds_instances(inv)
+    if not databases:
+        return ControlResult(status=NOT_APPLICABLE, detail="No databases reported.", **base)
+
+    retention = [(d, dim_num(d, "backup_retention_days")) for d in databases]
+    none_kept = [(d, r) for d, r in retention if r is not None and r <= 0]
+    unknown = [d for d, r in retention if r is None]
+    if none_kept:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(none_kept)} of {len(databases)} databases keep no automated backups.",
+            findings=[{"resource": _name(d), "detail": "Backup retention is 0 days"} for d, _ in none_kept],
+            **base,
+        )
+    if unknown:
+        return ControlResult(status=UNKNOWN, detail="Backup retention has not been reported for every database.", **base)
+    shortest = min(int(r) for _, r in retention if r is not None)
+    return ControlResult(status=PASS, detail=f"Every database keeps at least {shortest} days of backups.", **base)
+
+
+def _elb_zone_spread(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="RES-03", title="Load balancers span at least two availability zones", severity="medium",
+        remediation=(
+            "Attach a subnet from a second zone: aws elbv2 set-subnets --load-balancer-arn "
+            "<arn> --subnets <subnet-a> <subnet-b>"
+        ),
+        references=[
+            _ref("fca_ps21_3", "Resilience of the entry point to an important business service"),
+            _ref("iso27001", "A.8.14 Redundancy of information processing facilities"),
+        ],
+    )
+    balancers = [r for r in inv.get("elb", []) if dim(r, "type")]
+    if not balancers:
+        return ControlResult(status=NOT_APPLICABLE, detail="No load balancers reported.", **base)
+
+    counts = [(b, dim_num(b, "availability_zone_count")) for b in balancers]
+    single = [(b, c) for b, c in counts if c is not None and c < 2]
+    unknown = [b for b, c in counts if c is None]
+    if single:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(single)} of {len(balancers)} load balancers sit in one zone.",
+            findings=[{"resource": _name(b), "detail": f"{int(c)} availability zone"} for b, c in single],
+            **base,
+        )
+    if unknown:
+        return ControlResult(status=UNKNOWN, detail="Zone spread has not been reported for every load balancer.", **base)
+    return ControlResult(status=PASS, detail=f"All {len(balancers)} load balancers span two or more zones.", **base)
+
+
+def _alarms_exist(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="RES-04", title="CloudWatch alarms are configured", severity="medium",
+        remediation=(
+            "Create alarms for the things that would breach your impact tolerance first: "
+            "database CPU and storage, load balancer 5xx responses, and queue age."
+        ),
+        references=[
+            _ref("fca_ps21_3", "Detecting an incident in time to stay within impact tolerance"),
+            _ref("iso27001", "A.8.16 Monitoring activities"),
+        ],
+    )
+    alarms = inv.get("cloudwatch_alarms", [])
+    if alarms:
+        return ControlResult(status=PASS, detail=f"{len(alarms)} alarms configured.", **base)
+    # An empty list means one of two different things: the agent looked and
+    # found no alarms, or nothing has been reported at all. Treating silence as
+    # a failure would fail a customer for our own blind spot, so only call it a
+    # failure when the agent is plainly reporting other services.
+    if any(rows for service, rows in inv.items() if service != "cloudwatch_alarms"):
+        return ControlResult(
+            status=FAIL,
+            detail="No CloudWatch alarms are configured.",
+            findings=[{"resource": "CloudWatch", "detail": "No alarms found"}],
+            **base,
+        )
+    return ControlResult(status=UNKNOWN, detail="Alarms have not been reported yet.", **base)
+
+
 CONTROLS: List[Callable[[Inventory], ControlResult]] = [
     _s3_public_access,
     _s3_encryption,
@@ -420,6 +574,10 @@ CONTROLS: List[Callable[[Inventory], ControlResult]] = [
     _guardduty_enabled,
     _guardduty_open_findings,
     _cloudtrail_logging,
+    _rds_multi_az,
+    _rds_backups,
+    _elb_zone_spread,
+    _alarms_exist,
 ]
 
 
@@ -435,7 +593,7 @@ def evaluate(inventory: Inventory, now: Optional[datetime] = None) -> Dict[str, 
         failed = sum(1 for r in relevant if r.status == FAIL)
         unknown = sum(1 for r in relevant if r.status == UNKNOWN)
         evaluated = passed + failed
-        frameworks.append({
+        entry = {
             "id": fw["id"],
             "name": fw["name"],
             "score": round(100 * passed / evaluated) if evaluated else None,
@@ -443,7 +601,13 @@ def evaluate(inventory: Inventory, now: Optional[datetime] = None) -> Dict[str, 
             "failed": failed,
             "unknown": unknown,
             "total": len(relevant),
-        })
+        }
+        # PS21/3 carries a scope note, because a score against part of a
+        # regime must not be read as a score against the regime.
+        if fw.get("scope"):
+            entry["scope"] = fw["scope"]
+            entry["scope_note"] = fw["scope_note"]
+        frameworks.append(entry)
 
     severity_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     status_rank = {FAIL: 0, UNKNOWN: 1, PASS: 2, NOT_APPLICABLE: 3}

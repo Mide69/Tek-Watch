@@ -1,11 +1,14 @@
-"""Security router — GuardDuty, IAM, ACM, CloudWatch Alarms, compliance, incidents."""
+"""Security router — GuardDuty, IAM, ACM, alarms, compliance, incidents, evidence."""
+import csv
+import io
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services import compliance, correlation
+from services import compliance, correlation, evidence, exposure
+from services.dynamodb import DynamoDBService
 from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
@@ -216,7 +219,11 @@ async def get_compliance(
     See services/compliance.py for what is checked and how it is scored.
     """
     ts = TimestreamQueryService()
-    return compliance.evaluate(compliance.load_inventory(ts, customer.customer_id))
+    report = compliance.evaluate(compliance.load_inventory(ts, customer.customer_id))
+    # What a failing control could cost, from published sources only. See
+    # services/exposure.py for why this is three separate figures and not one.
+    report["exposure"] = exposure.estimate(report)
+    return report
 
 
 @router.get("/incidents")
@@ -229,3 +236,62 @@ async def get_incidents(
     """
     ts = TimestreamQueryService()
     return {"incidents": correlation.correlate(correlation.load_inventory(ts, customer.customer_id))}
+
+
+@router.get("/evidence")
+async def get_evidence(
+    limit: int = Query(50, ge=1, le=200),
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """The compliance evidence log: what was assessed, what changed, and when.
+
+    A compliance page shows today. This shows the history, which is what a
+    Cyber Essentials assessor or an ICO caseworker asks for.
+    """
+    db = DynamoDBService()
+    entries = db.list_evidence(customer.customer_id, limit=limit)
+    head = db.evidence_head(customer.customer_id)
+    return {
+        "entries": entries,
+        "total_recorded": head.get("seq", 0),
+        "statement": evidence.STATEMENT,
+    }
+
+
+@router.get("/evidence/verify")
+async def verify_evidence(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Recompute the whole chain and report whether it is intact.
+
+    The check is done from the stored bodies, not from a stored answer, so it
+    fails if any entry has been altered since it was written.
+    """
+    db = DynamoDBService()
+    return evidence.verify(db.all_evidence(customer.customer_id))
+
+
+@router.get("/evidence/export")
+async def export_evidence(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """The log as a CSV file, with the hashes, for an audit pack."""
+    entries = DynamoDBService().all_evidence(customer.customer_id)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["seq", "recorded_at", "kind", "summary", "hash", "prev_hash"])
+    for entry in entries:
+        writer.writerow([
+            entry.get("seq"),
+            entry.get("recorded_at"),
+            entry.get("kind"),
+            entry.get("summary"),
+            entry.get("hash"),
+            entry.get("prev_hash"),
+        ])
+    filename = f"tekwatch-compliance-evidence-{customer.customer_id}.csv"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

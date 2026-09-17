@@ -5,12 +5,17 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { Shield, ShieldAlert, Key, AlertTriangle, CheckCircle, HelpCircle, Clock, Users } from 'lucide-react'
+import { Shield, ShieldAlert, Key, AlertTriangle, CheckCircle, HelpCircle, Clock, Users, Scale, FileCheck, Download, Link2 } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useSecurity } from '@/hooks/useData'
 import { formatRelativeTime, fmtCount, DASH } from '@/lib/utils'
-import { COMPLIANCE_FRAMEWORK_NAMES, type ComplianceControl, type Incident } from '@/lib/mockData'
+import { COMPLIANCE_FRAMEWORK_NAMES, type ComplianceControl, type ComplianceFramework, type EvidenceLog, type Exposure, type Incident } from '@/lib/mockData'
+import { useState } from 'react'
+import axios from 'axios'
+import apiClient from '@/lib/api'
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
 
 function SeverityBadge({ severity }: { severity: string }) {
   const s = severity.toUpperCase()
@@ -25,8 +30,182 @@ function AlarmBadge({ state }: { state: string }) {
   return <Badge variant="default">{state}</Badge>
 }
 
+/**
+ * What a failing control could cost, from published sources only.
+ *
+ * Three figures kept apart on purpose: what the law allows, what the ICO has
+ * actually fined somebody for the same failing, and what the customer will
+ * spend putting it right. Adding them together would produce one confident
+ * number that means nothing. Every figure carries its source.
+ */
+function ExposureCard({ exposure }: { exposure: Exposure }) {
+  if (!exposure || exposure.controls_with_published_exposure === 0) return null
+  const bands = [
+    { label: 'Cost to put right', value: exposure.direct_cost.display, refs: exposure.direct_cost.references, tone: 'text-foreground' },
+    { label: 'Fined for the same failing', value: exposure.comparable_enforcement.display, refs: exposure.comparable_enforcement.references, tone: 'text-amber-600 dark:text-amber-400' },
+    { label: 'Statutory maximum', value: exposure.statutory_maximum.display, refs: exposure.statutory_maximum.references, tone: 'text-muted-foreground' },
+  ].filter(b => b.value)
+
+  return (
+    <Card className="border-amber-500/20 bg-amber-500/5">
+      <CardContent className="p-5">
+        <div className="flex items-start gap-2 mb-4">
+          <Scale className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-foreground">What this could cost you</h3>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Based on {exposure.controls_with_published_exposure} of your {exposure.failing_controls} failing checks
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {bands.map(band => (
+            <div key={band.label} className="rounded-lg border border-border bg-card/60 p-3">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">{band.label}</p>
+              <p className={`text-lg font-bold mt-1 ${band.tone}`}>{band.value}</p>
+              <ul className="mt-2 space-y-1">
+                {band.refs.map(r => (
+                  <li key={r.id}>
+                    <a href={r.source} target="_blank" rel="noopener noreferrer"
+                       className="text-[11px] text-primary hover:underline inline-flex items-start gap-1">
+                      <Link2 className="w-3 h-3 mt-0.5 flex-shrink-0" />
+                      <span>{r.kind === 'statutory_maximum' ? r.published : r.label}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 space-y-2">
+          {exposure.items.map(item => (
+            <details key={item.control_id} className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
+              <summary className="flex items-center gap-2 cursor-pointer list-none">
+                <span className="text-sm text-foreground flex-1">{item.control_title}</span>
+                <span className="text-[11px] font-mono text-muted-foreground">{item.control_id}</span>
+              </summary>
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{item.why}</p>
+              <ul className="mt-2 space-y-1.5">
+                {item.references.map(r => (
+                  <li key={r.id} className="text-xs text-muted-foreground leading-relaxed">
+                    <a href={r.source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      {r.label}
+                    </a>
+                    <span className="text-[11px]"> · {r.published}</span>
+                    <p className="text-[11px] mt-0.5">{r.summary}</p>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ))}
+        </div>
+
+        <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{exposure.basis}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+const EVIDENCE_KIND: Record<string, { label: string; variant: 'success' | 'error' | 'info' }> = {
+  resolved: { label: 'RESOLVED', variant: 'success' },
+  regressed: { label: 'REGRESSED', variant: 'error' },
+  snapshot: { label: 'ASSESSED', variant: 'info' },
+}
+
+/** The audit trail: what was assessed, what changed, and proof it is unedited. */
+function EvidenceCard({ evidence }: { evidence: EvidenceLog }) {
+  const [downloading, setDownloading] = useState(false)
+  const [error, setError] = useState('')
+  const verification = evidence.verification
+
+  async function download() {
+    setError('')
+    setDownloading(true)
+    try {
+      const response = await axios.get(`${API_BASE_URL}/api/v1/security/evidence/export`, {
+        headers: { Authorization: `Bearer ${apiClient.getToken()}` },
+        responseType: 'blob',
+      })
+      const url = URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.download = 'tekwatch-compliance-evidence.csv'
+      link.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      setError('Could not prepare the file right now. Please try again shortly.')
+    } finally {
+      setDownloading(false)
+    }
+  }
+
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-start gap-2">
+            <FileCheck className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-foreground">Compliance evidence</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {evidence.total_recorded > 0
+                  ? `${evidence.total_recorded} entries recorded. Every assessment and every change, in order.`
+                  : 'Entries appear here once the agent has reported and the first assessment runs.'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {verification && (
+              <Badge variant={verification.intact ? 'success' : 'error'}>
+                {verification.intact
+                  ? `CHAIN INTACT · ${verification.entries_checked} CHECKED`
+                  : `BROKEN AT ENTRY ${verification.broken_at}`}
+              </Badge>
+            )}
+            <button
+              onClick={download}
+              disabled={downloading || evidence.entries.length === 0}
+              className="flex items-center gap-1.5 rounded-md border border-border px-3 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 disabled:opacity-50"
+            >
+              <Download className="w-3.5 h-3.5" />
+              {downloading ? 'Preparing…' : 'Download evidence'}
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-500 dark:text-red-400 mb-3">{error}</p>}
+
+        {evidence.entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Nothing recorded yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {evidence.entries.slice(0, 8).map(entry => {
+              const kind = EVIDENCE_KIND[entry.kind] ?? EVIDENCE_KIND.snapshot
+              return (
+                <div key={entry.seq} className="flex items-start gap-3 rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                  <Badge variant={kind.variant}>{kind.label}</Badge>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm text-foreground">{entry.summary}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5 font-mono truncate">
+                      #{entry.seq} · {formatRelativeTime(entry.recorded_at)} · {entry.hash.slice(0, 16)}…
+                    </p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <p className="text-[11px] text-muted-foreground mt-3 leading-relaxed">{evidence.statement}</p>
+      </CardContent>
+    </Card>
+  )
+}
+
 /** A null score means no check for this framework could be evaluated yet. */
-function ComplianceBar({ label, score, sub }: { label: string; score: number | null; sub: string }) {
+function ComplianceBar({ label, score, sub, note }: { label: string; score: number | null; sub: string; note?: string }) {
   const color = score == null ? 'bg-muted-foreground/30' : score >= 90 ? 'bg-emerald-500' : score >= 75 ? 'bg-amber-500' : 'bg-red-500'
   const text  = score == null ? 'text-muted-foreground' : score >= 90 ? 'text-emerald-600 dark:text-emerald-400' : score >= 75 ? 'text-amber-500 dark:text-amber-400' : 'text-red-500 dark:text-red-400'
   return (
@@ -39,6 +218,14 @@ function ComplianceBar({ label, score, sub }: { label: string; score: number | n
         <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{ width: `${score ?? 0}%` }} />
       </div>
       <p className="text-[11px] text-muted-foreground mt-1">{sub}</p>
+      {note && (
+        <details className="mt-1">
+          <summary className="text-[11px] text-primary cursor-pointer hover:underline list-none">
+            What this covers
+          </summary>
+          <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{note}</p>
+        </details>
+      )}
     </div>
   )
 }
@@ -183,7 +370,7 @@ function SecurityContent() {
     )
   }
 
-  const { guardduty, iam, certs, alarms, compliance, incidents } = data
+  const { guardduty, iam, certs, alarms, compliance, incidents, evidence } = data
   const failing = compliance.controls.filter(c => c.status === 'fail')
   const unmeasured = compliance.controls.filter(c => c.status === 'unknown')
   // days_to_expiry is null for a cert the agent has not yet reported on — that
@@ -271,12 +458,13 @@ function SecurityContent() {
             {compliance.frameworks.length === 0 ? (
               <p className="text-sm text-muted-foreground">No compliance data yet.</p>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {compliance.frameworks.map(fw => (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {compliance.frameworks.map((fw: ComplianceFramework) => (
                   <ComplianceBar
                     key={fw.id}
                     label={fw.name}
                     score={fw.score}
+                    note={fw.scope_note}
                     sub={
                       fw.passed + fw.failed === 0
                         ? 'Not measured yet'
@@ -307,6 +495,10 @@ function SecurityContent() {
             )}
           </CardContent>
         </Card>
+
+        {compliance.exposure && <ExposureCard exposure={compliance.exposure} />}
+
+        {evidence && <EvidenceCard evidence={evidence} />}
 
         {/* GuardDuty */}
         <section>

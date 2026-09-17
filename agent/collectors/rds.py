@@ -55,6 +55,10 @@ class RDSCollector(BaseCollector):
             # this, so a database reachable from the internet looked exactly
             # like one that is not.
             "publicly_accessible": str(db.get("PubliclyAccessible", False)),
+            # Days of automated backups, 0 meaning none. Operational resilience
+            # rests on being able to restore, and nothing reported whether the
+            # database could be.
+            "backup_retention_days": db.get("BackupRetentionPeriod", 0),
         }
 
         # Inventory record

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import boto3
+from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from config import load_config
@@ -310,6 +311,123 @@ class DynamoDBService:
         except ClientError as exc:
             logger.error("acknowledge_alert failed: %s", exc)
             return False
+
+    # ── Compliance evidence log ───────────────────────────────────────────────
+    #
+    # Kept in the customers table under EVIDENCE# keys rather than a table of
+    # its own: the records are small, they are always read for one customer,
+    # and a separate table would be one more thing to provision per
+    # environment for no gain. EVIDENCE_HEAD holds the last sequence number and
+    # hash so a writer never has to read the whole log to append to it.
+
+    _EVIDENCE_PREFIX = "EVIDENCE#"
+    _EVIDENCE_HEAD = "EVIDENCE_HEAD"
+
+    def evidence_head(self, customer_id: str) -> Dict[str, Any]:
+        """The last entry's sequence and hash, or the starting point."""
+        from services.evidence import GENESIS
+        try:
+            item = self._customers.get_item(
+                Key={"customer_id": customer_id, "SK": self._EVIDENCE_HEAD}
+            ).get("Item")
+        except ClientError as exc:
+            logger.error("Evidence head read failed for %s: %s", customer_id, exc)
+            return {"seq": 0, "hash": GENESIS, "readable": False}
+        if not item:
+            return {"seq": 0, "hash": GENESIS, "readable": True}
+        return {
+            "seq": int(item.get("seq", 0)),
+            "hash": str(item.get("hash", GENESIS)),
+            "last_snapshot": item.get("last_snapshot"),
+            "readable": True,
+        }
+
+    def append_evidence(
+        self, customer_id: str, entry: Dict[str, Any], last_snapshot: Optional[Dict[str, Any]] = None
+    ) -> bool:
+        """Append one entry. Refuses to overwrite a sequence number already used.
+
+        The condition is what makes the log append-only in practice: two writers
+        racing for the same sequence means the loser is rejected rather than
+        silently replacing an entry somebody may already have downloaded.
+        """
+        try:
+            self._customers.put_item(
+                Item={
+                    "customer_id": customer_id,
+                    "SK": f"{self._EVIDENCE_PREFIX}{int(entry['seq']):012d}",
+                    **entry,
+                },
+                ConditionExpression="attribute_not_exists(SK)",
+            )
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code", "")
+            if code == "ConditionalCheckFailedException":
+                logger.warning("Evidence entry %s already exists for %s", entry.get("seq"), customer_id)
+            else:
+                logger.error("Evidence append failed for %s: %s", customer_id, exc)
+            return False
+
+        head: Dict[str, Any] = {
+            "customer_id": customer_id,
+            "SK": self._EVIDENCE_HEAD,
+            "seq": int(entry["seq"]),
+            "hash": entry["hash"],
+            "updated_at": _now_iso(),
+        }
+        if last_snapshot is not None:
+            head["last_snapshot"] = last_snapshot
+        try:
+            self._customers.put_item(Item=head)
+        except ClientError as exc:
+            # The entry is written; only the shortcut is stale. The next append
+            # reads a lower sequence and its condition rejects it, which is
+            # noisy but never loses or rewrites an entry.
+            logger.error("Evidence head update failed for %s: %s", customer_id, exc)
+        return True
+
+    def list_evidence(self, customer_id: str, limit: int = 50, newest_first: bool = True) -> List[Dict[str, Any]]:
+        """Entries for one customer, newest first by default."""
+        try:
+            response = self._customers.query(
+                KeyConditionExpression=Key("customer_id").eq(customer_id)
+                & Key("SK").begins_with(self._EVIDENCE_PREFIX),
+                ScanIndexForward=not newest_first,
+                Limit=max(1, min(limit, 500)),
+            )
+        except ClientError as exc:
+            logger.error("Evidence list failed for %s: %s", customer_id, exc)
+            return []
+        return [self._evidence_item(i) for i in response.get("Items", [])]
+
+    def all_evidence(self, customer_id: str, cap: int = 2000) -> List[Dict[str, Any]]:
+        """Every entry, oldest first. Used to verify the chain end to end."""
+        entries: List[Dict[str, Any]] = []
+        kwargs: Dict[str, Any] = {
+            "KeyConditionExpression": Key("customer_id").eq(customer_id)
+            & Key("SK").begins_with(self._EVIDENCE_PREFIX),
+            "ScanIndexForward": True,
+        }
+        while len(entries) < cap:
+            try:
+                response = self._customers.query(**kwargs)
+            except ClientError as exc:
+                logger.error("Evidence read failed for %s: %s", customer_id, exc)
+                break
+            entries.extend(self._evidence_item(i) for i in response.get("Items", []))
+            key = response.get("LastEvaluatedKey")
+            if not key:
+                break
+            kwargs["ExclusiveStartKey"] = key
+        return entries[:cap]
+
+    @staticmethod
+    def _evidence_item(item: Dict[str, Any]) -> Dict[str, Any]:
+        """Strip the table's own keys, and turn DynamoDB numbers back into ints."""
+        entry = {k: v for k, v in item.items() if k not in ("customer_id", "SK")}
+        if "seq" in entry:
+            entry["seq"] = int(entry["seq"])
+        return entry
 
     # ── Thresholds ────────────────────────────────────────────────────────────
 

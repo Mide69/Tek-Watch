@@ -74,6 +74,22 @@ def num(resource: Dict[str, Any], key: str) -> Optional[float]:
         return None
 
 
+def dim_num(resource: Dict[str, Any], key: str) -> Optional[float]:
+    """A dimension as a number, or None if it was never collected.
+
+    Counts such as backup retention days and availability zones travel as
+    dimensions, not metrics, and arrive as text. Same rule as everywhere else
+    here: uncollected is None, never a convenient zero.
+    """
+    value = (resource.get("dimensions") or {}).get(key)
+    if value is None or value == "":
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def text(resource: Dict[str, Any], key: str, default: str = "") -> str:
     """A metric as text — event-table values are strings such as "active"."""
     value = (resource.get("metrics") or {}).get(key)

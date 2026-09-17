@@ -55,6 +55,8 @@ class ELBCollector(BaseCollector):
                     "type": lb_type,
                     "scheme": scheme,
                     "vpc_id": vpc_id,
+                    # A load balancer in one zone falls over with that zone.
+                    "availability_zone_count": len(lb.get("AvailabilityZones", []) or []),
                 }
 
                 records.append(self._make_record(

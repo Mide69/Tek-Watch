@@ -432,12 +432,67 @@ export interface ComplianceFramework {
   failed: number
   unknown: number
   total: number
+  // Present on FCA PS21/3 only: a score against the technical half of a regime
+  // must never be read as a score against the regime.
+  scope?: string
+  scope_note?: string
+}
+
+export interface ExposureReference {
+  id: string
+  kind: 'statutory_maximum' | 'enforcement_case' | 'direct_cost'
+  label: string
+  summary: string
+  source: string
+  published: string
+  amount_low: number | null
+  amount_high: number | null
+}
+
+export interface ExposureBand {
+  low: number | null
+  high: number | null
+  display: string | null
+  references: ExposureReference[]
+}
+
+export interface Exposure {
+  failing_controls: number
+  controls_with_published_exposure: number
+  direct_cost: ExposureBand
+  comparable_enforcement: ExposureBand
+  statutory_maximum: { display: string | null; references: ExposureReference[] }
+  items: {
+    control_id: string
+    control_title: string
+    severity: string
+    why: string
+    references: ExposureReference[]
+  }[]
+  basis: string
+}
+
+export interface EvidenceEntry {
+  seq: number
+  recorded_at: string
+  kind: 'snapshot' | 'resolved' | 'regressed'
+  summary: string
+  hash: string
+  prev_hash: string
+}
+
+export interface EvidenceLog {
+  entries: EvidenceEntry[]
+  total_recorded: number
+  statement: string
+  verification?: { intact: boolean; entries_checked: number; broken_at: number | null }
 }
 
 export interface ComplianceReport {
   evaluated_at: string
   frameworks: ComplianceFramework[]
   controls: ComplianceControl[]
+  exposure?: Exposure
   disclaimer: string
 }
 
@@ -460,7 +515,14 @@ export const COMPLIANCE_FRAMEWORK_NAMES: Record<string, string> = {
   uk_gdpr: 'UK GDPR',
   cyber_essentials: 'Cyber Essentials',
   iso27001: 'ISO 27001:2022',
+  fca_ps21_3: 'FCA PS21/3 operational resilience',
 }
+
+const PS21_3_SCOPE_NOTE =
+  'Technical evidence only. These checks show whether the AWS resources behind a service can ' +
+  'survive a failure and be restored, which supports the resource mapping a firm must do under ' +
+  'PS21/3. Identifying important business services, setting impact tolerances and scenario ' +
+  'testing are governance work that cannot be read from AWS configuration, and are not assessed here.'
 
 const ref = (framework: string, reference: string) => ({ framework, reference })
 const ACCESS_REFS = [
@@ -484,6 +546,16 @@ const DEMO_CONTROLS: ComplianceControl[] = [
     remediation: 'Investigate each high or critical finding, contain the affected resource, and archive the finding once it is resolved.',
     references: [ref('uk_gdpr', 'Art. 33 assessing and notifying personal data breaches'), ref('iso27001', 'A.5.26 Response to information security incidents')],
     findings: [{ resource: 'GuardDuty', detail: '1 high/critical finding' }] },
+  { id: 'RES-01', title: 'Databases run in more than one availability zone', severity: 'high', status: 'pass',
+    detail: 'All 2 databases span two zones.',
+    remediation: 'Turn on Multi-AZ for production databases.',
+    references: [ref('fca_ps21_3', 'Remaining within impact tolerance when a data centre is lost'), ref('iso27001', 'A.8.14 Redundancy of information processing facilities')],
+    findings: [] },
+  { id: 'RES-02', title: 'Databases keep automated backups', severity: 'critical', status: 'fail',
+    detail: '1 of 2 databases keep no automated backups.',
+    remediation: 'Set a retention period of at least 7 days: aws rds modify-db-instance --db-instance-identifier <id> --backup-retention-period 7 --apply-immediately',
+    references: [ref('fca_ps21_3', 'Ability to restore an important business service after an incident'), ref('uk_gdpr', 'Art. 32(1)(c) ability to restore availability and access'), ref('iso27001', 'A.8.13 Information backup')],
+    findings: [{ resource: 'acme-reporting-db', detail: 'Backup retention is 0 days' }] },
   { id: 'IAM-03', title: 'No access keys older than 90 days', severity: 'medium', status: 'fail',
     detail: '2 access keys are older than 90 days.',
     remediation: 'Rotate each old key: create a new key, update whatever uses it, then deactivate and delete the old one.',
@@ -517,17 +589,96 @@ function scoreFrameworks(controls: ComplianceControl[]): ComplianceFramework[] {
     const failed = relevant.filter(c => c.status === 'fail').length
     const unknown = relevant.filter(c => c.status === 'unknown').length
     const evaluated = passed + failed
-    return { id, name, score: evaluated ? Math.round((100 * passed) / evaluated) : null, passed, failed, unknown, total: relevant.length }
+    const scope = id === 'fca_ps21_3' ? { scope: 'technical_evidence_only', scope_note: PS21_3_SCOPE_NOTE } : {}
+    return { id, name, score: evaluated ? Math.round((100 * passed) / evaluated) : null, passed, failed, unknown, total: relevant.length, ...scope }
   })
+}
+
+const ICO_ADVANCED: ExposureReference = {
+  id: 'ico_advanced_2025', kind: 'enforcement_case',
+  label: 'Advanced Computer Software Group Ltd, £3,070,000',
+  summary: 'Fined in March 2025 after attackers reached systems through a customer account that had no multi-factor authentication. Personal data of 79,404 people was put at risk.',
+  source: 'https://ico.org.uk/action-weve-taken/enforcement/2025/03/advanced-computer-software-group-limited/',
+  published: 'March 2025', amount_low: 3070000, amount_high: 3070000,
+}
+
+const ICO_DPP: ExposureReference = {
+  id: 'ico_dpp_law_2025', kind: 'enforcement_case',
+  label: 'DPP Law Ltd, £60,000',
+  summary: 'A law firm fined in April 2025 for infringing Articles 5(1)(f), 32(1), 32(2) and 33(1). Attackers entered through an infrequently used administrator account with no multi-factor authentication, and the breach was reported 43 days after it was discovered.',
+  source: 'https://ico.org.uk/action-weve-taken/enforcement/2025/04/dpp-law-ltd/',
+  published: 'April 2025', amount_low: 60000, amount_high: 60000,
+}
+
+const CE_PLUS: ExposureReference = {
+  id: 'ce_plus_assessment', kind: 'direct_cost',
+  label: 'Cyber Essentials Plus assessment, about £2,000 to £3,000',
+  summary: 'IASME, which runs the scheme for the NCSC, puts a Cyber Essentials Plus assessment at roughly £2,000 to £3,000 depending on the size and complexity of the network. A failed control means paying this again.',
+  source: 'https://iasme.co.uk/articles/cyber-essentials-and-cyber-essentials-plus-what-is-the-difference/',
+  published: 'IASME published guidance', amount_low: 2000, amount_high: 3000,
+}
+
+const GDPR_HIGHER_MAX: ExposureReference = {
+  id: 'ukgdpr_higher_max', kind: 'statutory_maximum',
+  label: 'Up to £17.5m or 4% of annual worldwide turnover, whichever is higher',
+  summary: 'The higher maximum, which applies to breaches of the data protection principles in Article 5, including the integrity and confidentiality principle in Article 5(1)(f).',
+  source: 'https://ico.org.uk/about-the-ico/our-information/policies-and-procedures/data-protection-fining-guidance/statutory-background/the-maximum-amount-of-a-fine-under-uk-gdpr-and-dpa-2018/',
+  published: 'ICO data protection fining guidance', amount_low: null, amount_high: 17500000,
+}
+
+export const MOCK_EXPOSURE: Exposure = {
+  failing_controls: 6,
+  controls_with_published_exposure: 3,
+  direct_cost: { low: 2000, high: 3000, display: '£2,000 to £3,000', references: [CE_PLUS] },
+  comparable_enforcement: { low: 60000, high: 3070000, display: '£60,000 to £3.07m', references: [ICO_DPP, ICO_ADVANCED] },
+  statutory_maximum: { display: GDPR_HIGHER_MAX.label, references: [GDPR_HIGHER_MAX] },
+  items: [
+    { control_id: 'IAM-01', control_title: 'Every IAM user with a password uses MFA', severity: 'high',
+      why: 'An account without MFA is the exact entry route in both ICO cases below.',
+      references: [ICO_ADVANCED, ICO_DPP, CE_PLUS] },
+    { control_id: 'S3-01', control_title: 'S3 buckets block public access', severity: 'high',
+      why: 'A bucket open to the internet is the clearest form of a confidentiality failure. If personal data is in it, this is a reportable breach.',
+      references: [GDPR_HIGHER_MAX] },
+    { control_id: 'GD-02', control_title: 'No open high or critical GuardDuty findings', severity: 'high',
+      why: 'Open high-severity findings are the state DPP Law was in: something was wrong and nobody acted, so the 72-hour clock was missed.',
+      references: [ICO_DPP] },
+  ],
+  basis:
+    'Figures are published sources only: the statutory maximum set out by the ICO, ICO penalty notices ' +
+    'for the same failing, and the certification body\'s own prices. They are not a prediction. A fine ' +
+    'depends on turnover, on what you do after an incident, and on the Commissioner\'s discretion, none ' +
+    'of which can be read from AWS settings.',
 }
 
 export const MOCK_COMPLIANCE: ComplianceReport = {
   evaluated_at: minsAgo(1),
   frameworks: scoreFrameworks(DEMO_CONTROLS),
   controls: DEMO_CONTROLS,
+  exposure: MOCK_EXPOSURE,
   disclaimer:
     'These are automated checks of the AWS technical controls TekWatch can see. ' +
     'They help you gather evidence and spot gaps. They are not a certification, an audit, or legal advice.',
+}
+
+export const MOCK_EVIDENCE: EvidenceLog = {
+  total_recorded: 5,
+  statement:
+    'Each entry is chained to the one before it with SHA-256, so any later edit to a stored entry ' +
+    'breaks every hash after it. This is a tamper-evident record kept by TekWatch. It is not a ' +
+    'third-party notarised timestamp.',
+  verification: { intact: true, entries_checked: 5, broken_at: null },
+  entries: [
+    { seq: 5, recorded_at: minsAgo(6), kind: 'snapshot', summary: 'Compliance assessment: 9 passed, 3 failed',
+      hash: '9f2c41ab6d0e77b2c4f1a8e3d5b0c6971e2a4d8f3b7c5e1a9d0f6b2c8e4a7d31', prev_hash: '4b7e0c2a9d1f6538e7c4b0a2d9f31e68c5a7b4d2f0e916c3a8d5b7f1e2c4a609' },
+    { seq: 4, recorded_at: hoursAgo(5), kind: 'resolved', summary: 'S3-02 now passes: S3 buckets encrypt what they store',
+      hash: '4b7e0c2a9d1f6538e7c4b0a2d9f31e68c5a7b4d2f0e916c3a8d5b7f1e2c4a609', prev_hash: 'd18a6f3b0c9e25471fa8d3b6c0e947215d8f3a0b6c2e419d7a5f0b3c8e6d2417' },
+    { seq: 3, recorded_at: hoursAgo(28), kind: 'regressed', summary: 'RES-02 started failing: Databases keep automated backups',
+      hash: 'd18a6f3b0c9e25471fa8d3b6c0e947215d8f3a0b6c2e419d7a5f0b3c8e6d2417', prev_hash: '72c5e0a9b3d1f846207e5c3a9d0b6f184e2a7c5d3b0f916e8a4d2c7b5f1e3a08' },
+    { seq: 2, recorded_at: hoursAgo(29), kind: 'snapshot', summary: 'Compliance assessment: 10 passed, 2 failed',
+      hash: '72c5e0a9b3d1f846207e5c3a9d0b6f184e2a7c5d3b0f916e8a4d2c7b5f1e3a08', prev_hash: '0a3f7d2c8b5e19406d3a7f2c9b0e5184d7a3c0f6b2e918d5a7c4f0b3e6d2a915' },
+    { seq: 1, recorded_at: hoursAgo(53), kind: 'snapshot', summary: 'Compliance assessment: 9 passed, 3 failed',
+      hash: '0a3f7d2c8b5e19406d3a7f2c9b0e5184d7a3c0f6b2e918d5a7c4f0b3e6d2a915', prev_hash: '0000000000000000000000000000000000000000000000000000000000000000' },
+  ],
 }
 
 export const MOCK_INCIDENTS: Incident[] = [

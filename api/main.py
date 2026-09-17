@@ -47,6 +47,7 @@ from routers.admin import customers, operations, thresholds
 from schemas.errors import ErrorDetail, ErrorResponse
 from services.alerting.anomaly import anomaly_detection_loop
 from services.alerting.threshold import threshold_evaluation_loop
+from services.evidence_recorder import evidence_recording_loop
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +85,10 @@ async def lifespan(app: FastAPI):
 
     _background_tasks.append(asyncio.create_task(threshold_evaluation_loop()))
     _background_tasks.append(asyncio.create_task(anomaly_detection_loop()))
-    logger.info("Background workers started: threshold_evaluation, anomaly_detection")
+    _background_tasks.append(asyncio.create_task(evidence_recording_loop()))
+    logger.info(
+        "Background workers started: threshold_evaluation, anomaly_detection, evidence_recording"
+    )
 
     yield
 
