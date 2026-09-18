@@ -48,6 +48,9 @@ async def get_cost_summary(
     return {
         "mtd_total": round(mtd_total, 2),
         "forecasted_monthly": round(forecast or 0, 2),
+        # The currency AWS bills this account in, so the page stops assuming
+        # dollars. Taken from the most recent day that reported one.
+        "currency": daily_costs[-1]["currency"] if daily_costs else "USD",
         "daily_costs": daily_costs,
     }
 

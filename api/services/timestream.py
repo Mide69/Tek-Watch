@@ -54,6 +54,18 @@ _RANGE_TO_TIMEDELTA = {
 }
 
 
+def currency_of(row: Dict[str, Any], default: str = "USD") -> str:
+    """The currency a cost row is in, as AWS reported it.
+
+    Cost Explorer returns an amount and a unit, and the unit is what the
+    account is billed in. The unit was collected and stored and then never
+    read, so every figure was rendered with a dollar sign regardless: fine for
+    an account billed in dollars, wrong and unarguably so for one that is not.
+    """
+    unit = str(row.get("unit") or "").strip().upper()
+    return unit if len(unit) == 3 and unit.isalpha() else default
+
+
 def _safe(value: str, pattern: re.Pattern = _SAFE_ID_RE) -> str:
     """Raise ValueError if value contains characters outside the allowlist."""
     if not pattern.match(value):
@@ -307,7 +319,7 @@ class TimestreamQueryService:
             if kept is None or str(r.get("time", "")) >= str(kept.get("time", "")):
                 by_day[day] = r
         return [
-            {"time": r["time"], "cost": float(r["value"])}
+            {"time": r["time"], "cost": float(r["value"]), "currency": currency_of(r)}
             for _, r in sorted(by_day.items())
         ]
 

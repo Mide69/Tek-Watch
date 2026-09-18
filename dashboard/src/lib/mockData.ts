@@ -821,6 +821,9 @@ export function getMockCostSummary(timeRange: TimeRange) {
     mtd_total: 2891.40,
     last_month_total: 4247.80,
     forecasted_monthly: 4180.00,
+    // What AWS bills the account in. The sample account is billed in dollars,
+    // the way most AWS accounts are, and the page follows the data.
+    currency: 'USD',
     daily_costs: genDailyCosts(timeRange, 142, 28, 77),
   }
 }

@@ -10,7 +10,9 @@ from decimal import Decimal
 
 import pytest
 from unittest.mock import MagicMock, patch
-from services.timestream import TimestreamQueryService, _safe, _SAFE_ID_RE, _SAFE_RANGE_RE
+from services.timestream import (
+    TimestreamQueryService, currency_of, _safe, _SAFE_ID_RE, _SAFE_RANGE_RE,
+)
 
 
 class TestSafeInputValidation:
@@ -343,3 +345,27 @@ class TestCostQueries:
         result = s.get_service_costs("TT-0001")
         assert result[0]["aws_service"] == "S3"
         assert result[0]["mtd_cost"] == 200.0
+
+
+class TestCurrencyIsReadNotAssumed:
+    """The unit was collected, stored, and never read, so every cost rendered
+    with a dollar sign whatever the account was billed in."""
+
+    def test_the_reported_unit_is_used(self):
+        assert currency_of({"unit": "gbp"}) == "GBP"
+        assert currency_of({"unit": "USD"}) == "USD"
+
+    def test_a_missing_or_odd_unit_falls_back_to_what_aws_usually_reports(self):
+        for row in ({}, {"unit": ""}, {"unit": "none"}, {"unit": "percent"}, {"unit": None}):
+            assert currency_of(row) == "USD"
+
+    def test_daily_costs_carry_the_currency(self, svc):
+        ts, table, _ = svc
+        table.query.return_value = {"Items": [{
+            "customer_id": "TT-1", "time": "2026-09-18T10:00:00+00:00",
+            "service": "cost_explorer", "metric_name": "daily_blended_cost",
+            "resource_id": "TT-1", "value": "12.5", "unit": "gbp", "dimensions": {},
+        }]}
+        [row] = ts.get_daily_costs("TT-1")
+        assert row["cost"] == 12.5
+        assert row["currency"] == "GBP"
