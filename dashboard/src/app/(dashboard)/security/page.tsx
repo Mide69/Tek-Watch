@@ -5,12 +5,12 @@ import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { Shield, ShieldAlert, Key, AlertTriangle, CheckCircle, HelpCircle, Clock, Users, Scale, FileCheck, Download, Link2 } from 'lucide-react'
+import { Shield, ShieldAlert, Key, AlertTriangle, CheckCircle, HelpCircle, Clock, Users, Scale, FileCheck, Download, Link2, CalendarClock, Network, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useSecurity } from '@/hooks/useData'
 import { formatRelativeTime, fmtCount, DASH } from '@/lib/utils'
-import { COMPLIANCE_FRAMEWORK_NAMES, type ComplianceControl, type ComplianceFramework, type EvidenceLog, type Exposure, type Incident } from '@/lib/mockData'
+import { COMPLIANCE_FRAMEWORK_NAMES, type CalendarEntry, type ComplianceControl, type ComplianceFramework, type EvidenceLog, type Exposure, type Incident, type RegulatoryCalendar, type ServiceImpactNode } from '@/lib/mockData'
 import { useState } from 'react'
 import axios from 'axios'
 import apiClient from '@/lib/api'
@@ -28,6 +28,157 @@ function AlarmBadge({ state }: { state: string }) {
   if (state === 'ALARM') return <Badge variant="error">ALARM</Badge>
   if (state === 'OK')    return <Badge variant="success">OK</Badge>
   return <Badge variant="default">{state}</Badge>
+}
+
+const URGENCY: Record<string, { variant: 'error' | 'warning' | 'info' | 'default'; label: string }> = {
+  overdue:   { variant: 'error',   label: 'OVERDUE' },
+  critical:  { variant: 'error',   label: 'TODAY' },
+  soon:      { variant: 'warning', label: 'SOON' },
+  scheduled: { variant: 'info',    label: 'SCHEDULED' },
+  unknown:   { variant: 'default', label: 'NO DATE SET' },
+}
+
+function whenDue(entry: CalendarEntry): string {
+  if (entry.days_remaining == null) return 'Date not set'
+  if (entry.overdue) return `${Math.abs(entry.days_remaining)} days ago`
+  if (entry.days_remaining === 0) return 'Today'
+  return `In ${entry.days_remaining} day${entry.days_remaining === 1 ? '' : 's'}`
+}
+
+/**
+ * Dates this account has to meet.
+ *
+ * Every row is driven by something real: a 72-hour clock started by an
+ * exposure we actually saw, an expiry date AWS reported, or a renewal date the
+ * customer gave us. A date nobody has told us stays blank and asks for it,
+ * rather than becoming an invented reminder.
+ */
+function CalendarCard({ calendar }: { calendar: RegulatoryCalendar }) {
+  if (!calendar || calendar.entries.length === 0) return null
+  return (
+    <Card className={calendar.overdue > 0 ? 'border-red-500/30 bg-red-500/5' : 'border-border'}>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-3 flex-wrap mb-4">
+          <div className="flex items-start gap-2">
+            <CalendarClock className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+            <div>
+              <h3 className="font-semibold text-foreground">What is due</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Deadlines, expiries and renewals for this account
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            {calendar.overdue > 0 && <Badge variant="error">{calendar.overdue} overdue</Badge>}
+            {calendar.due_within_14_days > 0 && <Badge variant="warning">{calendar.due_within_14_days} within 14 days</Badge>}
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          {calendar.entries.map(entry => {
+            const urgency = URGENCY[entry.urgency] ?? URGENCY.unknown
+            return (
+              <details key={entry.id} className="rounded-lg border border-border bg-background/60 px-3 py-2.5">
+                <summary className="flex items-center gap-2 cursor-pointer list-none flex-wrap">
+                  <Badge variant={urgency.variant}>{urgency.label}</Badge>
+                  <span className="text-sm text-foreground flex-1 min-w-0">{entry.title}</span>
+                  <span className="text-[11px] text-muted-foreground">{whenDue(entry)}</span>
+                </summary>
+                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{entry.detail}</p>
+                {entry.action && (
+                  <p className="mt-1.5 text-xs text-foreground">{entry.action}</p>
+                )}
+                <p className="mt-1.5 text-[11px] text-muted-foreground">
+                  {entry.framework}
+                  {entry.source && (
+                    <>
+                      {' · '}
+                      <a href={entry.source} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                        Read the rule
+                      </a>
+                    </>
+                  )}
+                </p>
+              </details>
+            )
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}
+
+/** What else a finding reaches, from the customer's own dependency graph. */
+function ServiceImpactBlock({ nodes, heading }: { nodes: ServiceImpactNode[]; heading: string }) {
+  if (!nodes || nodes.length === 0) return null
+  return (
+    <div>
+      <h4 className="font-semibold text-foreground mb-1.5 flex items-center gap-1.5">
+        <Network className="w-3.5 h-3.5 text-primary" />
+        {heading}
+      </h4>
+      <ul className="space-y-1.5">
+        {nodes.map(node => (
+          <li key={node.key} className="text-muted-foreground">
+            <span className="font-mono text-foreground">{node.name}</span>
+            <span className="text-[11px] uppercase tracking-wider ml-2">
+              {node.service} · {node.confidence}
+            </span>
+            <span className="block text-xs">{node.why}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+/**
+ * "I have fixed this, check now."
+ *
+ * The evidence recorder runs hourly, which is right for a log and wrong for
+ * somebody who has just changed something. This asks the API to re-evaluate
+ * against the agent's latest data and record whatever changed.
+ */
+function RecheckButton({ controlId, onResult }: { controlId: string; onResult: (status: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [result, setResult] = useState('')
+
+  async function recheck() {
+    setBusy(true)
+    setResult('')
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/v1/security/controls/${controlId}/recheck`,
+        {},
+        { headers: { Authorization: `Bearer ${apiClient.getToken()}` } },
+      )
+      const status = response.data?.control?.status ?? 'unknown'
+      setResult(
+        status === 'pass' ? 'Fixed. Recorded in your evidence log.'
+        : status === 'fail' ? 'Still failing against your latest agent data.'
+        : 'Not measurable yet. Give the agent one collection cycle.',
+      )
+      onResult(status)
+    } catch {
+      setResult('Could not check right now. Please try again shortly.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2 flex-wrap">
+      <button
+        onClick={recheck}
+        disabled={busy}
+        className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-foreground hover:bg-muted/40 disabled:opacity-50"
+      >
+        <RefreshCw className={`w-3.5 h-3.5 ${busy ? 'animate-spin' : ''}`} />
+        {busy ? 'Checking…' : 'I have fixed this, check now'}
+      </button>
+      {result && <span className="text-xs text-muted-foreground">{result}</span>}
+    </div>
+  )
 }
 
 /**
@@ -94,6 +245,9 @@ function ExposureCard({ exposure }: { exposure: Exposure }) {
                       {r.label}
                     </a>
                     <span className="text-[11px]"> · {r.published}</span>
+                    {r.applies_to === 'fca_regulated' && (
+                      <span className="text-[11px] text-amber-600 dark:text-amber-400"> · FCA-regulated firms only</span>
+                    )}
                     <p className="text-[11px] mt-0.5">{r.summary}</p>
                   </li>
                 ))}
@@ -230,7 +384,8 @@ function ComplianceBar({ label, score, sub, note }: { label: string; score: numb
   )
 }
 
-function ControlRow({ control }: { control: ComplianceControl }) {
+function ControlRow({ control, recheckable = false }: { control: ComplianceControl; recheckable?: boolean }) {
+  const [rechecked, setRechecked] = useState('')
   return (
     <details className="group rounded-lg border border-border bg-background/60 px-3 py-2.5">
       <summary className="flex items-center gap-2 cursor-pointer list-none">
@@ -240,6 +395,10 @@ function ControlRow({ control }: { control: ComplianceControl }) {
       </summary>
       <div className="mt-3 space-y-2 text-xs text-muted-foreground leading-relaxed">
         <p>{control.detail}</p>
+        {rechecked === 'pass' && (
+          <p className="text-emerald-600 dark:text-emerald-400">This now passes.</p>
+        )}
+        {recheckable && <RecheckButton controlId={control.id} onResult={setRechecked} />}
         {control.findings.length > 0 && (
           <ul className="space-y-1">
             {control.findings.map(f => (
@@ -307,6 +466,18 @@ function IncidentCard({ incident }: { incident: Incident }) {
                     </ul>
                   </div>
                 )}
+                {incident.service_impact && incident.service_impact.total > 0 && (
+                  <>
+                    <ServiceImpactBlock
+                      nodes={incident.service_impact.serves}
+                      heading="What else this is wired to"
+                    />
+                    <ServiceImpactBlock
+                      nodes={incident.service_impact.reachable_from}
+                      heading="What can reach it"
+                    />
+                  </>
+                )}
                 <div>
                   <h4 className="font-semibold text-foreground mb-1.5">Why it matters</h4>
                   <ul className="space-y-1.5">
@@ -370,7 +541,7 @@ function SecurityContent() {
     )
   }
 
-  const { guardduty, iam, certs, alarms, compliance, incidents, evidence } = data
+  const { guardduty, iam, certs, alarms, compliance, incidents, evidence, calendar } = data
   const failing = compliance.controls.filter(c => c.status === 'fail')
   const unmeasured = compliance.controls.filter(c => c.status === 'unknown')
   // days_to_expiry is null for a cert the agent has not yet reported on — that
@@ -480,7 +651,7 @@ function SecurityContent() {
                 <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   Failing checks ({failing.length})
                 </h4>
-                {failing.map(c => <ControlRow key={c.id} control={c} />)}
+                {failing.map(c => <ControlRow key={c.id} control={c} recheckable />)}
               </div>
             )}
 
@@ -495,6 +666,8 @@ function SecurityContent() {
             )}
           </CardContent>
         </Card>
+
+        {calendar && <CalendarCard calendar={calendar} />}
 
         {compliance.exposure && <ExposureCard exposure={compliance.exposure} />}
 

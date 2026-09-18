@@ -9,6 +9,8 @@ import type { TimeRange } from '@/contexts/DashboardContext'
 
 function hoursAgo(h: number)  { return new Date(Date.now() - h  * 3_600_000).toISOString() }
 function minsAgo(m: number)   { return new Date(Date.now() - m  * 60_000).toISOString() }
+function hoursAhead(h: number) { return new Date(Date.now() + h * 3_600_000).toISOString() }
+function daysAhead(d: number)  { return new Date(Date.now() + d * 86_400_000).toISOString() }
 function daysAgo(d: number)   { return new Date(Date.now() - d  * 86_400_000).toISOString() }
 
 /** Deterministic seeded noise — no flicker on re-render */
@@ -438,9 +440,51 @@ export interface ComplianceFramework {
   scope_note?: string
 }
 
+export interface ServiceImpactNode {
+  key: string
+  service: string
+  resource_id: string
+  name: string
+  region: string
+  relationship: string
+  confidence: 'direct' | 'inferred'
+  why: string
+}
+
+export interface ServiceImpact {
+  serves: ServiceImpactNode[]
+  reachable_from: ServiceImpactNode[]
+  runs_in: ServiceImpactNode[]
+  total: number
+  summary: string
+}
+
+export interface CalendarEntry {
+  id: string
+  kind: 'deadline' | 'expiry' | 'renewal'
+  title: string
+  due_at: string | null
+  days_remaining: number | null
+  overdue: boolean
+  urgency: 'overdue' | 'critical' | 'soon' | 'scheduled' | 'unknown'
+  detail: string
+  framework: string
+  source: string | null
+  action: string | null
+}
+
+export interface RegulatoryCalendar {
+  generated_at: string
+  entries: CalendarEntry[]
+  overdue: number
+  due_within_14_days: number
+  awaiting_your_date: number
+}
+
 export interface ExposureReference {
   id: string
   kind: 'statutory_maximum' | 'enforcement_case' | 'direct_cost'
+  applies_to?: 'all' | 'fca_regulated'
   label: string
   summary: string
   source: string
@@ -508,6 +552,7 @@ export interface Incident {
   chain: { service: string; time: string | null; detail: string }[]
   regulatory_impact: { framework: string; reference: string; why: string }[]
   operational_impact: { headline: string; points: string[] }
+  service_impact?: ServiceImpact
   remediation: { order: number; action: string; command: string | null }[]
 }
 
@@ -681,6 +726,35 @@ export const MOCK_EVIDENCE: EvidenceLog = {
   ],
 }
 
+export const MOCK_CALENDAR: RegulatoryCalendar = {
+  generated_at: minsAgo(1),
+  overdue: 0,
+  due_within_14_days: 2,
+  awaiting_your_date: 1,
+  entries: [
+    { id: 'ico-72h:s3-exposure:acme-marketing-assets', kind: 'deadline',
+      title: 'Decide whether the ICO must be told about acme-marketing-assets',
+      due_at: hoursAhead(69), days_remaining: 2, overdue: false, urgency: 'soon',
+      detail: 'Article 33 gives you 72 hours from becoming aware of a personal data breach to tell the ICO, unless it is unlikely to risk people\'s rights. If no personal data was exposed, record that decision and why.',
+      framework: 'UK GDPR',
+      source: 'https://ico.org.uk/for-organisations/report-a-breach/personal-data-breach/',
+      action: 'Check what was in it, decide, and write the decision down either way.' },
+    { id: 'cert-expiry:arn:cert', kind: 'expiry', title: 'TLS certificate for app.acme.co.uk expires',
+      due_at: daysAhead(11), days_remaining: 11, overdue: false, urgency: 'soon',
+      detail: 'An expired certificate stops the service and breaks encryption in transit. Certificates issued by ACM renew themselves only while the validation records are still in place.',
+      framework: 'UK GDPR', source: null,
+      action: 'Confirm the DNS validation records still exist so ACM can renew it.' },
+    { id: 'renewal:cyber_essentials_expires_at', kind: 'renewal', title: 'Cyber Essentials certification expires',
+      due_at: daysAhead(96), days_remaining: 96, overdue: false, urgency: 'scheduled',
+      detail: 'Certification lasts twelve months. Most buyers who ask for it check the date.',
+      framework: 'Cyber Essentials', source: null, action: null },
+    { id: 'renewal:ico_fee_due_at', kind: 'renewal', title: 'ICO data protection fee due',
+      due_at: null, days_remaining: null, overdue: false, urgency: 'unknown',
+      detail: 'Most organisations that process personal data must pay the ICO every year. Add your date and TekWatch will track it.',
+      framework: 'UK GDPR', source: null, action: 'Set the date on your profile.' },
+  ],
+}
+
 export const MOCK_INCIDENTS: Incident[] = [
   {
     id: 's3-exposure:acme-marketing-assets',
@@ -700,6 +774,15 @@ export const MOCK_INCIDENTS: Incident[] = [
       { framework: 'UK GDPR', reference: 'Art. 33 Notification of a personal data breach', why: 'If this bucket holds personal data and was accessed while exposed, the ICO must be told within 72 hours of you becoming aware, unless the breach is unlikely to result in a risk to individuals.' },
       { framework: 'Cyber Essentials', reference: 'Secure configuration', why: 'Cloud storage must not be left reachable by the public by default.' },
     ],
+    service_impact: {
+      total: 1,
+      summary: 'Also affected: it is published to the internet by CloudFront distribution cdn.acme.co.uk.',
+      serves: [{ key: 'cloudfront:E1ACME', service: 'cloudfront', resource_id: 'E1ACME',
+                 name: 'cdn.acme.co.uk', region: 'global', relationship: 'serves', confidence: 'direct',
+                 why: 'This distribution serves acme-marketing-assets as an origin.' }],
+      reachable_from: [],
+      runs_in: [],
+    },
     operational_impact: {
       headline: 'Public access is no longer prevented on acme-marketing-assets',
       points: [
