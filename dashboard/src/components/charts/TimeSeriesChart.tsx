@@ -27,9 +27,18 @@ function fmt(t: string) {
   try { return format(parseISO(t), 'HH:mm') } catch { return t }
 }
 
-const GRID   = 'rgba(255,255,255,0.05)'
-const TICK   = '#64748b'
-const TOOLTIP_STYLE = { borderRadius: 8, border: '1px solid rgba(255,255,255,0.08)', background: '#0e1525', fontSize: 12, color: '#e2eaf4' }
+// Theme tokens, not fixed slate. These were written when the product was dark
+// only: on the light theme the grid was white on white and the tooltip was a
+// dark slab in the middle of a pale page.
+const GRID   = 'hsl(var(--border))'
+const TICK   = 'hsl(var(--muted-foreground))'
+const TOOLTIP_STYLE = {
+  borderRadius: 8,
+  border: '1px solid hsl(var(--border))',
+  background: 'hsl(var(--popover))',
+  fontSize: 12,
+  color: 'hsl(var(--popover-foreground))',
+}
 
 export default function TimeSeriesChart({
   data, dataKey = 'value', color = '#6366f1', unit = '',
@@ -37,15 +46,15 @@ export default function TimeSeriesChart({
 }: TimeSeriesChartProps) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center rounded-lg bg-white/[0.02] animate-pulse" style={{ height }}>
-        <p className="text-sm text-slate-500">Loading…</p>
+      <div className="flex items-center justify-center rounded-lg bg-muted/30 animate-pulse" style={{ height }}>
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </div>
     )
   }
   if (!data || data.length === 0) {
     return (
-      <div className="flex items-center justify-center rounded-lg border border-dashed border-white/[0.08]" style={{ height }}>
-        <p className="text-sm text-slate-500">No data</p>
+      <div className="flex items-center justify-center rounded-lg border border-dashed border-border" style={{ height }}>
+        <p className="text-sm text-muted-foreground">No data</p>
       </div>
     )
   }
