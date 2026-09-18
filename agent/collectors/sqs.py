@@ -44,7 +44,7 @@ class SQSCollector(BaseCollector):
         try:
             attrs_response = self._sqs.get_queue_attributes(
                 QueueUrl=queue_url,
-                AttributeNames=_ATTRS + ["QueueArn"],
+                AttributeNames=_ATTRS + ["QueueArn", "KmsMasterKeyId", "SqsManagedSseEnabled"],
             )
             attrs = attrs_response.get("Attributes", {})
         except (ClientError, EndpointResolutionError) as exc:
@@ -53,6 +53,16 @@ class SQSCollector(BaseCollector):
 
         queue_arn = attrs.get("QueueArn", queue_url)
         is_dlq = "dlq" in queue_name.lower() or "dead" in queue_name.lower()
+
+        dims = {"is_dlq": str(is_dlq)}
+        # Either kind of server-side encryption counts. Both absent means the
+        # messages sit unencrypted, which for a queue carrying personal data is
+        # the same gap as an unencrypted bucket.
+        managed = attrs.get("SqsManagedSseEnabled")
+        if attrs.get("KmsMasterKeyId"):
+            dims["encryption_enabled"] = "True"
+        elif isinstance(managed, str) and managed.lower() in ("true", "false"):
+            dims["encryption_enabled"] = managed.capitalize()
 
         metric_map = {
             "ApproximateNumberOfMessages":          ("approximate_number_of_messages_visible", "count"),
@@ -70,7 +80,7 @@ class SQSCollector(BaseCollector):
                     metric_name=metric_name,
                     metric_value=int(raw),
                     unit=unit,
-                    dimensions={"is_dlq": str(is_dlq)},
+                    dimensions=dict(dims),
                 ))
 
         return records

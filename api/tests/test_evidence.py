@@ -60,11 +60,27 @@ class TestChain:
             evidence.GENESIS, 1, e["recorded_at"], e["kind"], e["body"]
         )
 
-    def test_the_statement_does_not_claim_a_notarised_timestamp(self):
-        # The plan called this "cryptographically timestamped". It is not: there
-        # is no third party attesting to the time.
-        assert "not a third-party notarised timestamp" in evidence.STATEMENT
-        assert "tamper-evident" in evidence.STATEMENT
+    def test_a_log_with_no_anchors_does_not_claim_an_independent_timestamp(self):
+        entries = chain(3)
+        assert evidence.statement_for(entries) == evidence.STATEMENT_WITHOUT_ANCHORS
+        assert "has not been anchored" in evidence.statement_for(entries)
+
+    def test_an_anchored_log_says_the_token_can_be_checked_without_us(self):
+        entries = chain(3) + [entry(4, chain(3)[-1]["hash"], kind=evidence.ANCHOR)]
+        statement = evidence.statement_for(entries)
+        assert "RFC 3161" in statement
+        assert "openssl" in statement
+
+    def test_verify_reports_how_many_anchors_the_chain_has(self):
+        entries, prev = [], evidence.GENESIS
+        for i, kind in enumerate((evidence.SNAPSHOT, evidence.ANCHOR, evidence.SNAPSHOT), start=1):
+            e = entry(i, prev, kind=kind)
+            entries.append(e)
+            prev = e["hash"]
+        result = evidence.verify(entries)
+        assert result["intact"] is True
+        assert result["anchors"] == 1
+        assert result["last_anchored_at"] == entries[1]["recorded_at"]
 
 
 def report(*controls, evaluated_at="2026-09-17T12:00:00+00:00"):
@@ -139,10 +155,12 @@ def recorder_services(head=None, controls=None):
 
 
 class TestRecorder:
-    def _run(self, monkeypatch, head=None, controls=None, now=NOW):
+    def _run(self, monkeypatch, head=None, controls=None, now=NOW, stamp=None):
         ts, db, written = recorder_services(head, controls)
         monkeypatch.setattr(evidence_recorder.compliance, "load_inventory", lambda *a, **k: {})
         monkeypatch.setattr(evidence_recorder.compliance, "evaluate", lambda inv, now=None: written)
+        # Never reach a real timestamping authority from a test.
+        monkeypatch.setattr(evidence_recorder, "_stamp_for", lambda h, n: stamp)
         count = evidence_recorder.record_for_customer("TT-1", ts, db, now=now)
         return count, db
 
@@ -213,6 +231,7 @@ class TestRecorder:
         db.append_evidence.assert_not_called()
 
     def test_a_rejected_append_stops_the_pass(self, monkeypatch):
+        monkeypatch.setattr(evidence_recorder, "_stamp_for", lambda h, n: None)
         ts, db, written = recorder_services(
             head={"seq": 2, "hash": "d" * 64, "readable": True,
                   "last_snapshot": {"recorded_at": NOW.isoformat(),
@@ -226,6 +245,7 @@ class TestRecorder:
         assert db.append_evidence.call_count == 1
 
     def test_an_estate_with_no_controls_records_nothing(self, monkeypatch):
+        monkeypatch.setattr(evidence_recorder, "_stamp_for", lambda h, n: None)
         ts, db, _ = recorder_services()
         monkeypatch.setattr(evidence_recorder.compliance, "load_inventory", lambda *a, **k: {})
         monkeypatch.setattr(evidence_recorder.compliance, "evaluate", lambda inv, now=None: {"controls": []})

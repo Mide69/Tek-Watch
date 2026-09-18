@@ -21,7 +21,7 @@ import {
   MOCK_ALERTS, MOCK_AGENT, MOCK_ECS, MOCK_DYNAMODB, MOCK_VPCS,
   MOCK_ELBS, MOCK_CLOUDFRONT, MOCK_S3, MOCK_SQS, MOCK_SNS,
   MOCK_GUARDDUTY, MOCK_IAM, MOCK_ACM_CERTS, MOCK_CW_ALARMS,
-  MOCK_COMPLIANCE, MOCK_INCIDENTS, MOCK_EVIDENCE, type EvidenceLog,
+  MOCK_COMPLIANCE, MOCK_INCIDENTS, MOCK_EVIDENCE, MOCK_CALENDAR, type EvidenceLog,
 } from '@/lib/mockData'
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -285,7 +285,7 @@ export function useSecurity() {
   // shown to every signed-in customer as if they were theirs. It now comes
   // from the API's rule engine, and only the demo sees fixtures.
   return useSWR(key, async () => {
-    const [guardduty, iam, certs, alarms, compliance, incidents, evidence, verification] = await Promise.all([
+    const [guardduty, iam, certs, alarms, compliance, incidents, evidence, verification, calendar] = await Promise.all([
       apiFetch(`/api/v1/security/guardduty?region=${region}`, MOCK_GUARDDUTY, 'findings'),
       apiFetch('/api/v1/security/iam', MOCK_IAM, 'summary'),
       apiFetch('/api/v1/security/acm', MOCK_ACM_CERTS, 'certificates'),
@@ -294,8 +294,10 @@ export function useSecurity() {
       apiFetch('/api/v1/security/incidents', MOCK_INCIDENTS, 'incidents'),
       apiFetch('/api/v1/security/evidence', MOCK_EVIDENCE),
       apiFetch('/api/v1/security/evidence/verify', MOCK_EVIDENCE.verification),
+      apiFetch('/api/v1/security/calendar', MOCK_CALENDAR),
     ])
-    return { guardduty, iam, certs, alarms, compliance, incidents, evidence: { ...evidence, verification } as EvidenceLog }
+    return { guardduty, iam, certs, alarms, compliance, incidents, calendar,
+             evidence: { ...evidence, verification } as EvidenceLog }
   }, {
     revalidateOnFocus: false,
     fallbackData: initial({
@@ -306,6 +308,7 @@ export function useSecurity() {
       compliance: MOCK_COMPLIANCE,
       incidents: MOCK_INCIDENTS,
       evidence: MOCK_EVIDENCE,
+      calendar: MOCK_CALENDAR,
     }),
   })
 }

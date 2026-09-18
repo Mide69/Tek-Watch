@@ -33,11 +33,26 @@ export function formatNumber(num: number): string {
 /**
  * Format currency
  */
+/**
+ * Money, in the currency it was actually reported in.
+ *
+ * AWS returns an amount and a unit, and the unit is what the account is
+ * billed in. This used to force en-US and a dollar default whatever arrived,
+ * so a UK account billed in pounds had its own spend shown in dollars. The
+ * currency now comes from the payload; USD is only the fallback, because that
+ * is what Cost Explorer reports when it reports nothing else.
+ */
 export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  }).format(amount)
+  const code = /^[A-Za-z]{3}$/.test(currency) ? currency.toUpperCase() : 'USD'
+  try {
+    // narrowSymbol so dollars render as $ rather than en-GB's US$, which is
+    // correct but reads as a typo and overflows the summary cards.
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency', currency: code, currencyDisplay: 'narrowSymbol',
+    }).format(amount)
+  } catch {
+    return `${code} ${amount.toFixed(2)}`
+  }
 }
 
 /**

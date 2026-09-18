@@ -4,10 +4,15 @@ import io
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query, Response
+from datetime import datetime, timezone
+
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, status
+from pydantic import BaseModel, field_validator
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services import compliance, correlation, evidence, exposure
+from services import (
+    calendar, compliance, correlation, evidence, evidence_recorder, exposure, timestamping, topology,
+)
 from services.dynamodb import DynamoDBService
 from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
@@ -254,7 +259,8 @@ async def get_evidence(
     return {
         "entries": entries,
         "total_recorded": head.get("seq", 0),
-        "statement": evidence.STATEMENT,
+        "anchors": sum(1 for e in entries if e.get("kind") == evidence.ANCHOR),
+        "statement": evidence.statement_for(entries),
     }
 
 
@@ -289,9 +295,116 @@ async def export_evidence(
             entry.get("hash"),
             entry.get("prev_hash"),
         ])
+    # The verification note rides with the file: an auditor who has only the
+    # CSV should be able to check an anchor without coming back to us.
+    writer.writerow([])
+    writer.writerow(["How to check this record"])
+    writer.writerow([evidence.statement_for(entries)])
+    writer.writerow([timestamping.VERIFY_INSTRUCTIONS])
+
     filename = f"tekwatch-compliance-evidence-{customer.customer_id}.csv"
     return Response(
         content=buffer.getvalue(),
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/topology")
+async def get_topology(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """The customer's own dependency graph: what is joined to what, and how surely.
+
+    See services/topology.py. Direct edges are stated by AWS itself; inferred
+    edges mean the two resources share something that usually means they talk.
+    """
+    ts = TimestreamQueryService()
+    graph = topology.build(topology.load_inventory(ts, customer.customer_id))
+    payload = graph.as_dict()
+    payload["confidence_note"] = (
+        "Direct edges come from AWS itself, such as a CloudFront distribution naming the "
+        "bucket it serves. Inferred edges mean the resources share a security group, which "
+        "usually means they can reach each other. TekWatch cannot see traffic, so it never "
+        "claims two resources do talk, only that they can."
+    )
+    return payload
+
+
+@router.get("/calendar")
+async def get_calendar(
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Dates this account has to meet: breach clocks, expiries, renewals."""
+    ts = TimestreamQueryService()
+    inventory = compliance.load_inventory(ts, customer.customer_id)
+    incidents = correlation.correlate(correlation.load_inventory(ts, customer.customer_id))
+    profile = DynamoDBService().get_customer(customer.customer_id) or {}
+    return calendar.build(inventory, incidents, profile)
+
+
+class RenewalDates(BaseModel):
+    """The two dates only the customer knows. Either may be cleared with null."""
+
+    cyber_essentials_expires_at: Optional[str] = None
+    ico_fee_due_at: Optional[str] = None
+
+    @field_validator("cyber_essentials_expires_at", "ico_fee_due_at")
+    @classmethod
+    def _is_a_date(cls, value):
+        if value in (None, ""):
+            return None
+        try:
+            datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        except ValueError:
+            raise ValueError("Use a date such as 2027-03-31")
+        return value
+
+
+@router.put("/calendar/renewals")
+async def set_renewals(
+    dates: RenewalDates,
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Store the renewal dates AWS cannot tell us."""
+    db = DynamoDBService()
+    if not db.get_customer(customer.customer_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer profile not found")
+    db.update_customer(customer.customer_id, dates.model_dump())
+    return {"status": "saved", **dates.model_dump()}
+
+
+@router.post("/controls/{control_id}/recheck")
+async def recheck_control(
+    control_id: str = Path(..., pattern=r"^[A-Z]{2,4}-[0-9]{2}$"),
+    customer: CustomerContext = Depends(get_current_customer),
+):
+    """Re-run the checks now, and say whether this one passes yet.
+
+    The evidence recorder runs hourly, which is right for a log and wrong for
+    somebody who has just fixed something and wants to know it worked. This
+    re-evaluates against the agent's latest data and appends whatever changed
+    to the evidence log, so a fix is recorded the moment it can be seen rather
+    than whenever the loop next comes round.
+
+    It proves nothing on its own: if the agent has not reported since the fix,
+    the control still fails and the answer says so.
+    """
+    ts = TimestreamQueryService()
+    db = DynamoDBService()
+    written = evidence_recorder.record_for_customer(customer.customer_id, ts, db)
+
+    report = compliance.evaluate(compliance.load_inventory(ts, customer.customer_id))
+    control = next((c for c in report["controls"] if c["id"] == control_id), None)
+    if control is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No control {control_id}")
+
+    return {
+        "control": control,
+        "checked_at": report["evaluated_at"],
+        "evidence_entries_written": written,
+        "note": (
+            "Checked against the most recent data your agent sent. If you have just made the "
+            "change, give the agent one collection cycle and check again."
+        ),
+    }

@@ -10,6 +10,12 @@ from botocore.exceptions import ClientError
 
 logger = logging.getLogger(__name__)
 
+# The evidence log is anchored daily to an independent RFC 3161 authority.
+# FreeTSA publishes both the service and the certificates needed to verify a
+# token, so a customer's auditor can check one without an account. Set TSA_URL
+# to use another authority, or to "" to turn anchoring off.
+DEFAULT_TSA_URL = "https://freetsa.org/tsr"
+
 
 @dataclass(frozen=True)
 class APIConfig:
@@ -41,6 +47,9 @@ class APIConfig:
     slack_webhook_url: str
     # SQS
     sqs_ingest_queue_url: str
+    # RFC 3161 timestamping authority used to anchor the evidence log. Empty
+    # turns anchoring off; the log still chains and still works.
+    tsa_url: str
     # Public image the customer agent runs from, baked into the CloudFormation
     # template customers download.
     agent_public_image_uri: str
@@ -117,6 +126,7 @@ def load_config() -> APIConfig:
         ses_from_email=secrets.get("ses_from_email", ""),
         slack_webhook_url=secrets.get("slack_webhook_url", ""),
         sqs_ingest_queue_url=secrets.get("sqs_ingest_queue_url", ""),
+        tsa_url=os.environ.get("TSA_URL", DEFAULT_TSA_URL),
         s3_uploads_bucket=secrets.get("s3_uploads_bucket", "") or os.environ.get("S3_UPLOADS_BUCKET", ""),
         agent_public_image_uri=(
             secrets.get("agent_public_image_uri", "")

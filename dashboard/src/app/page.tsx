@@ -8,7 +8,7 @@ import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, ShieldCheck, Cloud, GitMerge,
   ArrowRight, Check, ChevronDown, ChevronRight, Menu, X, Gavel, PoundSterling, BarChart3,
-  Linkedin, Youtube, Mail, MapPin, Bot, Sparkles, Key, Users, MessageSquare,
+  Mail, MapPin, Bot, Sparkles, Key, Users, MessageSquare,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -94,7 +94,7 @@ const previewTabs = [
 type PreviewTabId = typeof previewTabs[number]['id']
 
 const PLATFORM_LINKS = [
-  { label: 'Real-time monitoring', href: '#capabilities', desc: '20+ AWS services, every region' },
+  { label: 'Continuous monitoring', href: '#capabilities', desc: '23 AWS services, every region' },
   { label: 'Anomaly detection', href: '#platform', desc: 'Your own 7-day baseline' },
   { label: 'Compliance checks', href: '#capabilities', desc: 'UK GDPR, Cyber Essentials, ISO 27001' },
   { label: 'Incident correlation', href: '#platform', desc: 'Who changed what, and the fix' },
@@ -104,9 +104,9 @@ const PLATFORM_LINKS = [
 const FEATURES = [
   {
     icon: Activity,
-    title: 'Real-time Visibility',
+    title: 'Continuous Visibility',
     desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services, giving you full visibility across every active region from your first dashboard load.',
-    points: ['20+ AWS services monitored', 'Every active region, day one', '90-day metric history'],
+    points: ['23 AWS services monitored', 'Every active region, day one', '90-day metric history'],
   },
   {
     icon: Zap,
@@ -161,11 +161,40 @@ const statTiles = [
   { icon: DollarSign, label: 'Monthly AWS Spend', value: '£1,840', delta: '+4%', good: false, sub: 'vs last month', trend: [1650, 1700, 1680, 1720, 1750, 1690, 1730, 1760, 1740, 1780, 1810, 1840] },
 ]
 
+// Every figure here is one a reader can open and check, which is why each
+// carries a link. The four that used to sit here could not be: two cited
+// sources that do not publish the number, and the Cyber Essentials figure was
+// simply wrong (the NCSC's own review says 19% growth in certificates, not
+// 29% in Plus). A claim nobody can verify is worth less than no claim.
 const problemStats = [
-  { icon: Gavel, value: '£43.2M', label: 'ICO fines issued in 2024 for data protection failures', source: 'ICO Annual Report, 2024–25' },
-  { icon: PoundSterling, value: '£3,670', label: 'Average cost of a cyber incident for a UK SME', source: 'FSB Cyber Security Report, 2024' },
-  { icon: BarChart3, value: '<5%', label: 'Of UK SMEs with cloud infrastructure use any paid monitoring tool', source: 'AWS Partner Network research, 2024' },
-  { icon: TrendingUp, value: '29%', label: 'Year-on-year growth in Cyber Essentials Plus certifications', source: 'NCSC Annual Review, 2025' },
+  {
+    icon: Gavel,
+    value: '£3.07m',
+    label: 'ICO fine after attackers reached systems through an account with no multi-factor authentication',
+    source: 'ICO enforcement, March 2025',
+    href: 'https://ico.org.uk/action-weve-taken/enforcement/2025/03/advanced-computer-software-group-limited/',
+  },
+  {
+    icon: PoundSterling,
+    value: '£3,550',
+    label: 'Average cost of the most disruptive breach, for businesses that had a cost at all',
+    source: 'Cyber Security Breaches Survey 2025/26, DSIT',
+    href: 'https://www.gov.uk/government/statistics/cyber-security-breaches-survey-20252026/cyber-security-breaches-survey-20252026',
+  },
+  {
+    icon: BarChart3,
+    value: '11,950',
+    label: 'Cyber Essentials Plus certificates issued in the year to March 2025, each one needing evidence',
+    source: 'NCSC Annual Review 2025',
+    href: 'https://www.ncsc.gov.uk/collection/ncsc-annual-review-2025',
+  },
+  {
+    icon: TrendingUp,
+    value: '19%',
+    label: 'Growth in Cyber Essentials certificates issued that year',
+    source: 'NCSC Annual Review 2025',
+    href: 'https://www.ncsc.gov.uk/collection/ncsc-annual-review-2025',
+  },
 ]
 
 const pricingTiers = [
@@ -623,7 +652,7 @@ export default function LandingPage() {
             </div>
             <dl className="animate-fade-in-up mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6" style={{ animationDelay: '320ms' }}>
               {[
-                ['20+', 'AWS services monitored'],
+                ['23', 'AWS services monitored'],
                 ['<30 min', 'to first dashboard'],
                 ['£79', 'starting price /mo'],
                 ['0', 'firewall changes needed'],
@@ -855,7 +884,7 @@ export default function LandingPage() {
                             <span className="text-foreground/80">{c.label}</span>
                             <span className="font-mono font-semibold text-foreground">{c.score}%</span>
                           </div>
-                          <div className="h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+                          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
                             <div
                               className={`h-full rounded-full ${c.score >= 90 ? 'bg-emerald-400' : c.score >= 75 ? 'bg-amber-400' : 'bg-red-400'}`}
                               style={{ width: `${c.score}%` }}
@@ -981,7 +1010,7 @@ export default function LandingPage() {
             <SectionHeading
               title="Monitoring is priced for enterprises."
               accent="Most UK SMEs go without."
-              lead="Enterprise tools like Datadog cost £800–£5,000/month and need a specialist to run. For 5.5 million UK SMEs, that’s not a pricing tier. It’s a locked door."
+              lead="Enterprise monitoring is sold by the host and by the module, and configured by engineers. A small business running a handful of servers pays for both the licences and the specialist, so most pay for neither and watch nothing."
             />
           </Reveal>
           <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -991,7 +1020,11 @@ export default function LandingPage() {
                   <s.icon className="w-5 h-5 text-indigo-600 dark:text-indigo-400 mb-4" />
                   <div className="text-3xl font-bold text-foreground tabular-nums">{s.value}</div>
                   <p className="mt-2 text-sm text-muted-foreground leading-snug">{s.label}</p>
-                  <p className="mt-3 text-[11px] text-muted-foreground/70">{s.source}</p>
+                  <p className="mt-3 text-[11px] text-muted-foreground/70">
+                    <a href={s.href} target="_blank" rel="noopener noreferrer" className="hover:text-foreground hover:underline">
+                      {s.source}
+                    </a>
+                  </p>
                 </div>
               </Reveal>
             ))}
@@ -1010,7 +1043,7 @@ export default function LandingPage() {
           <Reveal>
             <SectionHeading
               title="Everything your team needs"
-              lead="From real-time resource health to UK-specific compliance evidence, all in one place."
+              lead="From resource health checked every fifteen minutes to UK-specific compliance evidence, all in one place."
             />
           </Reveal>
           <div className="mt-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -1052,7 +1085,7 @@ export default function LandingPage() {
                 {[
                   'Read-only IAM role, created for you by CloudFormation',
                   'Outbound only: no inbound ports, no VPN, no firewall rules',
-                  '20+ AWS services across every active region',
+                  '23 AWS services across every active region',
                   'Your data stays in the UK (AWS London, eu-west-2)',
                 ].map(p => (
                   <li key={p} className="flex items-start gap-3 text-base text-foreground/80">
@@ -1231,14 +1264,6 @@ export default function LandingPage() {
               <Link href="/overview/?demo=1" className="mt-4 inline-flex items-center gap-1 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
                 Launch live demo <ChevronRight className="w-4 h-4" />
               </Link>
-              <div className="mt-6 flex items-center gap-3">
-                <a href="#" aria-label="TekWatch on LinkedIn" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors">
-                  <Linkedin className="w-4 h-4" />
-                </a>
-                <a href="#" aria-label="Tek Talk on YouTube" className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200 transition-colors">
-                  <Youtube className="w-4 h-4" />
-                </a>
-              </div>
             </div>
 
             <div>

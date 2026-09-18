@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class DynamoDBCollector(BaseCollector):
     """Collects DynamoDB table inventory and CloudWatch capacity metrics."""
 
@@ -32,6 +49,29 @@ class DynamoDBCollector(BaseCollector):
         except (ClientError, EndpointResolutionError) as exc:
             logger.error("DynamoDB collection failed in %s: %s", self.region, exc)
         return records
+
+    def _point_in_time_recovery(self, table_name: str):
+        """True, False, or None when the call is not permitted or fails.
+
+        A table with no point-in-time recovery cannot be restored to a moment
+        before a bad write, which is the DynamoDB equivalent of running a
+        database with no backups.
+        """
+        try:
+            description = _as_dict(
+                self._ddb.describe_continuous_backups(TableName=table_name)
+            ).get("ContinuousBackupsDescription")
+        except (ClientError, EndpointResolutionError) as exc:
+            logger.warning("DynamoDB continuous backups unreadable for %s: %s", table_name, exc)
+            return None
+        status = _as_dict(
+            _as_dict(description).get("PointInTimeRecoveryDescription")
+        ).get("PointInTimeRecoveryStatus")
+        if status == "ENABLED":
+            return True
+        if status == "DISABLED":
+            return False
+        return None
 
     def _collect_table(self, table_name: str) -> List[MetricRecord]:
         """Collect metrics for a single DynamoDB table."""
@@ -59,6 +99,12 @@ class DynamoDBCollector(BaseCollector):
             "read_capacity":  read_cap,
             "write_capacity": write_cap,
         }
+        pitr = self._point_in_time_recovery(table_name)
+        if pitr is not None:
+            base_dims["point_in_time_recovery"] = str(pitr)
+        sse = _as_dict(table.get("SSEDescription")).get("Status")
+        if isinstance(sse, str) and sse:
+            base_dims["encryption_status"] = sse
 
         records.append(self._make_record(
             resource_type="table",

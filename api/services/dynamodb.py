@@ -339,11 +339,16 @@ class DynamoDBService:
             "seq": int(item.get("seq", 0)),
             "hash": str(item.get("hash", GENESIS)),
             "last_snapshot": item.get("last_snapshot"),
+            "last_anchor_at": item.get("last_anchor_at"),
             "readable": True,
         }
 
     def append_evidence(
-        self, customer_id: str, entry: Dict[str, Any], last_snapshot: Optional[Dict[str, Any]] = None
+        self,
+        customer_id: str,
+        entry: Dict[str, Any],
+        last_snapshot: Optional[Dict[str, Any]] = None,
+        last_anchor_at: Optional[str] = None,
     ) -> bool:
         """Append one entry. Refuses to overwrite a sequence number already used.
 
@@ -368,17 +373,26 @@ class DynamoDBService:
                 logger.error("Evidence append failed for %s: %s", customer_id, exc)
             return False
 
-        head: Dict[str, Any] = {
-            "customer_id": customer_id,
-            "SK": self._EVIDENCE_HEAD,
-            "seq": int(entry["seq"]),
-            "hash": entry["hash"],
-            "updated_at": _now_iso(),
+        # Updated field by field rather than written whole: the head also holds
+        # the last snapshot and the last anchor time, and an append that knows
+        # about neither must not wipe them.
+        sets = ["seq = :seq", "#h = :hash", "updated_at = :now"]
+        values: Dict[str, Any] = {
+            ":seq": int(entry["seq"]), ":hash": entry["hash"], ":now": _now_iso(),
         }
         if last_snapshot is not None:
-            head["last_snapshot"] = last_snapshot
+            sets.append("last_snapshot = :snapshot")
+            values[":snapshot"] = last_snapshot
+        if last_anchor_at is not None:
+            sets.append("last_anchor_at = :anchored")
+            values[":anchored"] = last_anchor_at
         try:
-            self._customers.put_item(Item=head)
+            self._customers.update_item(
+                Key={"customer_id": customer_id, "SK": self._EVIDENCE_HEAD},
+                UpdateExpression="SET " + ", ".join(sets),
+                ExpressionAttributeNames={"#h": "hash"},
+                ExpressionAttributeValues=values,
+            )
         except ClientError as exc:
             # The entry is written; only the shortcut is stale. The next append
             # reads a lower sequence and its condition rejects it, which is

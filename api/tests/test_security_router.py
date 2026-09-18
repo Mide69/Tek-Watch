@@ -92,8 +92,10 @@ async def test_compliance_carries_published_exposure_for_failing_controls():
     assert "not a prediction" in exposure["basis"]
     for item in exposure["items"]:
         assert item["references"], item["control_id"]
-        assert all(r["source"].startswith("https://ico.org.uk") or
-                   r["source"].startswith("https://iasme.co.uk") for r in item["references"])
+        assert all(
+            r["source"].startswith(("https://ico.org.uk", "https://iasme.co.uk", "https://www.fca.org.uk"))
+            for r in item["references"]
+        )
 
 
 @pytest.mark.asyncio
@@ -105,7 +107,9 @@ async def test_evidence_endpoint_returns_entries_and_the_honest_statement():
         result = await security.get_evidence(limit=50, customer=CTX)
     assert result["entries"][0]["seq"] == 2
     assert result["total_recorded"] == 2
-    assert "not a third-party notarised timestamp" in result["statement"]
+    # A log with no anchor yet must not borrow the claim that it has one.
+    assert result["anchors"] == 0
+    assert "has not been anchored" in result["statement"]
 
 
 @pytest.mark.asyncio

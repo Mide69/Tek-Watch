@@ -270,7 +270,7 @@ function AgentContent({ customerId }: { customerId: string | null }) {
             <h3 className="font-semibold text-foreground mb-3">Regions Monitored</h3>
             <div className="flex flex-wrap gap-2">
               {regions.map(r => (
-                <div key={r} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 border border-white/[0.08]">
+                <div key={r} className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-muted/20 border border-border">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                   <span className="text-sm font-mono text-foreground">{r}</span>
                 </div>

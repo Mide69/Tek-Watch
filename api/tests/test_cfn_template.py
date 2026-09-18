@@ -36,6 +36,7 @@ def make_config(**overrides) -> APIConfig:
         ses_from_email="noreply@tekwatch.io",
         slack_webhook_url="",
         sqs_ingest_queue_url="https://sqs.eu-west-2.amazonaws.com/834863651414/tek-watch-prod-ingest",
+        tsa_url="https://tsa.example/tsr",
         agent_public_image_uri="public.ecr.aws/s5b4q0k8/tek-watch-agent:latest",
         s3_uploads_bucket="tek-watch-prod-uploads",
         allowed_origins="https://app.tekwatch.io",

@@ -9,37 +9,40 @@ import { formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useCost } from '@/hooks/useData'
+import { BarChart } from '@/components/ui/MiniChart'
 import { cn } from '@/lib/utils'
 
 const SERVICE_COLORS = ['#6366f1','#3b82f6','#f59e0b','#10b981','#f97316','#a78bfa','#64748b','#ec4899']
 
-function DailyCostBars({ data }: { data: { cost: number; label?: string; time?: string }[] }) {
-  const maxC = Math.max(...data.map(d => d.cost)) || 1
+function DailyCostBars({ data, currency }: {
+  data: { cost: number; label?: string; time?: string }[]
+  currency: string
+}) {
   return (
     <div>
-      <div className="flex items-end gap-[3px] h-48">
-        {data.map((d, i) => (
-          <div
-            key={i}
-            className="flex-1 rounded-sm transition-all cursor-default"
-            style={{
-              height:     `${Math.max((d.cost / maxC) * 100, 2)}%`,
-              background: i === data.length - 1 ? '#f97316' : '#6366f1',
-              opacity:    i === data.length - 1 ? 1 : 0.65,
-            }}
-            title={`${d.label ?? d.time ?? ''}: ${formatCurrency(d.cost)}`}
-          />
-        ))}
-      </div>
+      <BarChart
+        data={data.map(d => ({ value: d.cost, label: d.label ?? d.time ?? '' }))}
+        height={192}
+        formatValue={v => formatCurrency(v, currency)}
+      />
       <div className="flex justify-between text-xs text-muted-foreground mt-2">
         <span>{data[0]?.label ?? 'Earlier'}</span>
-        <span className="text-orange-500 dark:text-orange-400 font-medium">Today</span>
+        <span className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-[2px] rounded-full bg-foreground/50" />
+            Trend
+          </span>
+          <span className="text-orange-500 dark:text-orange-400 font-medium">Today</span>
+        </span>
       </div>
     </div>
   )
 }
 
-function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number }[] }) {
+function ServiceDonut({ data, currency }: {
+  data: { aws_service: string; mtd_cost: number }[]
+  currency: string
+}) {
   const total = data.reduce((s, d) => s + d.mtd_cost, 0) || 1
   const R = 70, CX = 90, CY = 90
   const CIRC = 2 * Math.PI * R
@@ -68,7 +71,7 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
           />
         ))}
         <text x={CX} y={CY - 6}  textAnchor="middle" style={{ fill: 'hsl(var(--foreground))' }} fontSize={14} fontWeight="700">
-          {formatCurrency(total)}
+          {formatCurrency(total, currency)}
         </text>
         <text x={CX} y={CY + 12} textAnchor="middle" style={{ fill: 'hsl(var(--muted-foreground))' }} fontSize={10}>
           MTD Total
@@ -82,7 +85,7 @@ function ServiceDonut({ data }: { data: { aws_service: string; mtd_cost: number 
               style={{ background: SERVICE_COLORS[i % SERVICE_COLORS.length] }}
             />
             <span className="text-xs text-muted-foreground truncate flex-1">{d.aws_service}</span>
-            <span className="text-xs font-medium text-foreground">{formatCurrency(d.mtd_cost)}</span>
+            <span className="text-xs font-medium text-foreground">{formatCurrency(d.mtd_cost, currency)}</span>
           </div>
         ))}
       </div>
@@ -126,6 +129,9 @@ function CostContent() {
 
   const { summary, breakdown } = data
   const { mtd_total: mtd, last_month_total: last, forecasted_monthly: forecast, daily_costs } = summary
+  // AWS says what it bills this account in. Anything else is a guess dressed
+  // as a figure, so the fallback is the only assumption made.
+  const currency = summary.currency ?? 'USD'
   const trendUp  = mtd > last
   const trendPct = last > 0 ? Math.abs(((mtd - last) / last) * 100).toFixed(1) : '0'
 
@@ -152,7 +158,7 @@ function CostContent() {
           {[
             {
               label: 'Month-to-Date',
-              value: formatCurrency(mtd),
+              value: formatCurrency(mtd, currency),
               sub:   `${trendUp ? '+' : '−'}${trendPct}% vs last month`,
               icon:  trendUp ? TrendingUp : TrendingDown,
               color: trendUp ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400',
@@ -160,7 +166,7 @@ function CostContent() {
             },
             {
               label: 'Forecasted Monthly',
-              value: formatCurrency(forecast),
+              value: formatCurrency(forecast, currency),
               sub:   'Based on current trend',
               icon:  DollarSign,
               color: 'text-amber-500 dark:text-amber-400',
@@ -168,7 +174,7 @@ function CostContent() {
             },
             {
               label: 'Last Month Total',
-              value: formatCurrency(last),
+              value: formatCurrency(last, currency),
               sub:   'Previous billing period',
               icon:  DollarSign,
               color: 'text-foreground',
@@ -198,7 +204,7 @@ function CostContent() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <DailyCostBars data={daily_costs} />
+            <DailyCostBars data={daily_costs} currency={currency} />
           </CardContent>
         </Card>
 
@@ -213,6 +219,7 @@ function CostContent() {
             </CardHeader>
             <CardContent>
               <ServiceDonut
+                currency={currency}
                 data={breakdown.breakdown.map(d => ({
                   aws_service: d.aws_service,
                   mtd_cost: d.mtd_cost,
@@ -246,7 +253,7 @@ function CostContent() {
                               {svc.vs_last_month > 0 ? '+' : ''}{svc.vs_last_month.toFixed(1)}%
                             </span>
                           )}
-                          <span className="font-bold text-foreground">{formatCurrency(svc.mtd_cost)}</span>
+                          <span className="font-bold text-foreground">{formatCurrency(svc.mtd_cost, currency)}</span>
                         </div>
                       </div>
                       <div className="w-full bg-muted rounded-full h-1.5">
@@ -287,7 +294,7 @@ function CostContent() {
                   <span className="font-medium">acme-image-processor</span> function — invocations
                   are up but cold-start duration has also spiked 340%, suggesting a recent package
                   change. Your overall bill is trending toward{' '}
-                  <span className="font-medium">{formatCurrency(forecast)}</span> this month, which
+                  <span className="font-medium">{formatCurrency(forecast, currency)}</span> this month, which
                   is 1.6% below last month&apos;s total — the savings come from EC2 right-sizing
                   completed last week.
                 </p>

@@ -46,6 +46,10 @@ class Reference:
     published: str
     amount_low: Optional[int] = None    # GBP, None when the figure is a formula
     amount_high: Optional[int] = None
+    # FCA and PRA penalties reach regulated firms only. Showing one to a
+    # plumber as though it could happen to them would be the same dishonesty
+    # as inventing the number.
+    applies_to: str = "all"
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -124,6 +128,37 @@ REFERENCES: Dict[str, Reference] = {
             published="March 2022",
             amount_low=98_000,
             amount_high=98_000,
+        ),
+        Reference(
+            id="fca_tsb_2022",
+            kind=CASE,
+            label="TSB Bank plc, £48,650,000",
+            summary=(
+                "Fined in December 2022 by the FCA and the PRA together for operational risk "
+                "management and governance failures around an IT migration, including the "
+                "management of outsourcing risk. This is the operational resilience regime "
+                "PS21/3 sits in."
+            ),
+            source="https://www.fca.org.uk/news/press-releases/tsb-fined-48m-operational-resilience-failings",
+            published="December 2022",
+            amount_low=48_650_000,
+            amount_high=48_650_000,
+            applies_to="fca_regulated",
+        ),
+        Reference(
+            id="fca_equifax_2023",
+            kind=CASE,
+            label="Equifax Ltd, £11,164,400",
+            summary=(
+                "Fined in October 2023 for failing to manage and monitor the security of UK "
+                "consumer data it had outsourced. The FCA found there were known weaknesses "
+                "in the data security systems and that Equifax failed to act on them."
+            ),
+            source="https://www.fca.org.uk/news/press-releases/equifax-ltd-fine-cyber-security-breach",
+            published="October 2023",
+            amount_low=11_164_400,
+            amount_high=11_164_400,
+            applies_to="fca_regulated",
         ),
         Reference(
             id="ce_plus_assessment",
@@ -210,9 +245,32 @@ CONTROL_EXPOSURE: Dict[str, Dict[str, Any]] = {
     "GD-02": {
         "why": (
             "Open high-severity findings are the state DPP Law was in: something was wrong "
-            "and nobody acted, so the 72-hour clock was missed."
+            "and nobody acted, so the 72-hour clock was missed. The FCA fined Equifax for the "
+            "same shape of failure: known weaknesses, no action taken."
         ),
-        "references": ["ico_dpp_law_2025"],
+        "references": ["ico_dpp_law_2025", "fca_equifax_2023"],
+    },
+    "RES-01": {
+        "why": (
+            "A service that cannot survive losing a data centre cannot be shown to stay within "
+            "an impact tolerance."
+        ),
+        "references": ["fca_tsb_2022"],
+    },
+    "RES-02": {
+        "why": "Without backups there is no recovery, which is the heart of operational resilience.",
+        "references": ["fca_tsb_2022"],
+    },
+    "RES-03": {
+        "why": "A single-zone entry point takes the whole service down with one zone.",
+        "references": ["fca_tsb_2022"],
+    },
+    "RES-04": {
+        "why": (
+            "TSB's failures were compounded by not understanding what was happening during the "
+            "incident. Alarms are how you find out in time."
+        ),
+        "references": ["fca_tsb_2022"],
     },
     "CT-01": {
         "why": (
@@ -224,10 +282,11 @@ CONTROL_EXPOSURE: Dict[str, Dict[str, Any]] = {
 }
 
 BASIS = (
-    "Figures are published sources only: the statutory maximum set out by the ICO, ICO "
-    "penalty notices for the same failing, and the certification body's own prices. They "
-    "are not a prediction. A fine depends on turnover, on what you do after an incident, "
-    "and on the Commissioner's discretion, none of which can be read from AWS settings."
+    "Figures are published sources only: the statutory maximum set out by the ICO, ICO and FCA "
+    "penalty notices for the same failing, and the certification body's own prices. They are "
+    "not a prediction. A fine depends on turnover, on what you do after an incident, and on the "
+    "regulator's discretion, none of which can be read from AWS settings. Cases marked as "
+    "applying to FCA-regulated firms do not apply to businesses outside that regime."
 )
 
 

@@ -296,10 +296,13 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
                     </div>
                   )}
                 </div>
-                <BarChart data={costBars} height={96} />
+                <BarChart data={costBars} height={96} formatValue={formatCurrency} />
                 <div className="flex justify-between text-xs text-muted-foreground mt-2">
                   <span>{trend[0]?.label ?? 'Earlier'}</span>
-                  <span>Today</span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block w-3 h-[2px] rounded-full bg-foreground/50" />
+                    Trend · Today
+                  </span>
                 </div>
               </CardContent>
             </Card>

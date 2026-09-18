@@ -9,6 +9,8 @@ import type { TimeRange } from '@/contexts/DashboardContext'
 
 function hoursAgo(h: number)  { return new Date(Date.now() - h  * 3_600_000).toISOString() }
 function minsAgo(m: number)   { return new Date(Date.now() - m  * 60_000).toISOString() }
+function hoursAhead(h: number) { return new Date(Date.now() + h * 3_600_000).toISOString() }
+function daysAhead(d: number)  { return new Date(Date.now() + d * 86_400_000).toISOString() }
 function daysAgo(d: number)   { return new Date(Date.now() - d  * 86_400_000).toISOString() }
 
 /** Deterministic seeded noise — no flicker on re-render */
@@ -438,9 +440,51 @@ export interface ComplianceFramework {
   scope_note?: string
 }
 
+export interface ServiceImpactNode {
+  key: string
+  service: string
+  resource_id: string
+  name: string
+  region: string
+  relationship: string
+  confidence: 'direct' | 'inferred'
+  why: string
+}
+
+export interface ServiceImpact {
+  serves: ServiceImpactNode[]
+  reachable_from: ServiceImpactNode[]
+  runs_in: ServiceImpactNode[]
+  total: number
+  summary: string
+}
+
+export interface CalendarEntry {
+  id: string
+  kind: 'deadline' | 'expiry' | 'renewal'
+  title: string
+  due_at: string | null
+  days_remaining: number | null
+  overdue: boolean
+  urgency: 'overdue' | 'critical' | 'soon' | 'scheduled' | 'unknown'
+  detail: string
+  framework: string
+  source: string | null
+  action: string | null
+}
+
+export interface RegulatoryCalendar {
+  generated_at: string
+  entries: CalendarEntry[]
+  overdue: number
+  due_within_14_days: number
+  awaiting_your_date: number
+}
+
 export interface ExposureReference {
   id: string
   kind: 'statutory_maximum' | 'enforcement_case' | 'direct_cost'
+  applies_to?: 'all' | 'fca_regulated'
   label: string
   summary: string
   source: string
@@ -475,7 +519,7 @@ export interface Exposure {
 export interface EvidenceEntry {
   seq: number
   recorded_at: string
-  kind: 'snapshot' | 'resolved' | 'regressed'
+  kind: 'snapshot' | 'resolved' | 'regressed' | 'anchor'
   summary: string
   hash: string
   prev_hash: string
@@ -485,7 +529,14 @@ export interface EvidenceLog {
   entries: EvidenceEntry[]
   total_recorded: number
   statement: string
-  verification?: { intact: boolean; entries_checked: number; broken_at: number | null }
+  anchors?: number
+  verification?: {
+    intact: boolean
+    entries_checked: number
+    broken_at: number | null
+    anchors?: number
+    last_anchored_at?: string | null
+  }
 }
 
 export interface ComplianceReport {
@@ -508,6 +559,7 @@ export interface Incident {
   chain: { service: string; time: string | null; detail: string }[]
   regulatory_impact: { framework: string; reference: string; why: string }[]
   operational_impact: { headline: string; points: string[] }
+  service_impact?: ServiceImpact
   remediation: { order: number; action: string; command: string | null }[]
 }
 
@@ -661,13 +713,19 @@ export const MOCK_COMPLIANCE: ComplianceReport = {
 }
 
 export const MOCK_EVIDENCE: EvidenceLog = {
-  total_recorded: 5,
+  total_recorded: 6,
+  anchors: 1,
   statement:
     'Each entry is chained to the one before it with SHA-256, so any later edit to a stored entry ' +
-    'breaks every hash after it. This is a tamper-evident record kept by TekWatch. It is not a ' +
-    'third-party notarised timestamp.',
-  verification: { intact: true, entries_checked: 5, broken_at: null },
+    'breaks every hash after it. Once a day the head of the chain is sent to an independent ' +
+    'timestamping authority, which returns a signed RFC 3161 token proving the chain existed at ' +
+    'that time. You can check a token yourself with openssl, without TekWatch.',
+  verification: { intact: true, entries_checked: 6, broken_at: null, anchors: 1, last_anchored_at: hoursAgo(4) },
   entries: [
+    { seq: 6, recorded_at: hoursAgo(4), kind: 'anchor',
+      summary: 'Chain anchored with an independent timestamp from https://freetsa.org/tsr',
+      hash: '1c7e4a9b2f0d6853ae1b4c7d9f2036a5c8e1b4d7f0a3c6e9b2d5f8a1c4e7b0d3',
+      prev_hash: '9f2c41ab6d0e77b2c4f1a8e3d5b0c6971e2a4d8f3b7c5e1a9d0f6b2c8e4a7d31' },
     { seq: 5, recorded_at: minsAgo(6), kind: 'snapshot', summary: 'Compliance assessment: 9 passed, 3 failed',
       hash: '9f2c41ab6d0e77b2c4f1a8e3d5b0c6971e2a4d8f3b7c5e1a9d0f6b2c8e4a7d31', prev_hash: '4b7e0c2a9d1f6538e7c4b0a2d9f31e68c5a7b4d2f0e916c3a8d5b7f1e2c4a609' },
     { seq: 4, recorded_at: hoursAgo(5), kind: 'resolved', summary: 'S3-02 now passes: S3 buckets encrypt what they store',
@@ -678,6 +736,35 @@ export const MOCK_EVIDENCE: EvidenceLog = {
       hash: '72c5e0a9b3d1f846207e5c3a9d0b6f184e2a7c5d3b0f916e8a4d2c7b5f1e3a08', prev_hash: '0a3f7d2c8b5e19406d3a7f2c9b0e5184d7a3c0f6b2e918d5a7c4f0b3e6d2a915' },
     { seq: 1, recorded_at: hoursAgo(53), kind: 'snapshot', summary: 'Compliance assessment: 9 passed, 3 failed',
       hash: '0a3f7d2c8b5e19406d3a7f2c9b0e5184d7a3c0f6b2e918d5a7c4f0b3e6d2a915', prev_hash: '0000000000000000000000000000000000000000000000000000000000000000' },
+  ],
+}
+
+export const MOCK_CALENDAR: RegulatoryCalendar = {
+  generated_at: minsAgo(1),
+  overdue: 0,
+  due_within_14_days: 2,
+  awaiting_your_date: 1,
+  entries: [
+    { id: 'ico-72h:s3-exposure:acme-marketing-assets', kind: 'deadline',
+      title: 'Decide whether the ICO must be told about acme-marketing-assets',
+      due_at: hoursAhead(69), days_remaining: 2, overdue: false, urgency: 'soon',
+      detail: 'Article 33 gives you 72 hours from becoming aware of a personal data breach to tell the ICO, unless it is unlikely to risk people\'s rights. If no personal data was exposed, record that decision and why.',
+      framework: 'UK GDPR',
+      source: 'https://ico.org.uk/for-organisations/report-a-breach/personal-data-breach/',
+      action: 'Check what was in it, decide, and write the decision down either way.' },
+    { id: 'cert-expiry:arn:cert', kind: 'expiry', title: 'TLS certificate for app.acme.co.uk expires',
+      due_at: daysAhead(11), days_remaining: 11, overdue: false, urgency: 'soon',
+      detail: 'An expired certificate stops the service and breaks encryption in transit. Certificates issued by ACM renew themselves only while the validation records are still in place.',
+      framework: 'UK GDPR', source: null,
+      action: 'Confirm the DNS validation records still exist so ACM can renew it.' },
+    { id: 'renewal:cyber_essentials_expires_at', kind: 'renewal', title: 'Cyber Essentials certification expires',
+      due_at: daysAhead(96), days_remaining: 96, overdue: false, urgency: 'scheduled',
+      detail: 'Certification lasts twelve months. Most buyers who ask for it check the date.',
+      framework: 'Cyber Essentials', source: null, action: null },
+    { id: 'renewal:ico_fee_due_at', kind: 'renewal', title: 'ICO data protection fee due',
+      due_at: null, days_remaining: null, overdue: false, urgency: 'unknown',
+      detail: 'Most organisations that process personal data must pay the ICO every year. Add your date and TekWatch will track it.',
+      framework: 'UK GDPR', source: null, action: 'Set the date on your profile.' },
   ],
 }
 
@@ -700,6 +787,15 @@ export const MOCK_INCIDENTS: Incident[] = [
       { framework: 'UK GDPR', reference: 'Art. 33 Notification of a personal data breach', why: 'If this bucket holds personal data and was accessed while exposed, the ICO must be told within 72 hours of you becoming aware, unless the breach is unlikely to result in a risk to individuals.' },
       { framework: 'Cyber Essentials', reference: 'Secure configuration', why: 'Cloud storage must not be left reachable by the public by default.' },
     ],
+    service_impact: {
+      total: 1,
+      summary: 'Also affected: it is published to the internet by CloudFront distribution cdn.acme.co.uk.',
+      serves: [{ key: 'cloudfront:E1ACME', service: 'cloudfront', resource_id: 'E1ACME',
+                 name: 'cdn.acme.co.uk', region: 'global', relationship: 'serves', confidence: 'direct',
+                 why: 'This distribution serves acme-marketing-assets as an origin.' }],
+      reachable_from: [],
+      runs_in: [],
+    },
     operational_impact: {
       headline: 'Public access is no longer prevented on acme-marketing-assets',
       points: [
@@ -725,6 +821,9 @@ export function getMockCostSummary(timeRange: TimeRange) {
     mtd_total: 2891.40,
     last_month_total: 4247.80,
     forecasted_monthly: 4180.00,
+    // What AWS bills the account in. The sample account is billed in dollars,
+    // the way most AWS accounts are, and the page follows the data.
+    currency: 'USD',
     daily_costs: genDailyCosts(timeRange, 142, 28, 77),
   }
 }

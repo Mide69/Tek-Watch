@@ -17,9 +17,10 @@ line per change. Both are small.
 import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
-from services import compliance, evidence, exposure
+from config import load_config
+from services import compliance, evidence, exposure, timestamping
 from services.dynamodb import DynamoDBService
 from services.timestream import TimestreamQueryService
 
@@ -30,19 +31,76 @@ STARTUP_DELAY_SECONDS = 180
 # A snapshot at least this often even when nothing changes, so the log shows a
 # continuous record of assessment rather than gaps an assessor has to ask about.
 SNAPSHOT_MAX_AGE = timedelta(hours=24)
+# How often the chain is anchored to an independent timestamp. Daily is enough
+# to prove when a week's worth of entries existed, and leaves the authority
+# alone the rest of the time.
+ANCHOR_MAX_AGE = timedelta(hours=24)
 
 
-def _due_for_snapshot(head: Dict[str, Any], now: datetime) -> bool:
-    last = (head.get("last_snapshot") or {}).get("recorded_at")
-    if not last:
+def _older_than(value: Any, age: timedelta, now: datetime) -> bool:
+    """True when the stored time is missing, unreadable, or older than age."""
+    if not value:
         return True
     try:
-        when = datetime.fromisoformat(str(last).replace("Z", "+00:00"))
+        when = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
         return True
     if not when.tzinfo:
         when = when.replace(tzinfo=timezone.utc)
-    return now - when >= SNAPSHOT_MAX_AGE
+    return now - when >= age
+
+
+def _due_for_snapshot(head: Dict[str, Any], now: datetime) -> bool:
+    return _older_than((head.get("last_snapshot") or {}).get("recorded_at"), SNAPSHOT_MAX_AGE, now)
+
+
+def _due_for_anchor(head: Dict[str, Any], now: datetime) -> bool:
+    return _older_than(head.get("last_anchor_at"), ANCHOR_MAX_AGE, now)
+
+
+def _stamp_for(prev_hash: str, now: datetime) -> Optional[Dict[str, Any]]:
+    """The configured authority's token for this hash, or None.
+
+    Separated so a test never reaches an outside service by accident, and so
+    anchoring can be switched off with an empty TSA_URL.
+    """
+    url = load_config().tsa_url
+    if not url:
+        return None
+    return timestamping.stamp(prev_hash, url=url, now=now)
+
+
+def _anchor(
+    customer_id: str,
+    db_service: DynamoDBService,
+    seq: int,
+    prev_hash: str,
+    now: datetime,
+) -> Tuple[int, str, int]:
+    """Ask an authority to timestamp the head of the chain, and record it.
+
+    Best effort on purpose. If the authority is unreachable the log carries on
+    unanchored and tries again tomorrow, because evidence must not depend on
+    somebody else's uptime.
+    """
+    if prev_hash == evidence.GENESIS:
+        return seq, prev_hash, 0          # nothing to anchor yet
+    stamp = _stamp_for(prev_hash, now)
+    if not stamp:
+        return seq, prev_hash, 0
+
+    seq += 1
+    entry = evidence.build_entry(
+        prev_hash=prev_hash,
+        seq=seq,
+        kind=evidence.ANCHOR,
+        summary=f"Chain anchored with an independent timestamp from {stamp['authority']}",
+        body=evidence.anchor_body(stamp),
+        now=now,
+    )
+    if not db_service.append_evidence(customer_id, entry, last_anchor_at=entry["recorded_at"]):
+        return seq - 1, prev_hash, 0
+    return seq, entry["hash"], 1
 
 
 def record_for_customer(
@@ -94,7 +152,11 @@ def record_for_customer(
             entry,
             last_snapshot={"recorded_at": entry["recorded_at"], "seq": seq, "body": body},
         ):
-            written += 1
+            prev_hash, written = entry["hash"], written + 1
+
+    if _due_for_anchor(head, now):
+        _, _, anchored = _anchor(customer_id, db_service, seq, prev_hash, now)
+        written += anchored
 
     return written
 
