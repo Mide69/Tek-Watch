@@ -10,7 +10,9 @@ from fastapi import APIRouter, Depends, HTTPException, Path, Query, Response, st
 from pydantic import BaseModel, field_validator
 
 from auth.dependencies import CustomerContext, get_current_customer
-from services import calendar, compliance, correlation, evidence, evidence_recorder, exposure, topology
+from services import (
+    calendar, compliance, correlation, evidence, evidence_recorder, exposure, timestamping, topology,
+)
 from services.dynamodb import DynamoDBService
 from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
@@ -257,7 +259,8 @@ async def get_evidence(
     return {
         "entries": entries,
         "total_recorded": head.get("seq", 0),
-        "statement": evidence.STATEMENT,
+        "anchors": sum(1 for e in entries if e.get("kind") == evidence.ANCHOR),
+        "statement": evidence.statement_for(entries),
     }
 
 
@@ -292,6 +295,13 @@ async def export_evidence(
             entry.get("hash"),
             entry.get("prev_hash"),
         ])
+    # The verification note rides with the file: an auditor who has only the
+    # CSV should be able to check an anchor without coming back to us.
+    writer.writerow([])
+    writer.writerow(["How to check this record"])
+    writer.writerow([evidence.statement_for(entries)])
+    writer.writerow([timestamping.VERIFY_INSTRUCTIONS])
+
     filename = f"tekwatch-compliance-evidence-{customer.customer_id}.csv"
     return Response(
         content=buffer.getvalue(),

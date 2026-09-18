@@ -519,7 +519,7 @@ export interface Exposure {
 export interface EvidenceEntry {
   seq: number
   recorded_at: string
-  kind: 'snapshot' | 'resolved' | 'regressed'
+  kind: 'snapshot' | 'resolved' | 'regressed' | 'anchor'
   summary: string
   hash: string
   prev_hash: string
@@ -529,7 +529,14 @@ export interface EvidenceLog {
   entries: EvidenceEntry[]
   total_recorded: number
   statement: string
-  verification?: { intact: boolean; entries_checked: number; broken_at: number | null }
+  anchors?: number
+  verification?: {
+    intact: boolean
+    entries_checked: number
+    broken_at: number | null
+    anchors?: number
+    last_anchored_at?: string | null
+  }
 }
 
 export interface ComplianceReport {
@@ -706,13 +713,19 @@ export const MOCK_COMPLIANCE: ComplianceReport = {
 }
 
 export const MOCK_EVIDENCE: EvidenceLog = {
-  total_recorded: 5,
+  total_recorded: 6,
+  anchors: 1,
   statement:
     'Each entry is chained to the one before it with SHA-256, so any later edit to a stored entry ' +
-    'breaks every hash after it. This is a tamper-evident record kept by TekWatch. It is not a ' +
-    'third-party notarised timestamp.',
-  verification: { intact: true, entries_checked: 5, broken_at: null },
+    'breaks every hash after it. Once a day the head of the chain is sent to an independent ' +
+    'timestamping authority, which returns a signed RFC 3161 token proving the chain existed at ' +
+    'that time. You can check a token yourself with openssl, without TekWatch.',
+  verification: { intact: true, entries_checked: 6, broken_at: null, anchors: 1, last_anchored_at: hoursAgo(4) },
   entries: [
+    { seq: 6, recorded_at: hoursAgo(4), kind: 'anchor',
+      summary: 'Chain anchored with an independent timestamp from https://freetsa.org/tsr',
+      hash: '1c7e4a9b2f0d6853ae1b4c7d9f2036a5c8e1b4d7f0a3c6e9b2d5f8a1c4e7b0d3',
+      prev_hash: '9f2c41ab6d0e77b2c4f1a8e3d5b0c6971e2a4d8f3b7c5e1a9d0f6b2c8e4a7d31' },
     { seq: 5, recorded_at: minsAgo(6), kind: 'snapshot', summary: 'Compliance assessment: 9 passed, 3 failed',
       hash: '9f2c41ab6d0e77b2c4f1a8e3d5b0c6971e2a4d8f3b7c5e1a9d0f6b2c8e4a7d31', prev_hash: '4b7e0c2a9d1f6538e7c4b0a2d9f31e68c5a7b4d2f0e916c3a8d5b7f1e2c4a609' },
     { seq: 4, recorded_at: hoursAgo(5), kind: 'resolved', summary: 'S3-02 now passes: S3 buckets encrypt what they store',

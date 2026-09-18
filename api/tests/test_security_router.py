@@ -107,7 +107,9 @@ async def test_evidence_endpoint_returns_entries_and_the_honest_statement():
         result = await security.get_evidence(limit=50, customer=CTX)
     assert result["entries"][0]["seq"] == 2
     assert result["total_recorded"] == 2
-    assert "not a third-party notarised timestamp" in result["statement"]
+    # A log with no anchor yet must not borrow the claim that it has one.
+    assert result["anchors"] == 0
+    assert "has not been anchored" in result["statement"]
 
 
 @pytest.mark.asyncio

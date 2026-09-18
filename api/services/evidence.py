@@ -10,11 +10,16 @@ from end to end: change one stored entry and every hash after it stops
 matching. Nobody has to trust our word for it, because verify() recomputes the
 whole chain from the stored bodies.
 
-What this is not: it is not a trusted timestamp from a third party, and it does
-not stop someone with write access from rebuilding the whole chain. Saying
-"cryptographically timestamped" would overstate it. It is tamper-evident, which
-is a real and useful property, and the wording in the payload says exactly
-that and no more.
+Chaining alone proves nobody edited an entry afterwards. It cannot prove when
+an entry was made, because every time in the chain is one we wrote. So once a
+day the head of the chain is sent to an independent RFC 3161 timestamping
+authority and its signed token is recorded as an anchor (see
+services/timestamping.py). From then on the log carries proof of age that does
+not depend on trusting us.
+
+What is still true and worth saying out loud: an anchor proves the chain
+existed at that time, not that our records are correct, and a log with no
+anchors yet says so rather than borrowing the claim.
 """
 from __future__ import annotations
 
@@ -28,12 +33,27 @@ GENESIS = "0" * 64
 SNAPSHOT = "snapshot"       # the compliance position at a point in time
 RESOLVED = "resolved"       # a control that was failing now passes
 REGRESSED = "regressed"     # a control that was passing now fails
+ANCHOR = "anchor"           # an independent timestamp over the chain so far
 
 STATEMENT = (
     "Each entry is chained to the one before it with SHA-256, so any later edit to a "
-    "stored entry breaks every hash after it. This is a tamper-evident record kept by "
-    "TekWatch. It is not a third-party notarised timestamp."
+    "stored entry breaks every hash after it. Once a day the head of the chain is sent to "
+    "an independent timestamping authority, which returns a signed RFC 3161 token proving "
+    "the chain existed at that time. You can check a token yourself with openssl, without "
+    "TekWatch."
 )
+
+# Said instead when a log has no anchors yet, so nothing claims proof it lacks.
+STATEMENT_WITHOUT_ANCHORS = (
+    "Each entry is chained to the one before it with SHA-256, so any later edit to a "
+    "stored entry breaks every hash after it. This log has not been anchored to an "
+    "independent timestamp yet; anchoring runs daily."
+)
+
+
+def statement_for(entries: List[Dict[str, Any]]) -> str:
+    """The wording this particular log has earned."""
+    return STATEMENT if any(e.get("kind") == ANCHOR for e in entries) else STATEMENT_WITHOUT_ANCHORS
 
 
 def canonical(body: Dict[str, Any]) -> str:
@@ -67,9 +87,23 @@ def build_entry(
     }
 
 
+def anchor_body(stamp: Dict[str, Any]) -> Dict[str, Any]:
+    """What is kept from a timestamp token, so it can be checked later."""
+    return {
+        "anchored_hash": stamp.get("anchored_hash"),
+        "authority": stamp.get("authority"),
+        "requested_at": stamp.get("requested_at"),
+        "nonce": stamp.get("nonce"),
+        "token_sha256": stamp.get("token_sha256"),
+        "token_b64": stamp.get("token_b64"),
+        "verify": stamp.get("verify"),
+    }
+
+
 def verify(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
     """Recompute the chain. Returns where it breaks, if it breaks."""
     ordered = sorted(entries, key=lambda e: int(e.get("seq", 0)))
+    anchors = [e for e in ordered if e.get("kind") == ANCHOR]
     prev = GENESIS
     for entry in ordered:
         expected = entry_hash(
@@ -84,15 +118,25 @@ def verify(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "intact": False,
                 "entries_checked": len(ordered),
                 "broken_at": entry.get("seq"),
-                "statement": STATEMENT,
+                "anchors": len(anchors),
+                "last_anchored_at": _last_anchor_time(anchors),
+                "statement": statement_for(ordered),
             }
         prev = str(entry["hash"])
     return {
         "intact": True,
         "entries_checked": len(ordered),
         "broken_at": None,
-        "statement": STATEMENT,
+        "anchors": len(anchors),
+        "last_anchored_at": _last_anchor_time(anchors),
+        "statement": statement_for(ordered),
     }
+
+
+def _last_anchor_time(anchors: List[Dict[str, Any]]) -> Optional[str]:
+    if not anchors:
+        return None
+    return str(anchors[-1].get("recorded_at"))
 
 
 def _statuses(report: Dict[str, Any]) -> Dict[str, str]:

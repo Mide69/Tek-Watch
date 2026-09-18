@@ -262,10 +262,11 @@ function ExposureCard({ exposure }: { exposure: Exposure }) {
   )
 }
 
-const EVIDENCE_KIND: Record<string, { label: string; variant: 'success' | 'error' | 'info' }> = {
+const EVIDENCE_KIND: Record<string, { label: string; variant: 'success' | 'error' | 'info' | 'default' }> = {
   resolved: { label: 'RESOLVED', variant: 'success' },
   regressed: { label: 'REGRESSED', variant: 'error' },
   snapshot: { label: 'ASSESSED', variant: 'info' },
+  anchor: { label: 'TIMESTAMPED', variant: 'default' },
 }
 
 /** The audit trail: what was assessed, what changed, and proof it is unedited. */
@@ -318,6 +319,11 @@ function EvidenceCard({ evidence }: { evidence: EvidenceLog }) {
                   : `BROKEN AT ENTRY ${verification.broken_at}`}
               </Badge>
             )}
+            {verification?.anchors ? (
+              <Badge variant="info">
+                TIMESTAMPED {verification.last_anchored_at ? formatRelativeTime(verification.last_anchored_at) : ''}
+              </Badge>
+            ) : null}
             <button
               onClick={download}
               disabled={downloading || evidence.entries.length === 0}
