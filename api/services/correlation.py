@@ -27,6 +27,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from services.compliance import bool_metric
+from services import topology
 from services.inventory_view import dim, flag, num
 
 S3_ACCESS_EVENTS = frozenset({
@@ -485,7 +486,40 @@ def _root_login_incidents(
     }]
 
 
-def correlate(inventory: Dict[str, List[Dict[str, Any]]], now: Optional[datetime] = None) -> List[Dict[str, Any]]:
+# Which service an incident's affected resource belongs to, in the graph's
+# vocabulary. The affected list is written for a reader ("S3"), the graph is
+# keyed the way the agent reports ("s3").
+_GRAPH_SERVICE = {"S3": "s3", "RDS": "rds", "EC2": "ec2", "LAMBDA": "lambda"}
+
+
+def _attach_service_impact(incidents: List[Dict[str, Any]], graph: topology.Graph) -> None:
+    """Say what else each incident reaches, using the customer's own graph.
+
+    An incident about one bucket is really an incident about everything that
+    bucket is wired to. Until this existed the product could name the resource
+    that changed and nothing else, which is the gap between an alert and an
+    impact assessment.
+    """
+    for incident in incidents:
+        found = {"serves": [], "reachable_from": [], "runs_in": [], "total": 0, "summary": ""}
+        for affected in incident.get("affected", []):
+            service = _GRAPH_SERVICE.get(str(affected.get("service", "")).upper())
+            if not service:
+                continue
+            result = topology.impact(graph, topology.key_for(service, str(affected.get("resource"))))
+            if not result.get("resource"):
+                continue
+            for field in ("serves", "reachable_from", "runs_in"):
+                found[field].extend(result[field])
+            found["total"] += result["total"]
+            found["summary"] = topology.summarise(result)
+        incident["service_impact"] = found
+
+
+def correlate(
+    inventory: Dict[str, List[Dict[str, Any]]],
+    now: Optional[datetime] = None,
+) -> List[Dict[str, Any]]:
     """Every correlated incident, most severe and most recent first."""
     now = now or datetime.now(timezone.utc)
     cloudtrail = inventory.get("cloudtrail", [])
@@ -496,15 +530,14 @@ def correlate(inventory: Dict[str, List[Dict[str, Any]]], now: Optional[datetime
         + _root_login_incidents(inventory.get("iam", []), events)
         + _logging_off_incidents(cloudtrail, events)
     )
+    _attach_service_impact(incidents, topology.build(inventory))
     rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
     incidents.sort(key=lambda i: (rank.get(i["severity"], 9), not i["correlated"], i["id"]))
     return incidents
 
 
 def load_inventory(ts: Any, customer_id: str) -> Dict[str, List[Dict[str, Any]]]:
-    return {
-        "s3": ts.get_service_inventory(customer_id, "s3", "24h"),
-        "rds": ts.get_service_inventory(customer_id, "rds", "24h"),
-        "iam": ts.get_service_inventory(customer_id, "iam", "24h"),
-        "cloudtrail": ts.get_service_inventory(customer_id, "cloudtrail", CLOUDTRAIL_WINDOW),
-    }
+    services = {"s3", "rds", "iam", *topology.TOPOLOGY_SERVICES}
+    inventory = {svc: ts.get_service_inventory(customer_id, svc, "24h") for svc in sorted(services)}
+    inventory["cloudtrail"] = ts.get_service_inventory(customer_id, "cloudtrail", CLOUDTRAIL_WINDOW)
+    return inventory

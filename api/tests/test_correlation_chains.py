@@ -4,7 +4,7 @@ The S3 and audit-logging chains are covered in test_correlation.py.
 """
 from datetime import datetime, timedelta, timezone
 
-from services import correlation
+from services import correlation, topology
 
 NOW = datetime(2026, 9, 12, 12, 0, tzinfo=timezone.utc)
 
@@ -179,4 +179,7 @@ def test_load_inventory_reads_the_services_the_chains_need():
             return []
 
     correlation.load_inventory(FakeTS(), "TT-1")
-    assert set(asked) == {"s3", "rds", "iam", "cloudtrail"}
+    # The four the chains read, plus whatever the dependency graph joins up, so
+    # an incident can say what else the change reaches.
+    assert {"s3", "rds", "iam", "cloudtrail"} <= set(asked)
+    assert set(topology.TOPOLOGY_SERVICES) <= set(asked)
