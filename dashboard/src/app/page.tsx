@@ -31,7 +31,7 @@ const spendData = spendCurrent.map((v, i) => ({ day: i + 1, spend: v, prevSpend:
 const avgSpend = Math.round(spendCurrent.reduce((s, v) => s + v, 0) / spendCurrent.length)
 const anomalyPoint = spendData[spendData.length - 1]
 
-const scoreData = [{ name: 'score', value: 91, fill: '#818cf8' }]
+const scoreData = [{ name: 'score', value: 91, fill: '#3aa9bb' }]
 
 const complianceFrameworks = [
   { label: 'UK GDPR', status: 'pass' as const },
@@ -49,7 +49,7 @@ const serviceCostData = [
 ]
 const maxServiceCost = Math.max(...serviceCostData.map(d => d.cost))
 
-const SERVICE_COLORS = ['#818cf8', '#a78bfa', '#38bdf8', '#fbbf24', '#f97316', '#34d399']
+const SERVICE_COLORS = ['#3aa9bb', '#a78bfa', '#38bdf8', '#fbbf24', '#f97316', '#34d399']
 const DONUT_R = 62, DONUT_CX = 78, DONUT_CY = 78
 const donutCirc = 2 * Math.PI * DONUT_R
 const donutTotal = serviceCostData.reduce((s, d) => s + d.cost, 0)
@@ -399,14 +399,14 @@ function HeroFlow() {
         <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 15 minutes</span>
       </div>
       <svg viewBox="0 0 640 332" className="w-full h-auto" role="img" aria-label="Your AWS account sends read-only data to the TekWatch agent, which feeds anomaly detection, compliance checks and incident correlation">
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#a5b4fc" strokeWidth={1.5} />
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#4f46e5" strokeWidth={1.5} className="animate-flow" />
+        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#78ccd8" strokeWidth={1.5} />
+        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#17707f" strokeWidth={1.5} className="animate-flow" />
         {outputs.map(o => {
           const d = `M${bx + bw} ${cy} C ${bx + bw + 30} ${cy}, ${ox - 30} ${o.y + 28}, ${ox} ${o.y + 28}`
           return (
             <g key={o.title}>
-              <path d={d} fill="none" stroke="#a5b4fc" strokeWidth={1.5} />
-              <path d={d} fill="none" stroke="#4f46e5" strokeWidth={1.5} className="animate-flow" />
+              <path d={d} fill="none" stroke="#78ccd8" strokeWidth={1.5} />
+              <path d={d} fill="none" stroke="#17707f" strokeWidth={1.5} className="animate-flow" />
             </g>
           )
         })}
@@ -779,9 +779,9 @@ export default function LandingPage() {
                         <AreaChart data={spendData} margin={{ top: 14, right: 60, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#818cf8" stopOpacity={0.2} />
-                              <stop offset="60%" stopColor="#818cf8" stopOpacity={0.04} />
-                              <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                              <stop offset="0%" stopColor="#3aa9bb" stopOpacity={0.2} />
+                              <stop offset="60%" stopColor="#3aa9bb" stopOpacity={0.04} />
+                              <stop offset="100%" stopColor="#3aa9bb" stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
@@ -796,9 +796,9 @@ export default function LandingPage() {
                           <ReferenceLine y={avgSpend} stroke="rgba(255,255,255,0.18)" strokeDasharray="3 3" />
                           <Area type="monotone" dataKey="prevSpend" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3"
                             fill="none" dot={false} activeDot={{ r: 3, fill: '#64748b', stroke: '#0e1525', strokeWidth: 1.5 }} />
-                          <Area type="monotone" dataKey="spend" stroke="#818cf8" strokeWidth={2}
+                          <Area type="monotone" dataKey="spend" stroke="#3aa9bb" strokeWidth={2}
                             fill="url(#spendFill)" dot={false}
-                            activeDot={{ r: 4, fill: '#818cf8', stroke: '#0e1525', strokeWidth: 2 }} />
+                            activeDot={{ r: 4, fill: '#3aa9bb', stroke: '#0e1525', strokeWidth: 2 }} />
                           <ReferenceDot
                             x={anomalyPoint.day} y={anomalyPoint.spend} r={5}
                             fill="#fbbf24" stroke="#0e1525" strokeWidth={2}
@@ -845,7 +845,7 @@ export default function LandingPage() {
                         <Tooltip contentStyle={TIP_STY} formatter={(v: number) => [`£${v}`, 'Cost']} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                         <Bar dataKey="cost" radius={[0, 4, 4, 0]} barSize={14}>
                           {serviceCostData.map((d, i) => (
-                            <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#818cf8'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.7} />
+                            <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#3aa9bb'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.7} />
                           ))}
                         </Bar>
                       </BarChart>

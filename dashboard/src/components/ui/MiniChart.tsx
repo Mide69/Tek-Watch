@@ -4,7 +4,7 @@ interface SparkPoint { value: number }
 
 export function Sparkline({
   data,
-  color = '#6366f1',
+  color = '#1f8c9e',
   height = 36,
   filled = true,
 }: {

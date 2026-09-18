@@ -565,7 +565,7 @@ export interface Incident {
 
 export const COMPLIANCE_FRAMEWORK_NAMES: Record<string, string> = {
   uk_gdpr: 'UK GDPR',
-  cyber_essentials: 'Cyber Essentials',
+  cyber_essentials: 'Cyber Essentials v3.3',
   iso27001: 'ISO 27001:2022',
   fca_ps21_3: 'FCA PS21/3 operational resilience',
 }

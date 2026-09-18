@@ -41,7 +41,7 @@ const TOOLTIP_STYLE = {
 }
 
 export default function TimeSeriesChart({
-  data, dataKey = 'value', color = '#6366f1', unit = '',
+  data, dataKey = 'value', color = '#1f8c9e', unit = '',
   height = 240, type = 'area', loading = false, formatValue,
 }: TimeSeriesChartProps) {
   if (loading) {
