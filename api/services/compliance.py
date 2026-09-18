@@ -49,7 +49,19 @@ NOT_APPLICABLE = "not_applicable"
 
 FRAMEWORKS: List[Dict[str, Any]] = [
     {"id": "uk_gdpr", "name": "UK GDPR"},
-    {"id": "cyber_essentials", "name": "Cyber Essentials"},
+    {
+        "id": "cyber_essentials",
+        "name": "Cyber Essentials v3.3",
+        "scope": "cloud_controls_only",
+        "scope_note": (
+            "The cloud side only. From an AWS account TekWatch can evidence firewalls and "
+            "internet gateways, secure configuration, user access control, and the cloud half of "
+            "security update management, such as functions left on retired runtimes. Malware "
+            "protection, and patching on the laptops and phones your people use, are not visible "
+            "to TekWatch and are not assessed here. Version 3.3 applies to assessments from "
+            "27 April 2026 and puts cloud services firmly in scope."
+        ),
+    },
     {"id": "iso27001", "name": "ISO 27001:2022"},
     {
         "id": "fca_ps21_3",

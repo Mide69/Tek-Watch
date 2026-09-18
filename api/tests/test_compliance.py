@@ -384,3 +384,30 @@ class TestTheRestOfTheEstate:
         # The claim in the plan is checkable, so keep it checked.
         assert len(compliance.INVENTORY_SERVICES) == 17
         assert len(compliance.CONTROLS) == 24
+
+
+class TestCyberEssentialsScope:
+    """Naming the version invites the check, so the product must be precise
+    about which of the five controls an AWS account can actually evidence."""
+
+    def test_the_version_assessors_use_is_named(self):
+        fw = framework(compliance.evaluate(healthy_inventory()), "cyber_essentials")
+        assert fw["name"] == "Cyber Essentials v3.3"
+
+    def test_it_says_which_controls_it_cannot_see(self):
+        fw = framework(compliance.evaluate(healthy_inventory()), "cyber_essentials")
+        note = fw["scope_note"].lower()
+        assert "malware protection" in note
+        assert "laptops" in note
+        assert "not assessed here" in note
+
+    def test_the_checks_map_only_to_controls_it_claims_to_cover(self):
+        report = compliance.evaluate(healthy_inventory())
+        referenced = {
+            r["reference"] for c in report["controls"] for r in c["references"]
+            if r["framework"] == "cyber_essentials"
+        }
+        assert referenced <= {
+            "Firewalls and internet gateways", "Secure configuration",
+            "User access control", "Security update management",
+        }
