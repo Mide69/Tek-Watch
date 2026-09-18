@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class CloudFrontCollector(BaseCollector):
     """Collects CloudFront distribution inventory and performance metrics.
 
@@ -58,6 +75,18 @@ class CloudFrontCollector(BaseCollector):
             "enabled": str(enabled),
             "aliases": alias_str,
         }
+        # The origins are the edge that matters most in the graph: a bucket
+        # that looks private from the outside is public if a distribution in
+        # front of it is serving the same objects to the world.
+        origins = _joined([
+            o.get("DomainName") for o in _as_dict(dist.get("Origins")).get("Items", []) or []
+            if isinstance(o, dict)
+        ])
+        if origins:
+            base_dims["origins"] = origins
+        viewer_policy = _as_dict(_as_dict(dist.get("DefaultCacheBehavior"))).get("ViewerProtocolPolicy")
+        if isinstance(viewer_policy, str) and viewer_policy:
+            base_dims["viewer_protocol_policy"] = viewer_policy
 
         records.append(self._make_record(
             resource_type="distribution",

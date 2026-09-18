@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class RDSCollector(BaseCollector):
     """Collects RDS instance inventory and CloudWatch performance metrics."""
 
@@ -60,6 +77,15 @@ class RDSCollector(BaseCollector):
             # database could be.
             "backup_retention_days": db.get("BackupRetentionPeriod", 0),
         }
+        subnet_group = _as_dict(db.get("DBSubnetGroup"))
+        if subnet_group.get("VpcId"):
+            base_dims["vpc_id"] = subnet_group["VpcId"]
+        groups = _joined([
+            g.get("VpcSecurityGroupId") for g in db.get("VpcSecurityGroups", []) or []
+            if isinstance(g, dict)
+        ])
+        if groups:
+            base_dims["security_groups"] = groups
 
         # Inventory record
         records.append(self._make_record(

@@ -92,8 +92,10 @@ async def test_compliance_carries_published_exposure_for_failing_controls():
     assert "not a prediction" in exposure["basis"]
     for item in exposure["items"]:
         assert item["references"], item["control_id"]
-        assert all(r["source"].startswith("https://ico.org.uk") or
-                   r["source"].startswith("https://iasme.co.uk") for r in item["references"])
+        assert all(
+            r["source"].startswith(("https://ico.org.uk", "https://iasme.co.uk", "https://www.fca.org.uk"))
+            for r in item["references"]
+        )
 
 
 @pytest.mark.asyncio

@@ -10,6 +10,23 @@ from collectors.base import BaseCollector, MetricRecord
 
 logger = logging.getLogger(__name__)
 
+
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
 _CW_PERIOD = 300       # 5-minute CloudWatch period
 _CW_STAT = "Average"
 
@@ -67,6 +84,14 @@ class EC2Collector(BaseCollector):
             "vpc_id": instance.get("VpcId", ""),
             "subnet_id": instance.get("SubnetId", ""),
         }
+        # What the instance can talk to, and what can talk to it. Without this
+        # there is no way to say which other resources a change reaches.
+        groups = _joined([
+            g.get("GroupId") for g in instance.get("SecurityGroups", []) or []
+            if isinstance(g, dict)
+        ])
+        if groups:
+            base_dims["security_groups"] = groups
 
         # Inventory record
         records.append(self._make_record(

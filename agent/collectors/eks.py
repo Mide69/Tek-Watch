@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class EKSCollector(BaseCollector):
     """Collects EKS cluster inventory and CloudWatch Container Insights metrics."""
 
@@ -49,6 +66,11 @@ class EKSCollector(BaseCollector):
                 "version": version,
                 "status": status,
             }
+            access = _as_dict(_as_dict(cluster.get("resourcesVpcConfig")))
+            if isinstance(access.get("endpointPublicAccess"), bool):
+                base_dims["endpoint_public_access"] = str(access["endpointPublicAccess"])
+            if access.get("vpcId"):
+                base_dims["vpc_id"] = access["vpcId"]
 
             records.append(self._make_record(
                 resource_type="cluster",

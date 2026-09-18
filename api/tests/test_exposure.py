@@ -111,3 +111,30 @@ class TestEstimate:
 ])
 def test_money_formatting(amount, expected):
     assert exposure._money(amount) == expected
+
+
+class TestFcaCases:
+    """FCA and PRA penalties reach regulated firms only, and the payload has to
+    say so. Showing one to an unregulated SME as its own exposure would be the
+    same dishonesty as inventing a number."""
+
+    def test_fca_cases_are_marked_as_applying_to_regulated_firms_only(self):
+        for ref_id in ("fca_tsb_2022", "fca_equifax_2023"):
+            assert exposure.REFERENCES[ref_id].applies_to == "fca_regulated"
+
+    def test_ico_cases_and_costs_apply_to_everybody(self):
+        for ref in exposure.REFERENCES.values():
+            if ref.id.startswith("ico_") or ref.kind != exposure.CASE:
+                assert ref.applies_to == "all", ref.id
+
+    def test_the_operational_resilience_case_sits_on_the_resilience_controls(self):
+        for cid in ("RES-01", "RES-02", "RES-03", "RES-04"):
+            assert "fca_tsb_2022" in exposure.CONTROL_EXPOSURE[cid]["references"]
+
+    def test_resilience_failures_now_carry_published_exposure(self):
+        result = exposure.estimate(report(control("RES-02")))
+        assert result["controls_with_published_exposure"] == 1
+        assert result["comparable_enforcement"]["display"] == "£48.65m"
+
+    def test_the_basis_warns_that_fca_cases_are_not_for_everyone(self):
+        assert "do not apply to businesses outside that regime" in exposure.BASIS

@@ -49,6 +49,10 @@ class ElastiCacheCollector(BaseCollector):
             "node_type": node_type,
             "num_nodes": num_nodes,
         }
+        for key, dim_name in (("AtRestEncryptionEnabled", "at_rest_encryption"),
+                              ("TransitEncryptionEnabled", "transit_encryption")):
+            if isinstance(cluster.get(key), bool):
+                base_dims[dim_name] = str(cluster[key])
 
         # Inventory record
         records.append(self._make_record(

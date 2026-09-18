@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class LambdaCollector(BaseCollector):
     """Collects Lambda function inventory and CloudWatch invocation metrics."""
 
@@ -47,6 +64,15 @@ class LambdaCollector(BaseCollector):
             "memory_mb": memory,
             "timeout_seconds": timeout,
         }
+        vpc_config = _as_dict(fn.get("VpcConfig"))
+        if vpc_config.get("VpcId"):
+            base_dims["vpc_id"] = vpc_config["VpcId"]
+        subnets = _joined(vpc_config.get("SubnetIds"))
+        if subnets:
+            base_dims["subnet_ids"] = subnets
+        groups = _joined(vpc_config.get("SecurityGroupIds"))
+        if groups:
+            base_dims["security_groups"] = groups
 
         # Inventory record
         records.append(self._make_record(

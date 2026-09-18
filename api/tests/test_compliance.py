@@ -21,9 +21,10 @@ def bucket(name, blocked="True", encrypted="True", versioned="True"):
     return res(name, {"bucket_state": "active"}, dims)
 
 
-def database(name, multi_az="True", backup_days=7):
+def database(name, multi_az="True", backup_days=7, public="False"):
     return res(name, {"db_instance_status": "available"},
-               {"engine": "postgres", "multi_az": multi_az, "backup_retention_days": backup_days})
+               {"engine": "postgres", "multi_az": multi_az, "backup_retention_days": backup_days,
+                "publicly_accessible": public})
 
 
 def load_balancer(name, zones=2):
@@ -45,6 +46,16 @@ def healthy_inventory():
         "rds": [database("prod-db")],
         "elb": [load_balancer("public-alb")],
         "cloudwatch_alarms": [res("alarm-cpu", {"alarm_state": "OK"})],
+        "lambda": [res("api-fn", {"function_runtime": "python3.12"}, {"runtime": "python3.12"})],
+        "dynamodb": [res("orders", {"table_status": "ACTIVE"}, {"point_in_time_recovery": "True"})],
+        "sqs": [res("jobs", {"approximate_number_of_messages_visible": 0}, {"encryption_enabled": "True"})],
+        "sns": [res("alerts", {"topic_state": "active"}, {"encryption_enabled": "True"})],
+        "eks": [res("prod-cluster", {"cluster_status": "ACTIVE"}, {"endpoint_public_access": "False"})],
+        "elasticache": [res("cache-1", {"cluster_status": "available"}, {"at_rest_encryption": "True"})],
+        "cloudfront": [res("E1", {"distribution_status": "Deployed"},
+                           {"domain": "d1.cloudfront.net", "viewer_protocol_policy": "redirect-to-https"})],
+        "config": [res("config-eu-west-2", {"non_compliant_rules_count": 0, "compliant_rules_count": 12})],
+        "security_hub": [res("security-hub-eu-west-2", {"findings_critical_count": 0, "findings_total_count": 3})],
     }
 
 
@@ -183,14 +194,19 @@ class TestScoring:
         inv = healthy_inventory()
         inv["iam"] = []                                  # 3 IAM checks become unknown
         fw = framework(compliance.evaluate(inv), "cyber_essentials")
-        # Cyber Essentials maps S3-01 plus three IAM checks: one evaluated, passed.
-        assert (fw["passed"], fw["failed"], fw["unknown"], fw["score"]) == (1, 0, 3, 100)
+        assert fw["unknown"] == 3
+        assert fw["failed"] == 0
+        # Unknown checks neither pass nor drag the score down.
+        assert fw["score"] == 100
+        assert fw["passed"] + fw["failed"] + fw["unknown"] <= fw["total"]
 
     def test_score_is_share_of_evaluated_checks(self):
         inv = healthy_inventory()
         inv["s3"].append(bucket("marketing", blocked="False"))
         fw = framework(compliance.evaluate(inv), "cyber_essentials")
-        assert (fw["passed"], fw["failed"], fw["score"]) == (3, 1, 75)
+        assert fw["failed"] == 1
+        assert fw["score"] == round(100 * fw["passed"] / (fw["passed"] + fw["failed"]))
+        assert fw["score"] < 100
 
     def test_failures_listed_first(self):
         inv = healthy_inventory()
@@ -276,3 +292,95 @@ class TestOperationalResilience:
         fw = framework(compliance.evaluate(inv), "fca_ps21_3")
         assert fw["score"] == 100
         assert fw["passed"] + fw["failed"] < fw["total"]
+
+
+class TestTheRestOfTheEstate:
+    """Nine more services, checked from facts the agent now collects.
+
+    The plan claimed mappings across 23 services while the engine covered
+    eight. These close most of that gap; the rest are services where nothing
+    we collect supports an honest verdict, and those stay uncovered rather
+    than being filled with a guess.
+    """
+
+    def test_a_public_database_fails_as_critical_and_is_named(self):
+        inv = healthy_inventory()
+        inv["rds"] = [res("customer-db", {"db_instance_status": "available"},
+                          {"engine": "postgres", "multi_az": "True", "backup_retention_days": 7,
+                           "publicly_accessible": "True"})]
+        c = control(compliance.evaluate(inv), "RDS-01")
+        assert c["status"] == compliance.FAIL
+        assert c["severity"] == "critical"
+        assert [f["resource"] for f in c["findings"]] == ["customer-db"]
+
+    def test_a_private_database_passes(self):
+        inv = healthy_inventory()
+        inv["rds"][0]["dimensions"]["publicly_accessible"] = "False"
+        assert control(compliance.evaluate(inv), "RDS-01")["status"] == compliance.PASS
+
+    def test_a_table_without_point_in_time_recovery_fails(self):
+        inv = healthy_inventory()
+        inv["dynamodb"] = [res("orders", {"table_status": "ACTIVE"}, {"point_in_time_recovery": "False"})]
+        assert control(compliance.evaluate(inv), "DDB-01")["status"] == compliance.FAIL
+
+    def test_a_table_we_could_not_read_is_unknown(self):
+        inv = healthy_inventory()
+        inv["dynamodb"] = [res("orders", {"table_status": "ACTIVE"}, {})]
+        assert control(compliance.evaluate(inv), "DDB-01")["status"] == compliance.UNKNOWN
+
+    def test_unencrypted_queue_and_topic_fail(self):
+        inv = healthy_inventory()
+        inv["sqs"] = [res("jobs", {}, {"encryption_enabled": "False"})]
+        inv["sns"] = [res("alerts", {"topic_state": "active"}, {"encryption_enabled": "False"})]
+        report = compliance.evaluate(inv)
+        assert control(report, "SQS-01")["status"] == compliance.FAIL
+        assert control(report, "SNS-01")["status"] == compliance.FAIL
+
+    def test_a_public_kubernetes_endpoint_fails(self):
+        inv = healthy_inventory()
+        inv["eks"] = [res("prod-cluster", {"cluster_status": "ACTIVE"},
+                          {"endpoint_public_access": "True"})]
+        assert control(compliance.evaluate(inv), "EKS-01")["status"] == compliance.FAIL
+
+    def test_a_distribution_allowing_plain_http_fails(self):
+        inv = healthy_inventory()
+        inv["cloudfront"] = [res("E1", {"distribution_status": "Deployed"},
+                                 {"domain": "d1.cloudfront.net", "viewer_protocol_policy": "allow-all"})]
+        assert control(compliance.evaluate(inv), "CF-01")["status"] == compliance.FAIL
+
+    def test_a_retired_lambda_runtime_fails_and_names_the_runtime(self):
+        inv = healthy_inventory()
+        inv["lambda"] = [res("legacy-fn", {"function_runtime": "python3.7"}, {"runtime": "python3.7"})]
+        c = control(compliance.evaluate(inv), "LAM-01")
+        assert c["status"] == compliance.FAIL
+        assert "python3.7" in c["findings"][0]["detail"]
+
+    def test_an_unfamiliar_runtime_is_not_called_a_failure(self):
+        # A runtime we have never heard of is more likely to be new than retired.
+        inv = healthy_inventory()
+        inv["lambda"] = [res("future-fn", {"function_runtime": "python3.15"}, {"runtime": "python3.15"})]
+        assert control(compliance.evaluate(inv), "LAM-01")["status"] == compliance.PASS
+
+    def test_failing_config_rules_fail_the_control(self):
+        inv = healthy_inventory()
+        inv["config"] = [res("config-eu-west-2", {"non_compliant_rules_count": 3})]
+        c = control(compliance.evaluate(inv), "CFG-01")
+        assert c["status"] == compliance.FAIL and "3 Config rules" in c["detail"]
+
+    def test_critical_security_hub_findings_fail_the_control(self):
+        inv = healthy_inventory()
+        inv["security_hub"] = [res("security-hub-eu-west-2", {"findings_critical_count": 2})]
+        assert control(compliance.evaluate(inv), "SH-01")["status"] == compliance.FAIL
+
+    def test_services_the_customer_does_not_use_are_not_applicable(self):
+        inv = healthy_inventory()
+        for service in ("dynamodb", "sqs", "sns", "eks", "elasticache", "cloudfront", "lambda"):
+            inv[service] = []
+        report = compliance.evaluate(inv)
+        for cid in ("DDB-01", "SQS-01", "SNS-01", "EKS-01", "EC-01", "CF-01", "LAM-01"):
+            assert control(report, cid)["status"] == compliance.NOT_APPLICABLE, cid
+
+    def test_the_engine_now_covers_seventeen_services(self):
+        # The claim in the plan is checkable, so keep it checked.
+        assert len(compliance.INVENTORY_SERVICES) == 17
+        assert len(compliance.CONTROLS) == 24

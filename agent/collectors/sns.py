@@ -11,6 +11,23 @@ from collectors.base import BaseCollector, MetricRecord
 logger = logging.getLogger(__name__)
 
 
+def _as_dict(value) -> dict:
+    """A response that is really a dict, or an empty one.
+
+    Anything else, including a mock in a test or a partial response, counts as
+    "not collected" so the caller leaves the dimension out.
+    """
+    return value if isinstance(value, dict) else {}
+
+
+def _joined(values, limit: int = 10) -> str:
+    """A list of ids as one dimension value, or "" when there is nothing real."""
+    if not isinstance(values, (list, tuple)):
+        return ""
+    ids = [str(v) for v in values if isinstance(v, (str, int))]
+    return ",".join(ids[:limit])
+
+
 class SNSCollector(BaseCollector):
     """Collects SNS topic inventory and CloudWatch delivery metrics."""
 
@@ -41,16 +58,22 @@ class SNSCollector(BaseCollector):
 
         # Topic attributes
         subscriptions_confirmed = 0
+        encrypted = None
         try:
-            attrs = self._sns.get_topic_attributes(TopicArn=topic_arn).get("Attributes", {})
+            attrs = _as_dict(
+                _as_dict(self._sns.get_topic_attributes(TopicArn=topic_arn)).get("Attributes")
+            )
             subscriptions_confirmed = int(attrs.get("SubscriptionsConfirmed", 0))
-        except (ClientError, EndpointResolutionError):
+            encrypted = bool(attrs.get("KmsMasterKeyId"))
+        except (ClientError, EndpointResolutionError, TypeError, ValueError):
             pass
 
         base_dims = {
             "is_fifo":                  str(is_fifo),
             "subscriptions_count":      subscriptions_confirmed,
         }
+        if encrypted is not None:
+            base_dims["encryption_enabled"] = str(encrypted)
 
         records.append(self._make_record(
             resource_type="topic",

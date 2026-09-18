@@ -74,7 +74,11 @@ DISCLAIMER = (
 # Services the checks read, and how far back to look for their latest state.
 # A day rather than an hour: a compliance view should show the last known
 # state through a short agent gap instead of flipping everything to unknown.
-INVENTORY_SERVICES = ("s3", "iam", "acm", "guardduty", "cloudtrail", "rds", "elb", "cloudwatch_alarms")
+INVENTORY_SERVICES = (
+    "s3", "iam", "acm", "guardduty", "cloudtrail", "rds", "elb", "cloudwatch_alarms",
+    "lambda", "dynamodb", "sqs", "sns", "eks", "elasticache", "cloudfront",
+    "config", "security_hub",
+)
 INVENTORY_WINDOW = "24h"
 
 Inventory = Dict[str, List[Dict[str, Any]]]
@@ -563,6 +567,309 @@ def _alarms_exist(inv: Inventory) -> ControlResult:
     return ControlResult(status=UNKNOWN, detail="Alarms have not been reported yet.", **base)
 
 
+# ── Data stores beyond S3 ─────────────────────────────────────────────────────
+
+def _flag_control(
+    inv: Inventory,
+    service: str,
+    key: str,
+    *,
+    cid: str,
+    title: str,
+    severity: str,
+    noun: str,
+    fail_detail: str,
+    remediation: str,
+    references: List[Dict[str, str]],
+    identify=None,
+    want: bool = True,
+) -> ControlResult:
+    """Pass when every resource of a kind has a boolean dimension set the right way.
+
+    One shape for eight checks. Each still reports which resources failed and
+    keeps the same rule: a flag the agent never sent is unknown, never a pass.
+    """
+    base = dict(id=cid, title=title, severity=severity, remediation=remediation, references=references)
+    resources = [r for r in inv.get(service, []) if (identify is None or identify(r))]
+    if not resources:
+        return ControlResult(status=NOT_APPLICABLE, detail=f"No {noun} reported.", **base)
+
+    failing = [r for r in resources if flag(r, key) is (not want)]
+    unknown = [r for r in resources if flag(r, key) is None]
+    if failing:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(failing)} of {len(resources)} {noun} fail this check.",
+            findings=[{"resource": _name(r), "detail": fail_detail} for r in failing],
+            **base,
+        )
+    if unknown:
+        return ControlResult(
+            status=UNKNOWN,
+            detail=f"This setting has not been reported for {len(unknown)} of {len(resources)} {noun}.",
+            **base,
+        )
+    return ControlResult(status=PASS, detail=f"All {len(resources)} {noun} pass.", **base)
+
+
+def _rds_not_public(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "rds", "publicly_accessible",
+        cid="RDS-01",
+        title="Databases are not reachable from the internet",
+        severity="critical",
+        noun="databases",
+        fail_detail="This database has a public endpoint",
+        remediation=(
+            "Turn off public access: aws rds modify-db-instance --db-instance-identifier "
+            "<id> --no-publicly-accessible --apply-immediately, and reach it through your VPC."
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(b) confidentiality of processing systems"),
+            _ref("cyber_essentials", "Firewalls and internet gateways"),
+            _ref("iso27001", "A.8.20 Network security"),
+        ],
+        identify=lambda r: bool(dim(r, "engine")),
+        want=False,
+    )
+
+
+def _dynamodb_recovery(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "dynamodb", "point_in_time_recovery",
+        cid="DDB-01",
+        title="DynamoDB tables can be restored to a point in time",
+        severity="high",
+        noun="tables",
+        fail_detail="Point-in-time recovery is off",
+        remediation=(
+            "Switch it on: aws dynamodb update-continuous-backups --table-name <name> "
+            "--point-in-time-recovery-specification PointInTimeRecoveryEnabled=true"
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(c) ability to restore availability and access"),
+            _ref("iso27001", "A.8.13 Information backup"),
+            _ref("fca_ps21_3", "Ability to recover data supporting an important business service"),
+        ],
+    )
+
+
+def _sqs_encryption(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "sqs", "encryption_enabled",
+        cid="SQS-01",
+        title="Queues encrypt the messages they hold",
+        severity="medium",
+        noun="queues",
+        fail_detail="Server-side encryption is off",
+        remediation=(
+            "Turn on SQS-managed encryption: aws sqs set-queue-attributes --queue-url <url> "
+            "--attributes SqsManagedSseEnabled=true"
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(a) encryption of personal data"),
+            _ref("iso27001", "A.8.24 Use of cryptography"),
+        ],
+    )
+
+
+def _sns_encryption(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "sns", "encryption_enabled",
+        cid="SNS-01",
+        title="Topics encrypt the messages they carry",
+        severity="medium",
+        noun="topics",
+        fail_detail="Server-side encryption is off",
+        remediation=(
+            "Attach a KMS key: aws sns set-topic-attributes --topic-arn <arn> "
+            "--attribute-name KmsMasterKeyId --attribute-value alias/aws/sns"
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(a) encryption of personal data"),
+            _ref("iso27001", "A.8.24 Use of cryptography"),
+        ],
+    )
+
+
+def _elasticache_encryption(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "elasticache", "at_rest_encryption",
+        cid="EC-01",
+        title="Caches encrypt what they store",
+        severity="medium",
+        noun="cache clusters",
+        fail_detail="Encryption at rest is off",
+        remediation=(
+            "Encryption at rest cannot be turned on in place. Create a replacement cluster "
+            "with --at-rest-encryption-enabled and move traffic to it."
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(a) encryption of personal data"),
+            _ref("iso27001", "A.8.24 Use of cryptography"),
+        ],
+    )
+
+
+def _eks_private_endpoint(inv: Inventory) -> ControlResult:
+    return _flag_control(
+        inv, "eks", "endpoint_public_access",
+        cid="EKS-01",
+        title="Kubernetes API endpoints are not open to the whole internet",
+        severity="high",
+        noun="clusters",
+        fail_detail="The Kubernetes API is reachable from the internet",
+        remediation=(
+            "Restrict it: aws eks update-cluster-config --name <cluster> "
+            "--resources-vpc-config endpointPublicAccess=false,endpointPrivateAccess=true, "
+            "or keep public access but set publicAccessCidrs to your own addresses."
+        ),
+        references=[
+            _ref("cyber_essentials", "Firewalls and internet gateways"),
+            _ref("iso27001", "A.8.20 Network security"),
+        ],
+        identify=lambda r: bool(text(r, "cluster_status", "")),
+        want=False,
+    )
+
+
+# ── Delivery and posture ──────────────────────────────────────────────────────
+
+_INSECURE_VIEWER_POLICIES = {"allow-all"}
+
+
+def _cloudfront_https(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="CF-01", title="CloudFront serves over HTTPS only", severity="medium",
+        remediation=(
+            "Set the viewer protocol policy to redirect-to-https or https-only on the "
+            "default behaviour of each distribution."
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(a) encryption of personal data in transit"),
+            _ref("cyber_essentials", "Secure configuration"),
+            _ref("iso27001", "A.8.24 Use of cryptography"),
+        ],
+    )
+    distributions = [r for r in inv.get("cloudfront", []) if dim(r, "domain")]
+    if not distributions:
+        return ControlResult(status=NOT_APPLICABLE, detail="No CloudFront distributions reported.", **base)
+
+    failing = [d for d in distributions if dim(d, "viewer_protocol_policy") in _INSECURE_VIEWER_POLICIES]
+    unknown = [d for d in distributions if not dim(d, "viewer_protocol_policy")]
+    if failing:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(failing)} of {len(distributions)} distributions allow plain HTTP.",
+            findings=[{"resource": _name(d), "detail": "Viewer protocol policy is allow-all"} for d in failing],
+            **base,
+        )
+    if unknown:
+        return ControlResult(status=UNKNOWN, detail="The viewer protocol policy has not been reported for every distribution.", **base)
+    return ControlResult(status=PASS, detail=f"All {len(distributions)} distributions require HTTPS.", **base)
+
+
+def _lambda_supported_runtimes(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="LAM-01", title="Functions run supported language runtimes", severity="medium",
+        remediation=(
+            "Move each function to a supported runtime and redeploy. AWS stops applying "
+            "security patches to a runtime once it reaches end of support."
+        ),
+        references=[
+            _ref("cyber_essentials", "Security update management"),
+            _ref("uk_gdpr", "Art. 32(1)(b) ongoing security of processing systems"),
+            _ref("iso27001", "A.8.8 Management of technical vulnerabilities"),
+        ],
+    )
+    functions = [r for r in inv.get("lambda", []) if dim(r, "runtime")]
+    if not functions:
+        return ControlResult(status=NOT_APPLICABLE, detail="No Lambda functions reported.", **base)
+
+    failing = [f for f in functions if _is_deprecated_runtime(dim(f, "runtime"))]
+    if failing:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{len(failing)} of {len(functions)} functions run a retired runtime.",
+            findings=[{"resource": _name(f), "detail": f"Runtime {dim(f, 'runtime')} is no longer supported"} for f in failing],
+            **base,
+        )
+    return ControlResult(status=PASS, detail=f"All {len(functions)} functions run supported runtimes.", **base)
+
+
+# Runtimes AWS has already retired. Deliberately a list of what is known to be
+# dead rather than a list of what is alive: a new runtime we have not heard of
+# must not be reported as a failure.
+DEPRECATED_RUNTIME_PREFIXES = (
+    "python2.7", "python3.6", "python3.7", "python3.8",
+    "nodejs", "nodejs4.3", "nodejs6.10", "nodejs8.10", "nodejs10.x", "nodejs12.x",
+    "nodejs14.x", "nodejs16.x",
+    "ruby2.5", "ruby2.7", "dotnetcore2.1", "dotnetcore3.1", "dotnet5.0", "dotnet6",
+    "java8", "go1.x",
+)
+
+
+def _is_deprecated_runtime(runtime: str) -> bool:
+    name = (runtime or "").strip().lower()
+    return name in DEPRECATED_RUNTIME_PREFIXES
+
+
+def _config_rules_passing(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="CFG-01", title="AWS Config rules are passing", severity="medium",
+        remediation=(
+            "Open AWS Config, read each non-compliant rule, and fix the resources it names. "
+            "Config rules are your own policy, so a failure here is a rule you set yourself."
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(d) testing and assessing security measures"),
+            _ref("iso27001", "A.8.9 Configuration management"),
+        ],
+    )
+    rows = inv.get("config", [])
+    non_compliant = [num(r, "non_compliant_rules_count") for r in rows]
+    non_compliant = [int(c) for c in non_compliant if c is not None]
+    if not non_compliant:
+        return ControlResult(status=UNKNOWN, detail="AWS Config has not reported yet.", **base)
+    total = sum(non_compliant)
+    if total:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{total} Config rule{'s' if total != 1 else ''} are failing.",
+            findings=[{"resource": "AWS Config", "detail": f"{total} non-compliant rules"}],
+            **base,
+        )
+    return ControlResult(status=PASS, detail="No Config rule is failing.", **base)
+
+
+def _security_hub_findings(inv: Inventory) -> ControlResult:
+    base = dict(
+        id="SH-01", title="No open critical Security Hub findings", severity="high",
+        remediation=(
+            "Work through the critical findings in Security Hub, fix the resource each one "
+            "names, and resolve the finding."
+        ),
+        references=[
+            _ref("uk_gdpr", "Art. 32(1)(d) testing and assessing security measures"),
+            _ref("iso27001", "A.5.26 Response to information security incidents"),
+        ],
+    )
+    rows = inv.get("security_hub", [])
+    counts = [num(r, "findings_critical_count") for r in rows]
+    counts = [int(c) for c in counts if c is not None]
+    if not counts:
+        return ControlResult(status=NOT_APPLICABLE, detail="Security Hub is not reporting findings.", **base)
+    total = sum(counts)
+    if total:
+        return ControlResult(
+            status=FAIL,
+            detail=f"{total} critical finding{'s' if total != 1 else ''} open.",
+            findings=[{"resource": "Security Hub", "detail": f"{total} critical findings"}],
+            **base,
+        )
+    return ControlResult(status=PASS, detail="No critical findings open.", **base)
+
+
 CONTROLS: List[Callable[[Inventory], ControlResult]] = [
     _s3_public_access,
     _s3_encryption,
@@ -578,6 +885,16 @@ CONTROLS: List[Callable[[Inventory], ControlResult]] = [
     _rds_backups,
     _elb_zone_spread,
     _alarms_exist,
+    _rds_not_public,
+    _dynamodb_recovery,
+    _sqs_encryption,
+    _sns_encryption,
+    _elasticache_encryption,
+    _eks_private_endpoint,
+    _cloudfront_https,
+    _lambda_supported_runtimes,
+    _config_rules_passing,
+    _security_hub_findings,
 ]
 
 
