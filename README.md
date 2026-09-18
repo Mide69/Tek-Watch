@@ -1,352 +1,535 @@
-# Tek Watch
+# TekWatch
 
-> AI-assisted cloud infrastructure monitoring platform by Tek Tribe Ltd.
+> Cloud regulatory intelligence for UK small businesses running on AWS. Built by Tek Tribe Ltd.
 
-Tek Watch gives each Tek Tribe managed service customer a real-time, authenticated window into the state of their AWS infrastructure.
+TekWatch watches a customer's AWS account through a read-only agent, decides for
+itself when something has changed or gone wrong, works out which UK regulatory
+obligation that touches, says what it could cost using published figures, tells
+the owner what to do in plain English, checks the fix when the evidence shows
+it, and keeps a tamper-evident, independently timestamped record of the whole
+sequence.
+
+**Live:** [app.tekwatch.io](https://app.tekwatch.io) · **Demo:** [app.tekwatch.io/overview/?demo=1](https://app.tekwatch.io/overview/?demo=1) · **Region:** eu-west-2 (London)
+
+![TekWatch overview](docs/screenshots/11-overview-light.png)
+
+---
+
+## Contents
+
+- [The workflow: seven stages](#the-workflow-seven-stages)
+- [Screenshots](#screenshots)
+- [What is our code, and what is Claude](#what-is-our-code-and-what-is-claude)
+- [Regulatory coverage](#regulatory-coverage)
+- [Financial exposure](#financial-exposure)
+- [The evidence record](#the-evidence-record)
+- [Dependency tracing](#dependency-tracing)
+- [Regulatory calendar](#regulatory-calendar)
+- [Architecture](#architecture)
+- [The agent](#the-agent)
+- [Repository structure](#repository-structure)
+- [Local development](#local-development)
+- [Testing](#testing)
+- [Deployment](#deployment)
+- [Customer onboarding](#customer-onboarding)
+- [API endpoints](#api-endpoints)
+- [Configuration](#configuration)
+- [Security](#security)
+- [What TekWatch does not do](#what-tekwatch-does-not-do)
+- [Known gaps](#known-gaps)
+
+---
+
+## The workflow: seven stages
+
+One technical event is carried all the way to a regulator-ready record. Each
+stage names the module that implements it, so every claim here can be checked
+against the code.
+
+| Stage | What happens | Implemented in |
+|---|---|---|
+| **1. Detect** | Every metric is compared against its own seven-day baseline. A reading is an anomaly at three or five standard deviations, or when a step change holds. Needs 24 hours and 12 samples of history first. | [`api/services/alerting/detector.py`](api/services/alerting/detector.py) |
+| **2. Trace** | The affected resource is looked up in the customer's own dependency graph. Edges are marked *direct* (AWS states them) or *inferred* (shared security group). One hop only. | [`api/services/topology.py`](api/services/topology.py) |
+| **3. Map** | Configuration is judged against **24 technical controls across 17 AWS services**, each carrying the clause it supports in UK GDPR, Cyber Essentials v3.3, ISO 27001:2022 or FCA PS21/3. | [`api/services/compliance.py`](api/services/compliance.py) |
+| **4. Quantify** | Each failing control carries published figures: the statutory maximum, ICO or FCA penalties for the same failing, and the certification body's prices. Three separate numbers, never added. | [`api/services/exposure.py`](api/services/exposure.py) |
+| **5. Resolve** | A prioritised plain-English remediation plan ordered by severity, with the AWS CLI command where one exists. | `compliance.py`, `correlation.py` |
+| **6. Verify** | A control moving from fail to pass is recorded the moment the agent's data shows it. "I have fixed this, check now" re-runs the check on demand. | [`api/services/evidence_recorder.py`](api/services/evidence_recorder.py) |
+| **7. Record** | Every assessment and change is appended to a SHA-256 hash chain, anchored daily with an RFC 3161 token from an independent timestamping authority. | [`api/services/evidence.py`](api/services/evidence.py), [`timestamping.py`](api/services/timestamping.py) |
+
+Across the chain sits a **regulatory calendar**
+([`api/services/calendar.py`](api/services/calendar.py)): the Article 33
+72-hour clock, certificate expiries, and renewals.
+
+---
+
+## Screenshots
+
+All taken from the demo account, which uses sample data.
+
+**Four frameworks, each scored only on the controls it could evaluate**
+
+![Compliance checks](docs/screenshots/01-compliance-four-frameworks.png)
+
+**What a failing control could cost, with every figure linked to its source**
+
+![Financial exposure](docs/screenshots/03-exposure-published-figures.png)
+
+**The evidence record: chain intact, independently timestamped, downloadable**
+
+![Evidence record](docs/screenshots/05-evidence-chain-and-timestamp.png)
+
+**The regulatory calendar, with the 72-hour ICO clock running**
+
+![Regulatory calendar](docs/screenshots/06-regulatory-calendar.png)
+
+**An incident traced through the dependency graph: what else it is wired to**
+
+![Dependency trace](docs/screenshots/08-incident-dependency-trace.png)
+
+**Closing the loop on demand**
+
+![Recheck](docs/screenshots/09-recheck-button.png)
+
+**Daily spend: thin bars with the moving-average trend drawn over them**
+
+![Cost trend](docs/screenshots/10-cost-bars-with-trend.png)
+
+---
+
+## What is our code, and what is Claude
+
+Every monitoring decision (what is anomalous, what fails a check, what counts as
+an incident, what it could cost) is made by TekWatch's own deterministic code.
+The detection module contains no reference to any AI service, and the system
+raises exactly the same alerts with every AI key removed.
+
+| Capability | Where it runs | How it works |
+|---|---|---|
+| Data collection | Our agent (`agent/collectors/`) | 23 read-only boto3 collectors |
+| Baselines | Our API (`api/services/timestream.py`) | 7-day mean, standard deviation and sample count per resource metric, cached for 6 hours |
+| Anomaly detection | Our API (`alerting/detector.py`) | z-score against the baseline (3σ medium, 5σ high), plus step-change detection for metrics that are normally flat |
+| Threshold alerts | Our API (`alerting/threshold.py`) | Default or customer thresholds, every 5 minutes |
+| Compliance | Our API (`compliance.py`) | 24 rule-based controls, 17 services, 4 frameworks |
+| Dependency graph | Our API (`topology.py`) | Built from relationships the agent reports |
+| Incident correlation | Our API (`correlation.py`) | Joins CloudTrail changes to current state: who changed what, when, the UK GDPR impact, what else it reaches, and ordered remediation |
+| Financial exposure | Our API (`exposure.py`) | Published ICO, FCA and IASME figures only |
+| Evidence record | Our API (`evidence.py`, `timestamping.py`) | SHA-256 chain, daily RFC 3161 anchor |
+| Alert delivery | Our API (`notifications.py`) | Email (SES) and Slack, filtered by each customer's minimum severity |
+| Alert wording | Claude API, optional | Rewrites anomalies the detector already found in plain English. Discarded unless it returns exactly one explanation per anomaly. Without a key, built-in wording is used |
+| AI assistant | Claude API | Answers questions using ten read-only tools over the customer's own data. It answers; it does not decide |
+
+What is proprietary is not a model. It is the regulatory rule library, the
+detection methodology, the dependency graph, the exposure mapping to published
+enforcement, and the evidence chain.
+
+---
+
+## Regulatory coverage
+
+| Framework | What is assessed | What is not |
+|---|---|---|
+| **UK GDPR** | Article 32 security of processing, Article 5(2) accountability, Article 32(1)(c) restoration | Lawful basis, consent, data subject rights: anything not readable from infrastructure |
+| **Cyber Essentials v3.3** | Firewalls and internet gateways, secure configuration, user access control, and the cloud half of security update management | Malware protection, and patching on staff laptops and phones |
+| **ISO 27001:2022** | Annex A access restriction, cryptography, backup, logging, monitoring, network security, redundancy, configuration management | The management system itself: policies, risk treatment, internal audit |
+| **FCA PS21/3** | Technical evidence only: Multi-AZ databases, automated backups, load balancers across zones, alarms configured | Important business services, impact tolerances, scenario testing. These are governance |
+
+Cyber Essentials and PS21/3 carry a scope note in the API payload and on the
+page, so a score against part of a scheme is never read as a score against the
+whole of it.
+
+**The 24 controls**
+
+| Area | Controls |
+|---|---|
+| Storage | S3-01 public access blocked · S3-02 encryption · S3-03 versioning |
+| Identity | IAM-01 user MFA · IAM-02 root MFA · IAM-03 access keys under 90 days |
+| Certificates | ACM-01 not expiring within 30 days |
+| Threat detection | GD-01 GuardDuty on · GD-02 no open high or critical findings · SH-01 no critical Security Hub findings |
+| Logging and config | CT-01 CloudTrail logging · CFG-01 AWS Config rules passing |
+| Databases | RDS-01 not internet-reachable · RES-01 Multi-AZ · RES-02 automated backups · DDB-01 point-in-time recovery |
+| Messaging | SQS-01 queue encryption · SNS-01 topic encryption |
+| Compute and delivery | EKS-01 API endpoint not public · LAM-01 supported runtimes · CF-01 HTTPS only · EC-01 cache encryption |
+| Resilience | RES-03 load balancers across zones · RES-04 alarms configured |
+
+**Three rules keep the scoring honest, and tests enforce them:** a fact the
+agent did not collect is *unknown*, never a pass; unknown and not-applicable
+controls are left out of the score rather than counted; and every payload says
+the result is not a certification, an audit or legal advice.
+
+---
+
+## Financial exposure
+
+A made-up fine estimate in front of a regulator is worse than saying nothing,
+so nothing is modelled or predicted. A published case is attached to a control
+only where the regulator's own account of that case names the same failing.
+
+| Kind | Figure | Source |
+|---|---|---|
+| Statutory maximum | £8.7m or 2% of turnover (Article 32); £17.5m or 4% (Article 5) | [ICO fining guidance](https://ico.org.uk/about-the-ico/our-information/policies-and-procedures/data-protection-fining-guidance/statutory-background/the-maximum-amount-of-a-fine-under-uk-gdpr-and-dpa-2018/) |
+| Enforcement | Advanced Computer Software Group, £3.07m, March 2025, missing MFA | [ICO](https://ico.org.uk/action-weve-taken/enforcement/2025/03/advanced-computer-software-group-limited/) |
+| Enforcement | DPP Law Ltd, £60,000, April 2025, missing MFA and late reporting | [ICO](https://ico.org.uk/action-weve-taken/enforcement/2025/04/dpp-law-ltd/) |
+| Enforcement | Tuckers Solicitors LLP, £98,000, March 2022, unencrypted backups | [ICO](https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/security/encryption/encryption-scenarios/) |
+| Enforcement (FCA-regulated only) | TSB Bank plc, £48.65m, December 2022, operational resilience | [FCA](https://www.fca.org.uk/news/press-releases/tsb-fined-48m-operational-resilience-failings) |
+| Enforcement (FCA-regulated only) | Equifax Ltd, £11,164,400, October 2023, known weaknesses not acted on | [FCA](https://www.fca.org.uk/news/press-releases/equifax-ltd-fine-cyber-security-breach) |
+| Direct cost | Cyber Essentials Plus assessment, about £2,000 to £3,000 | [IASME](https://iasme.co.uk/articles/cyber-essentials-and-cyber-essentials-plus-what-is-the-difference/) |
+
+FCA and PRA penalties are marked as reaching regulated firms only, on the page
+and in the data.
+
+---
+
+## The evidence record
+
+A compliance page says what is wrong today. The evidence record says what was
+wrong, when it was fixed, and proves nobody has edited the answer since.
+
+- **Chained.** Each entry carries the SHA-256 hash of the one before it. Edit a
+  stored entry and every hash after it stops matching.
+- **Verified from the data.** `GET /api/v1/security/evidence/verify` recomputes
+  the whole chain from the stored entries, not from a stored answer.
+- **Independently timestamped.** Once a day the head of the chain goes to an
+  RFC 3161 timestamping authority, which returns a signed token saying it saw
+  that hash at that time. Best effort and off the hot path: if the authority is
+  down, the log carries on and tries again tomorrow.
+- **Checkable without us.** The CSV export carries the verification command.
+  With the token saved as `token.tsr` and the authority's certificates:
+
+```bash
+openssl ts -verify -digest <anchored_hash> -in token.tsr -CAfile cacert.pem -untrusted tsa.crt
+```
+
+The RFC 3161 request is built by hand
+([`timestamping.py`](api/services/timestamping.py)) rather than through an
+ASN.1 library: about sixty bytes and a status check. It has been confirmed
+against FreeTSA, with `openssl ts -reply -text` showing the granted status, the
+SHA-256 algorithm and our exact hash.
+
+What an anchor does not prove, and the product says so: that the chain existed
+at that time, not that the records are correct. A log with no anchor yet says
+so instead of borrowing the claim.
+
+---
+
+## Dependency tracing
+
+The graph is built only from relationships the agent really reports, and every
+edge says how sure it is.
+
+| Edge | Confidence | Source |
+|---|---|---|
+| CloudFront distribution serves an S3 bucket | direct | The distribution's own origin list |
+| Resource runs inside a VPC | direct | The resource's own VPC placement |
+| Resources share a security group | inferred | Shared group membership; they can usually reach each other |
+
+We do not collect VPC flow logs or security group rules, so the strongest claim
+anywhere in the output is "can usually reach", never "talks to". Impact stops
+at one hop: two hops through a shared VPC reaches the whole account and tells
+the reader nothing.
+
+---
+
+## Regulatory calendar
+
+Every entry has something real behind it.
+
+| Kind | Example | Driven by |
+|---|---|---|
+| Deadline | Decide whether the ICO must be told about a bucket | The 72 hours of Article 33, counted from when TekWatch first saw the exposure |
+| Expiry | TLS certificate for app.example.com expires | The expiry date AWS reports |
+| Renewal | Cyber Essentials certificate, ICO data protection fee | Dates only the customer knows. Until entered, the entry says "no date set" rather than inventing one |
+
+---
 
 ## Architecture
 
 ```
-Customer AWS Account
-  └── ECS Fargate (tek-watch-agent) ──HTTPS──▶ SQS (ingest queue)
-                                                        │
-                                          Tek Watch Central Account
-                                                        │
-                                              ECS (ingest-consumer)
-                                                        │
-                                        DynamoDB (metrics + events, TTL)
-                                                        │
-                                              ECS (tek-watch-api)
-                                                   │         │
-                                            dashboard/   admin-portal/
-                                         app.tekwatch  admin.tekwatch
-                                               .io            .io
+Customer AWS account                              TekWatch central account (eu-west-2)
+┌──────────────────────────────┐                 ┌─────────────────────────────────────────┐
+│ EventBridge (every 15 min)   │                 │ SQS ingest queue                        │
+│   └─ ECS Fargate: agent  ────┼── HTTPS, out ──▶│   └─ ECS: ingest-consumer               │
+│      23 read-only collectors │     only        │        └─ DynamoDB metrics + events     │
+│      key from Secrets Mgr    │                 │           (90-day TTL)                  │
+└──────────────────────────────┘                 │ ECS: api (FastAPI)                      │
+                                                 │   ├─ detection, compliance, topology,   │
+                                                 │   │  exposure, evidence, calendar       │
+                                                 │   └─ background loops: thresholds,      │
+                                                 │      anomalies, evidence recording      │
+                                                 │ S3 + CloudFront                         │
+                                                 │   ├─ app.tekwatch.io   (dashboard)      │
+                                                 │   └─ admin.tekwatch.io (admin portal)   │
+                                                 │ Cognito · SES · Lambda silence detector │
+                                                 └─────────────────────────────────────────┘
+                                                              │ once a day
+                                                              ▼
+                                                  RFC 3161 timestamping authority
 ```
 
-## What is our code, and what is Claude
+Browsers reach the API through a CloudFront `/api/*` behaviour on
+`app.tekwatch.io`.
 
-Every monitoring decision (what is anomalous, what fails a check, what counts
-as an incident) is made by TekWatch's own deterministic code. The Claude API is
-used for language only, never to decide what is wrong.
+---
 
-| Capability | Where it runs | How it works |
-|---|---|---|
-| Data collection | Our agent (`agent/collectors/`) | 23 read-only boto3 collectors, every 15 minutes |
-| Baselines | Our API (`api/services/timestream.py`) | 7-day mean, standard deviation and sample count per resource metric |
-| Anomaly detection | Our API (`api/services/alerting/detector.py`) | z-score against the 7-day baseline (3σ medium, 5σ high), plus step-change detection for metrics that are normally flat. Needs 24 hours and 12 samples of history first |
-| Threshold alerts | Our API (`api/services/alerting/threshold.py`) | Default or customer thresholds, every 5 minutes |
-| Compliance checks | Our API (`api/services/compliance.py`) | 10 rule-based checks (S3, IAM, ACM, GuardDuty, CloudTrail) mapped to UK GDPR, Cyber Essentials and ISO 27001:2022. A check with no data is reported as not measured and left out of the score, never counted as a pass |
-| Incident correlation | Our API (`api/services/correlation.py`) | Joins CloudTrail changes to current S3 and trail state: who changed what and when, the UK GDPR impact, and ordered remediation |
-| Alert delivery | Our API (`api/services/notifications.py`) | Email (SES) and Slack, filtered by each customer's minimum severity |
-| Alert wording | Claude API, optional | Rewrites anomalies the detector already found in plain English. It cannot add, remove or re-grade them. Without a key, built-in wording is used and detection runs unchanged |
-| AI assistant | Claude API | Answers questions by calling our API's tools over the customer's own data |
+## The agent
 
-Compliance results are automated evidence about AWS technical controls. They
-are not a certification, an audit or legal advice. FCA PS21/3 operational
-resilience is not covered: it depends on business services and impact
-tolerances that cannot be judged from AWS configuration.
+A Python container that runs in the customer's own AWS account, collects, sends,
+and exits.
 
-## Repository Structure
+| | |
+|---|---|
+| Collectors | 23: EC2, RDS, Lambda, ECS, EKS, S3, DynamoDB, ELB, VPC, Route53, CloudFront, ElastiCache, SNS, SQS, ACM, IAM, GuardDuty, Security Hub, Config, CloudTrail, CloudWatch Alarms, Cost Explorer, Trusted Advisor |
+| Permissions | AWS `ReadOnlyAccess` plus sending to one SQS queue. No inbound access |
+| Schedule | Home region every run (default 15 minutes). All enabled regions every 30 minutes. Cost Explorer every 6 hours, because it bills per request |
+| Deadline | A run stops one minute short of its interval and publishes what it has, so runs can never pile up |
+| Rule | A fact it could not read is left out, never reported as a convenient false |
+
+Scheduling is stateless: each run works out what is due from the clock, rounded
+to the nearest schedule slot to absorb EventBridge jitter. See
+[`agent/utils/schedule.py`](agent/utils/schedule.py).
+
+---
+
+## Repository structure
 
 ```
-tek-watch/
-├── agent/                  # Python Docker agent (runs in customer account)
-├── ingest-consumer/        # FastAPI SQS consumer → DynamoDB writer
-├── api/                    # FastAPI central API (serves dashboards)
+Tek-Watch/
+├── agent/                  # Collection agent (runs in the customer's account)
+│   ├── collectors/         # 23 read-only collectors
+│   └── utils/schedule.py   # What is due on this run
+├── ingest-consumer/        # SQS consumer, validates keys, writes to DynamoDB
+├── api/                    # FastAPI central API
+│   ├── services/           # detector, compliance, topology, exposure,
+│   │                       # evidence, timestamping, calendar, correlation
+│   └── routers/            # HTTP endpoints
 ├── dashboard/              # Next.js customer dashboard (app.tekwatch.io)
 ├── admin-portal/           # Next.js admin portal (admin.tekwatch.io)
 ├── infrastructure/
-│   ├── terraform/          # Tek Watch central account resources
-│   └── cloudformation/     # Customer agent deployment template
-├── .github/workflows/      # CI/CD pipelines
+│   ├── terraform/          # Central account
+│   └── lambda/             # Silence detector
+├── docs/                   # Architecture, guide, runbook, screenshots
+├── .github/workflows/      # CI/CD
 └── docker-compose.yml      # Local development
 ```
 
-## Quick Start
+---
 
-### Prerequisites
-- Docker and Docker Compose
-- Python 3.12+ (for local development without Docker)
-- Node.js 18+ (for dashboard development)
-- AWS CLI configured (for deployment)
+## Local development
 
-### Local Development
+**Prerequisites:** Docker and Docker Compose, Python 3.12+, Node.js 18+, AWS CLI.
 
-1. **Clone the repository**
 ```bash
 git clone https://github.com/Mide69/Tek-Watch.git
 cd Tek-Watch
-```
-
-2. **Set up environment variables**
-```bash
-cp .env.example .env.local
-# Edit .env.local with your configuration
-```
-
-3. **Start services with Docker Compose**
-```bash
+cp .env.example .env.local        # then edit
 docker-compose up
 ```
 
 | Service | URL |
 |---|---|
 | API | http://localhost:8000 |
-| API Docs | http://localhost:8000/docs |
+| API docs | http://localhost:8000/docs |
 | LocalStack | http://localhost:4566 |
 
-4. **Run agent manually (optional)**
+Run a service on its own:
+
 ```bash
-docker-compose --profile agent up agent
+cd api && pip install -r requirements.txt && uvicorn main:app --reload
+cd dashboard && npm install && npm run dev      # demo mode: /overview/?demo=1
+cd agent && pip install -r requirements.txt && python main.py
 ```
 
-### Running Individual Services
+---
 
-#### Agent
-```bash
-cd agent
-pip install -r requirements.txt
-python main.py
-```
+## Testing
 
-#### Ingest Consumer
-```bash
-cd ingest-consumer
-pip install -r requirements.txt
-python main.py
-```
+**877 automated tests**, all passing.
 
-#### API
-```bash
-cd api
-pip install -r requirements.txt
-uvicorn main:app --reload
-```
+| Suite | Tests | Command |
+|---|---|---|
+| API | 470 | `cd api && pytest` |
+| Agent | 291 | `cd agent && pytest` |
+| Ingest consumer | 28 | `cd ingest-consumer && pytest` |
+| Dashboard | 88 | `cd dashboard && npm test` |
 
-## Tech Stack
+Plus Playwright end-to-end suites for the dashboard and admin portal
+(`npm run test:e2e`).
 
-| Layer | Technology |
-|---|---|
-| Agent | Python 3.12, boto3 |
-| Ingest Consumer | Python 3.12, FastAPI |
-| API | Python 3.12, FastAPI, Anthropic SDK |
-| Dashboard | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
-| Admin Portal | Next.js 14, TypeScript, Tailwind, Shadcn/ui, SWR |
-| Metrics Store | Amazon DynamoDB (metrics + events tables, 90-day TTL) |
-| App Data | Amazon DynamoDB |
-| Queue | Amazon SQS |
-| Auth | AWS Cognito |
-| Compute | AWS ECS Fargate |
-| Region | eu-west-2 (London) |
+The tests pin the honesty rules as well as the behaviour: an uncollected fact is
+never a pass, a control with no published source produces no exposure figure,
+editing any evidence entry breaks the chain, a refused timestamp is never stored
+as proof, and no test reaches a real timestamping authority.
 
-## Project Status
-
-Live in production on AWS (eu-west-2), serving from `app.tekwatch.io`.
-
-### Built and deployed
-- [x] Agent with multi-region discovery and **23 collectors** — EC2, RDS, Lambda,
-      ECS, EKS, S3, DynamoDB, ELB, VPC, Route53, CloudFront, ElastiCache, SNS,
-      SQS, ACM, IAM, GuardDuty, Security Hub, Config, CloudTrail, CloudWatch
-      Alarms, Cost Explorer, Trusted Advisor
-- [x] SQS publisher with batching; ingest consumer writing to DynamoDB
-- [x] FastAPI service with Cognito JWT auth and all customer/admin routers
-- [x] Threshold alerting, statistical anomaly detection, compliance checks and
-      incident correlation (our code); plain-English alert wording and the chat
-      assistant (Claude API)
-- [x] Customer alert delivery by email and Slack, per notification preferences
-- [x] Agent silence-detection Lambda on a 10-minute EventBridge schedule
-- [x] Customer dashboard and admin portal (Next.js static exports on
-      S3 + CloudFront), both with password reset and TOTP MFA enrolment
-- [x] Terraform for the whole central account; CloudFormation template for the
-      customer-side agent
-- [x] **370 automated tests** — 216 agent, 94 API, 22 Lambda, 28 dashboard,
-      10 admin portal, plus Playwright end-to-end suites
-
-### Known gaps
-- [ ] **No customer data has ever flowed through the platform.** The pipeline
-      (agent -> SQS -> consumer -> DynamoDB -> API -> dashboard) has never
-      carried a message end to end; dashboards render mock data. Onboarding the
-      first customer is the outstanding milestone.
-- [ ] The ALB serves HTTP; browsers reach the API over HTTPS via a CloudFront
-      `/api/*` behaviour. A dedicated `api.tekwatch.io` certificate would let
-      the frontends address it directly.
-- [ ] No staging environment provisioned. `staging.tfvars` is ready but unused.
-- [ ] `deploy-dev` and `deploy-staging` are gated behind `ENABLE_DEV_DEPLOY` /
-      `ENABLE_STAGING_DEPLOY`, both unset, because neither environment exists.
-- [ ] The GitHub Actions IAM role holds `AdministratorAccess`. The OIDC trust
-      condition limits it to this repository, but it should be scoped down.
-- [ ] Several pinned Actions still target Node 20, which GitHub has deprecated.
-      They run (forced onto Node 24) but should be bumped.
-
-### CI/CD
-Enabled via the `ENABLE_CD` repository variable. Pushes to `main` build and push
-images to ECR; production deploys are `workflow_dispatch` only. Verified
-deploying to prod on 30 Aug 2026.
-
-Terraform deliberately does **not** manage the running task definition revision
-(`ignore_changes`), because CD owns it — otherwise any `terraform apply` would
-roll the service back to whatever revision terraform last created.
+---
 
 ## Deployment
 
-### Customer Agent Deployment
+CI/CD runs from GitHub Actions and is enabled by the `ENABLE_CD` repository
+variable.
+
+| Event | What happens |
+|---|---|
+| Pull request | Tests only |
+| Push to `main` | Tests, then images are built and pushed to ECR |
+| `workflow_dispatch` | Production deploy of that service |
+
+> **Important:** a push to `main` that touches `agent/` publishes the agent to
+> ECR Public as `:latest`, and customer stacks pull `:latest` on every run. For
+> the agent, **merging to `main` is a deploy**. The API, dashboard and ingest
+> consumer only go live on a manual dispatch.
+
+```bash
+gh workflow run api.yml --ref main
+gh workflow run dashboard.yml --ref main
+gh workflow run ingest-consumer.yml --ref main
+```
+
+Terraform deliberately does not manage the running task definition revision
+(`ignore_changes`), because CD owns it. See
+[`infrastructure/terraform/README.md`](infrastructure/terraform/README.md).
+
+---
+
+## Customer onboarding
 
 There is one template, generated per customer by the API
-(`api/services/cfn_template.py`). A static copy used to live in
-`infrastructure/cloudformation/` and had drifted: its SQS grant named a queue
-pattern the real queue does not match, so an agent deployed from it collected
-data and was then refused at the send step.
+([`api/services/cfn_template.py`](api/services/cfn_template.py)).
 
-1. **The customer signs in and opens the Agent page**, then downloads their
-   template. It is pre-filled with their Customer ID, the ingest queue and the
-   agent image. On the first download a fresh agent key is issued and embedded
-   (it is only ever shown once; later downloads leave it blank unless a new
-   key is requested). An admin can download the same template from the admin
-   portal.
+1. **Download the template** from the Agent page. It carries the Customer ID,
+   the ingest queue and the agent image. It never contains the agent key.
+2. **Create the agent key** on the same page with "Create agent key". It is
+   shown once. The API stores only a hash.
+3. **Create the stack** in your own AWS account, pasting the key into the hidden
+   `APIKey` field, or:
 
-2. **They create the stack in their own AWS account.** In the console: upload
-   the file, pick a VPC and subnets, and acknowledge the named IAM roles. Or:
 ```bash
 aws cloudformation create-stack \
   --stack-name tek-watch-agent \
   --template-body file://tek-watch-agent-TT-XXXXXXXX.yaml \
   --parameters \
+    ParameterKey=APIKey,ParameterValue=<your key> \
     ParameterKey=VpcId,ParameterValue=vpc-0123456789abcdef0 \
     ParameterKey=SubnetIds,ParameterValue=subnet-0123456789abcdef0 \
+    ParameterKey=RunIntervalMinutes,ParameterValue=15 \
   --capabilities CAPABILITY_NAMED_IAM
 ```
-   It creates an ECS cluster and task, a read-only task role, the key in
-   Secrets Manager, an outbound-only security group and an EventBridge
-   schedule. No inbound access is opened.
 
-3. **The agent runs every 15 minutes** and sends read-only metrics to the
-   ingest queue. Data appears on the dashboard within about 20 minutes.
-   Other regions are swept every 30 minutes and costs fetched every 6 hours,
-   because Cost Explorer bills per request.
+It creates an ECS cluster and task, a read-only task role, the key in Secrets
+Manager, an outbound-only security group and an EventBridge schedule. Data
+appears within about 20 minutes.
 
-### Central Platform Deployment
+The key used to be embedded in the template as a parameter default, which
+CloudFormation stores in the template body where anyone with `GetTemplate` can
+read it. It no longer is.
 
-See `infrastructure/terraform/README.md` for Terraform deployment instructions.
+---
 
-## API Endpoints
+## API endpoints
 
-### Customer Endpoints (JWT Required)
-- `GET /api/v1/overview` - Dashboard summary
-- `GET /api/v1/compute/ec2` - EC2 instances
-- `GET /api/v1/compute/lambda` - Lambda functions
-- `GET /api/v1/databases/rds` - RDS instances
-- `GET /api/v1/security/guardduty` - GuardDuty findings
-- `GET /api/v1/security/compliance` - Automated compliance check results
-- `GET /api/v1/security/incidents` - Correlated security incidents
-- `GET|PUT /api/v1/notifications/preferences` - Email, Slack and minimum severity
-- `GET /api/v1/cost/summary` - Cost overview
-- `GET /api/v1/alerts` - Active alerts
-- `GET /api/v1/metrics/{resource_id}` - Time-series data
-- `GET /api/v1/profile` - Company profile (name, address, logo)
-- `PUT /api/v1/profile` - Update company profile
-- `POST /api/v1/profile/logo` - Upload a company logo (PNG/JPEG/GIF, max 2 MB)
-- `DELETE /api/v1/profile/logo` - Remove the company logo
+All customer endpoints require a Cognito JWT.
 
-### Admin Endpoints (Admin JWT Required)
-- `GET /api/v1/admin/customers` - List all customers
-- `POST /api/v1/admin/customers` - Create customer
-- `PUT /api/v1/admin/customers/{id}` - Update customer
-- `POST /api/v1/admin/customers/{id}/rotate-key` - Rotate API key
-- `GET /api/v1/admin/thresholds` - Manage thresholds
-- `GET /api/v1/admin/operations` - Platform health
+**Monitoring**
+- `GET /api/v1/overview` · `GET /api/v1/compute/{ec2,lambda,ecs}` · `GET /api/v1/databases/{rds,dynamodb}`
+- `GET /api/v1/storage/s3` · `GET /api/v1/networking/{vpc,elb}` · `GET /api/v1/metrics/{resource_id}`
+- `GET /api/v1/alerts` · `GET /api/v1/cost/summary` · `GET /api/v1/cost/breakdown`
+
+**Regulatory intelligence**
+- `GET /api/v1/security/compliance` — the 24 controls, four frameworks, and published exposure
+- `GET /api/v1/security/incidents` — correlated incidents, with what else each one reaches
+- `GET /api/v1/security/topology` — the dependency graph
+- `GET /api/v1/security/calendar` — deadlines, expiries, renewals
+- `PUT /api/v1/security/calendar/renewals` — set Cyber Essentials and ICO fee dates
+- `POST /api/v1/security/controls/{id}/recheck` — re-run the checks now and record the result
+- `GET /api/v1/security/evidence` — the evidence log
+- `GET /api/v1/security/evidence/verify` — recompute the chain
+- `GET /api/v1/security/evidence/export` — CSV with hashes and verification instructions
+- `GET /api/v1/security/{guardduty,iam,acm,alarms}`
+
+**Agent**
+- `GET /api/v1/agent/health` · `GET /api/v1/agent/cfn-template`
+- `POST /api/v1/agent/key` — issue the agent key, shown once; `{"replace": true}` to replace
+
+**Account**
+- `GET|PUT /api/v1/profile` · `POST|DELETE /api/v1/profile/logo`
+- `GET|PUT /api/v1/notifications/preferences`
+
+**Admin** (admin JWT)
+- `GET|POST /api/v1/admin/customers` · `PUT /api/v1/admin/customers/{id}`
+- `POST /api/v1/admin/customers/{id}/rotate-key` · `GET /api/v1/admin/thresholds` · `GET /api/v1/admin/operations`
+
+---
 
 ## Configuration
 
-### Environment Variables
+See `.env.example` for everything. Production reads secrets from AWS Secrets
+Manager via `SECRETS_MANAGER_SECRET_ARN`.
 
-See `.env.example` for all configuration options.
+| Variable | Used by | Purpose |
+|---|---|---|
+| `TEK_WATCH_CUSTOMER_ID` | agent | Customer the data belongs to |
+| `TEK_WATCH_INGEST_QUEUE_URL` | agent | Where to send |
+| `TEK_WATCH_API_KEY` | agent | From Secrets Manager, never in the task definition |
+| `TEK_WATCH_RUN_INTERVAL_MINUTES` | agent | Must match the schedule. 5, 10 or 15; default 5 for older stacks |
+| `AWS_REGION`, `ENVIRONMENT` | API, consumer | Region and environment |
+| `TSA_URL` | API | RFC 3161 authority. Default `https://freetsa.org/tsr`; empty turns anchoring off |
+| `AGENT_PUBLIC_IMAGE_URI` | API | Image written into customer templates |
 
-**Required for Agent:**
-- `TEK_WATCH_CUSTOMER_ID`
-- `TEK_WATCH_INGEST_QUEUE_URL`
-- `TEK_WATCH_API_KEY`
-
-**Required for API/Consumer:**
-- `AWS_REGION`
-- `ENVIRONMENT`
-- `SECRETS_MANAGER_SECRET_ARN` (production) or individual env vars (dev)
-
-### Secrets Manager Structure
-
-Production deployments use AWS Secrets Manager:
-```json
-{
-  "dynamodb_customers_table": "tek_watch_customers",
-  "dynamodb_metrics_table": "tek_watch_metrics",
-  "dynamodb_events_table": "tek_watch_events",
-  "cognito_customer_user_pool_id": "...",
-  "anthropic_api_key": "...",
-  "sns_ops_alerts_topic_arn": "..."
-}
-```
-
-## Development Guidelines
-
-### Code Style
-- Python: PEP 8, max line length 100, type hints required
-- TypeScript: Strict mode, no `any` types
-- All functions must have docstrings (Google style)
-
-### Testing
-```bash
-# Agent tests
-cd agent && pytest
-
-# API tests
-cd api && pytest --cov=. --cov-fail-under=70
-
-# Dashboard tests
-cd dashboard && npm test
-```
-
-### Logging
-- Use structured JSON logging
-- Never use `print()` in production code
-- Log levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+---
 
 ## Security
 
-- All secrets stored in AWS Secrets Manager
-- API keys hashed with SHA-256
-- JWT tokens expire after 8 hours
-- Admin portal requires MFA
-- Customer data isolated by `customer_id` in all queries
-- Agent has read-only IAM permissions
+- The agent is read-only and outbound-only. No inbound firewall change is needed.
+- Agent keys are stored as SHA-256 hashes, shown once, and never written into a
+  template. The ingest consumer re-reads a customer's key within 60 seconds, so
+  a rotated key takes effect without a restart.
+- Customer data is isolated by `customer_id` in every query.
+- Cognito JWTs; the admin portal requires MFA.
+- CloudFront sends HSTS, `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, a strict referrer policy and a permissions policy.
 
-## Monitoring
+---
 
-- CloudWatch Logs for all services
-- CloudWatch Alarms for DLQ depth, API errors, ECS failures
-- Agent silence detection (alerts if no heartbeat > 20 min)
-- Platform health dashboard in Admin Portal
+## What TekWatch does not do
 
-## Contributing
+Stated here so nobody has to find out.
 
-1. Create a feature branch from `main`
-2. Make changes following code style guidelines
-3. Add tests for new functionality
-4. Submit PR with clear description
-5. Ensure CI passes
+- No traffic analysis. Without flow logs, the graph says resources *can* reach
+  each other, never that they do.
+- No device or endpoint checks, so two of the five Cyber Essentials controls are
+  out of scope.
+- No impact-tolerance testing or scenario exercises for PS21/3, only the
+  technical evidence that supports them.
+- No certification, audit or legal advice. Every compliance payload says so.
+
+---
+
+## Known gaps
+
+- [ ] No independent penetration test of the platform yet.
+- [ ] No staging environment. `staging.tfvars` is ready but unused, and
+      `deploy-dev` and `deploy-staging` are gated off.
+- [ ] The ALB serves HTTP; browsers reach the API over HTTPS through CloudFront.
+      A dedicated `api.tekwatch.io` certificate would let clients address it
+      directly.
+- [ ] The GitHub Actions IAM role holds `AdministratorAccess`, limited to this
+      repository by the OIDC trust condition. It should be scoped down.
+- [ ] Several pinned Actions still target Node 20, which GitHub has deprecated.
+- [ ] Roadmap: one screen that walks a finding through all seven stages, an
+      availability-zone loss report, a formal audit pack, and the statistics
+      behind each detection shown on the alert.
+
+---
 
 ## Docs
 
 - [Architecture](docs/ARCHITECTURE.md)
-- [Deployment & Testing Guide](docs/GUIDE.md)
+- [Deployment and testing guide](docs/GUIDE.md)
 - [Runbook](docs/RUNBOOK.md)
-- [Zero-cost demo deployment](docs/DEMO_DEPLOYMENT.md)
 
-## License
+## Licence
 
-Proprietary. Copyright © 2026 Tek Tribe Ltd. All rights reserved.
-See [LICENSE](LICENSE).
+Proprietary. Copyright © 2026 Tek Tribe Ltd. All rights reserved. See
+[LICENSE](LICENSE).
 
 ## Support
 
-For issues or questions:
-- Internal: Slack #tek-watch
-- Customers: support@tekwatch.io
+Customers: support@tekwatch.io
