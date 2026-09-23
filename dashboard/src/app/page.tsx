@@ -79,7 +79,7 @@ const securitySummaryTiles = [
 ]
 
 const chatExchange = {
-  question: 'Why did my AWS bill spike this week?',
+  question: 'Why did my cloud bill spike this week?',
   answer: 'Your spend jumped 18% on Tuesday, mostly EC2. Three on-demand instances in eu-west-2 have run at steady utilisation for 30 days straight; switching them to Reserved would save roughly £140/month.',
   tools: ['Cost breakdown', 'EC2 instances'],
 }
@@ -94,7 +94,7 @@ const previewTabs = [
 type PreviewTabId = typeof previewTabs[number]['id']
 
 const PLATFORM_LINKS = [
-  { label: 'Continuous monitoring', href: '#capabilities', desc: '23 AWS services, every region' },
+  { label: 'Continuous monitoring', href: '#capabilities', desc: '23 cloud services, every region' },
   { label: 'Anomaly detection', href: '#platform', desc: 'Your own 7-day baseline' },
   { label: 'Compliance checks', href: '#capabilities', desc: 'UK GDPR, Cyber Essentials, ISO 27001' },
   { label: 'Incident correlation', href: '#platform', desc: 'Who changed what, and the fix' },
@@ -105,8 +105,8 @@ const FEATURES = [
   {
     icon: Activity,
     title: 'Continuous Visibility',
-    desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services, giving you full visibility across every active region from your first dashboard load.',
-    points: ['23 AWS services monitored', 'Every active region, day one', '90-day metric history'],
+    desc: 'Compute, databases, storage, networking, messaging and security services, giving you full visibility across every active region from your first dashboard load.',
+    points: ['23 cloud services monitored', 'Every active region, day one', '90-day metric history'],
   },
   {
     icon: Zap,
@@ -117,7 +117,7 @@ const FEATURES = [
   {
     icon: Shield,
     title: 'UK Compliance Intelligence',
-    desc: 'Automated checks of your AWS setup, mapped to the UK frameworks SMEs actually face, naming each failing resource and how to fix it.',
+    desc: 'Automated checks of your cloud setup, mapped to the UK frameworks SMEs actually face, naming each failing resource and how to fix it.',
     points: ['UK GDPR, Cyber Essentials & ISO 27001', 'Incidents traced to who changed what', 'GuardDuty & Security Hub findings'],
   },
   {
@@ -135,7 +135,7 @@ const FEATURES = [
   {
     icon: Radio,
     title: 'Lightweight Agent',
-    desc: 'A single ECS Fargate task in your AWS account. Read-only IAM, outbound-only, zero firewall changes.',
+    desc: 'A single read-only container in your own cloud account. Outbound only, zero firewall changes.',
     points: ['ECS Fargate', 'Read-only IAM role', 'Auto-deploy CloudFormation'],
   },
 ]
@@ -147,7 +147,7 @@ const ONBOARDING_STEPS = [
   },
   {
     title: 'Deploy in under 30 minutes',
-    desc: 'When you are ready to connect your own AWS account, we hand you a pre-configured CloudFormation template for the read-only monitoring agent. No inbound firewall changes needed.',
+    desc: 'When you are ready to connect your own cloud account, we hand you a pre-configured template for the read-only monitoring agent. No inbound firewall changes needed.',
   },
   {
     title: 'See what’s really going on',
@@ -158,7 +158,7 @@ const ONBOARDING_STEPS = [
 const statTiles = [
   { icon: Cpu, label: 'Monitored Resources', value: '847', delta: '+12%', good: true, sub: 'vs last month', trend: [620, 640, 655, 670, 690, 705, 720, 735, 760, 780, 810, 847] },
   { icon: AlertTriangle, label: 'Active Alerts', value: '3', delta: '−40%', good: true, sub: 'vs last week', trend: [9, 8, 8, 7, 6, 6, 5, 5, 4, 4, 3, 3] },
-  { icon: DollarSign, label: 'Monthly AWS Spend', value: '£1,840', delta: '+4%', good: false, sub: 'vs last month', trend: [1650, 1700, 1680, 1720, 1750, 1690, 1730, 1760, 1740, 1780, 1810, 1840] },
+  { icon: DollarSign, label: 'Monthly cloud spend', value: '£1,840', delta: '+4%', good: false, sub: 'vs last month', trend: [1650, 1700, 1680, 1720, 1750, 1690, 1730, 1760, 1740, 1780, 1810, 1840] },
 ]
 
 // Every figure here is one a reader can open and check, which is why each
@@ -169,10 +169,10 @@ const statTiles = [
 const problemStats = [
   {
     icon: Gavel,
-    value: '£3.07m',
-    label: 'ICO fine after attackers reached systems through an account with no multi-factor authentication',
-    source: 'ICO enforcement, March 2025',
-    href: 'https://ico.org.uk/action-weve-taken/enforcement/2025/03/advanced-computer-software-group-limited/',
+    value: '£14m',
+    label: 'ICO fine on Capita in October 2025 over a breach that exposed the data of 6.6 million people',
+    source: 'ICO enforcement, October 2025',
+    href: 'https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/2025/10/capita-fined-14m-for-data-breach-affecting-over-6m-people/',
   },
   {
     icon: PoundSterling,
@@ -190,24 +190,50 @@ const problemStats = [
   },
   {
     icon: TrendingUp,
-    value: '19%',
-    label: 'Growth in Cyber Essentials certificates issued that year',
-    source: 'NCSC Annual Review 2025',
-    href: 'https://www.ncsc.gov.uk/collection/ncsc-annual-review-2025',
+    value: '43%',
+    label: 'Of UK businesses identified a cyber breach or attack in the last twelve months',
+    source: 'Cyber Security Breaches Survey 2025, DSIT',
+    href: 'https://www.gov.uk/government/statistics/cyber-security-breaches-survey-2025/cyber-security-breaches-survey-2025',
+  },
+]
+
+// Three dates doing the work. Each one is published by the body that sets it,
+// and linked, because an unsourced deadline is just pressure.
+const REGULATORY_DATES = [
+  {
+    when: '27 April 2026',
+    what: 'Cyber Essentials v3.3',
+    detail: 'The updated requirements put cloud services firmly in scope and tighten the rules on multi-factor authentication.',
+    href: 'https://iasme.co.uk/articles/important-update-changes-to-cyber-essentials-for-april-2026/',
+    source: 'IASME',
+  },
+  {
+    when: 'In force now',
+    what: 'FCA PS21/3 operational resilience',
+    detail: 'The compliance deadline passed in March 2025. Regulated firms are now asked for evidence rather than plans.',
+    href: 'https://www.fca.org.uk/publications/policy-statements/ps21-3-building-operational-resilience',
+    source: 'FCA',
+  },
+  {
+    when: '72 hours',
+    what: 'UK GDPR Article 33',
+    detail: 'The time you have to tell the ICO about a personal data breach, counted from when you become aware of it.',
+    href: 'https://ico.org.uk/for-organisations/report-a-breach/personal-data-breach/',
+    source: 'ICO',
   },
 ]
 
 const pricingTiers = [
   {
     name: 'Starter', monthly: 79, discount: 0.10,
-    desc: 'For micro-businesses, startups and charities getting started with AWS.',
-    features: ['Up to 2 AWS accounts', '50 monitored resources', 'Anomaly detection', 'UK GDPR compliance checks'],
+    desc: 'For micro-businesses, startups and charities getting started in the cloud.',
+    features: ['Up to 2 cloud accounts', '50 monitored resources', 'Anomaly detection', 'UK GDPR compliance checks'],
     highlight: false,
   },
   {
     name: 'Business', monthly: 199, discount: 0.10,
     desc: 'For growing SMEs, FinTech firms and professional services.',
-    features: ['Up to 5 AWS accounts', '500 monitored resources', 'AI assistant + cost spike alerts', 'UK GDPR, Cyber Essentials & ISO 27001 checks', 'Email & Slack alerts'],
+    features: ['Up to 5 cloud accounts', '500 monitored resources', 'Assistant + cost spike alerts', 'UK GDPR, Cyber Essentials & ISO 27001 checks', 'Email & Slack alerts'],
     highlight: true,
   },
   {
@@ -444,12 +470,14 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-14 items-center">
           <div>
             <h1 className="text-[2.2rem] sm:text-[2.6rem] lg:text-[2.9rem] font-semibold leading-[1.12] tracking-tight text-foreground">
-              AWS monitoring and UK compliance evidence for small businesses
+              Cloud monitoring and UK compliance evidence for small businesses
             </h1>
             <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
-              TekWatch watches your AWS account through a read-only agent, tells you in plain
-              English when something changes or breaks, shows which UK GDPR, Cyber Essentials or
-              FCA obligation it touches, and keeps a dated record of every check and every fix.
+              TekWatch watches the cloud you already run, through a read-only agent, tells you
+              in plain English when something changes or breaks, shows which UK GDPR, Cyber
+              Essentials or FCA obligation it touches, and keeps a dated record of every check and
+              every fix. There is nothing to migrate: we watch your infrastructure, we do not
+              host it.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link href="/overview/?demo=1" className={primaryBtn}>
@@ -459,7 +487,7 @@ export default function LandingPage() {
             </div>
             <dl className="mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6">
               {[
-                ['23', 'AWS services monitored'],
+                ['23', 'cloud services monitored'],
                 ['<30 min', 'to first dashboard'],
                 ['£79', 'starting price /mo'],
                 ['0', 'firewall changes needed'],
@@ -598,7 +626,7 @@ export default function LandingPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2 min-w-0 rounded-xl border border-border bg-background/60 p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs text-muted-foreground">Daily AWS Spend (Last 30 Days)</div>
+                        <div className="text-xs text-muted-foreground">Daily cloud spend (last 30 days)</div>
                         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-[2px] rounded-full bg-indigo-400" />This month</span>
                           <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-slate-500" />Last month</span>
@@ -665,7 +693,7 @@ export default function LandingPage() {
                   </div>
 
                   <div className="rounded-xl border border-border bg-background/60 p-4">
-                    <div className="text-xs text-muted-foreground mb-2">Top AWS Services by Cost (This Month)</div>
+                    <div className="text-xs text-muted-foreground mb-2">Top services by cost (this month)</div>
                     <div aria-hidden="true"><ResponsiveContainer width="100%" height={150}>
                       <BarChart data={serviceCostData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                         <CartesianGrid horizontal={false} vertical={false} />
@@ -817,7 +845,7 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="rounded-xl border border-border bg-background/60 p-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex-1">Ask about cost, security, or anything in your AWS estate...</span>
+                    <span className="flex-1">Ask about cost, security, or anything in your cloud estate...</span>
                     <span className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center flex-shrink-0">
                       <ArrowRight className="w-3 h-3 text-white" />
                     </span>
@@ -856,9 +884,23 @@ export default function LandingPage() {
               </Reveal>
             ))}
           </div>
+          <div className="mt-10 grid md:grid-cols-3 gap-4">
+            {REGULATORY_DATES.map(d => (
+              <div key={d.what} className="h-full rounded-lg border border-border bg-card p-5">
+                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">{d.when}</div>
+                <div className="mt-1.5 text-base font-semibold text-foreground">{d.what}</div>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{d.detail}</p>
+                <a href={d.href} target="_blank" rel="noopener noreferrer"
+                   className="mt-3 inline-block text-[11px] text-muted-foreground/80 hover:text-foreground hover:underline">
+                  {d.source}
+                </a>
+              </div>
+            ))}
+          </div>
+
           <Reveal className="mt-8">
-            <p className="rounded-xl border-l-4 border-indigo-600 bg-indigo-50/60 dark:bg-indigo-500/10 px-6 py-5 text-base md:text-lg font-medium text-foreground/90">
-              Built by engineers who monitor AWS for a living. Made for the businesses who don&apos;t have one on staff.
+            <p className="rounded-lg border-l-4 border-indigo-600 bg-indigo-50/60 dark:bg-indigo-500/10 px-6 py-5 text-base md:text-lg font-medium text-foreground/90">
+              Built by engineers who monitor cloud infrastructure for a living. Made for the businesses who don&apos;t have one on staff.
             </p>
           </Reveal>
         </div>
@@ -903,17 +945,18 @@ export default function LandingPage() {
           <Reveal>
             <SectionHeading
               title="Connected in 30 Minutes. No Firewall Changes."
-              lead="The agent runs as one ECS Fargate task inside your own AWS account, with a read-only IAM role, and only ever sends data out. Nothing to open, nothing to install on your servers."
+              lead="The agent runs as one container inside your own cloud account, with a read-only role, and only ever sends data out. Nothing to open, nothing to install on your servers."
             />
           </Reveal>
           <div className="mt-10 grid lg:grid-cols-2 gap-10 items-center">
             <Reveal>
               <ul className="space-y-4">
                 {[
-                  'Read-only IAM role, created for you by CloudFormation',
+                  'Read-only role, created for you by the deployment template',
                   'Outbound only: no inbound ports, no VPN, no firewall rules',
-                  '23 AWS services across every active region',
-                  'Your data stays in the UK (AWS London, eu-west-2)',
+                  '23 cloud services across every active region',
+                  'Your data stays in the UK (London region)',
+                  'AWS today. Azure is next on the roadmap',
                 ].map(p => (
                   <li key={p} className="flex items-start gap-3 text-base text-foreground/80">
                     <span className="mt-0.5 w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
@@ -924,7 +967,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link href="/signup" className="mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
-                Connect your AWS account <ChevronRight className="w-4 h-4" />
+                Connect your cloud account <ChevronRight className="w-4 h-4" />
               </Link>
             </Reveal>
             <Reveal delay={100}>
@@ -941,8 +984,8 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <SectionHeading
-              title="Stop Guessing About Your AWS,"
-              accent="Start Seeing It"
+              title="Stop guessing about your cloud."
+              accent="Start seeing it."
               lead="No sales call. No credit card. No specialist knowledge required."
             />
           </Reveal>
@@ -1044,7 +1087,7 @@ export default function LandingPage() {
             <div className="text-center max-w-3xl mx-auto">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Get started</p>
               <h2 className="mt-3 text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
-                See your AWS estate clearly,<br className="hidden sm:block" /> starting today
+                See your cloud clearly,<br className="hidden sm:block" /> starting today
               </h2>
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
                 <Link href="/overview/?demo=1" className={primaryBtn}>Launch live demo <ArrowRight className="w-4 h-4" /></Link>
@@ -1055,7 +1098,7 @@ export default function LandingPage() {
 
           <div className="mt-14 grid md:grid-cols-3 gap-5">
             {[
-              { icon: MessageSquare, title: 'Ready to get started?', desc: 'Talk to the team about your AWS estate and what you need to prove.', cta: 'Contact us', href: '/contact' },
+              { icon: MessageSquare, title: 'Ready to get started?', desc: 'Talk to the team about your cloud estate and what you need to prove.', cta: 'Contact us', href: '/contact' },
               { icon: Mail, title: 'Questions?', desc: 'Setup, billing or compliance, email us and an engineer will get back to you.', cta: 'hello@tekwatch.io', href: 'mailto:hello@tekwatch.io' },
               { icon: MonitorPlay, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
             ].map((c, i) => (
@@ -1129,7 +1172,7 @@ export default function LandingPage() {
 
           <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
             <p>© 2026 Tek Tribe Ltd. All rights reserved.</p>
-            <p>AWS monitoring and UK compliance checks, built for SMEs.</p>
+            <p>Cloud monitoring and UK compliance evidence, built for SMEs.</p>
           </div>
         </div>
       </footer>

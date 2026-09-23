@@ -9,8 +9,8 @@ const sans = Plus_Jakarta_Sans({ subsets: ['latin'], variable: '--font-sans', we
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' })
 
 export const metadata: Metadata = {
-  title: 'TekWatch: AWS Monitoring and UK Compliance Checks for SMEs',
-  description: 'AWS monitoring with anomaly detection, plain-English alerts, and automated checks mapped to UK GDPR, Cyber Essentials and ISO 27001, priced for SMEs, not enterprises.',
+  title: 'TekWatch: Cloud Monitoring and UK Compliance Evidence for SMEs',
+  description: 'Cloud monitoring with statistical anomaly detection, plain-English alerts, and automated checks mapped to UK GDPR, Cyber Essentials v3.3, ISO 27001 and FCA PS21/3, priced for SMEs, not enterprises.',
 }
 
 // Applies a saved dark preference before first paint. ThemeProvider only runs
