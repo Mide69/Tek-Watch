@@ -1,7 +1,16 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageSquare, Send, Bot, User, Loader2, Sparkles, X } from 'lucide-react'
+import { MessageSquare, Send, User, Loader2, X } from 'lucide-react'
+
+/** The assistant's mark: the product's initials, not a robot. */
+function AssistantMark() {
+  return (
+    <span className="w-7 h-7 rounded-md bg-primary text-primary-foreground text-[10px] font-bold tracking-wide flex items-center justify-center flex-shrink-0 mt-0.5">
+      TW
+    </span>
+  )
+}
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import apiClient from '@/lib/api'
@@ -39,9 +48,8 @@ const TOOL_LABELS: Record<string, string> = {
 
 function ToolBadge({ tool }: { tool: string }) {
   return (
-    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-primary/10 border border-primary/20 text-primary">
-      <Sparkles className="w-2.5 h-2.5" />
-      {TOOL_LABELS[tool] ?? tool}
+    <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted border border-border text-muted-foreground">
+      Read: {TOOL_LABELS[tool] ?? tool}
     </span>
   )
 }
@@ -50,14 +58,11 @@ function MessageBubble({ msg }: { msg: Message }) {
   const isUser = msg.role === 'user'
   return (
     <div className={cn('flex gap-3', isUser ? 'flex-row-reverse' : 'flex-row')}>
-      <div className={cn(
-        'w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5',
-        isUser ? 'bg-primary' : 'bg-muted border border-border'
-      )}>
-        {isUser
-          ? <User className="w-3.5 h-3.5 text-primary-foreground" />
-          : <Bot className="w-3.5 h-3.5 text-primary" />}
-      </div>
+      {isUser ? (
+        <div className="w-7 h-7 rounded-md flex items-center justify-center flex-shrink-0 mt-0.5 bg-muted border border-border">
+          <User className="w-3.5 h-3.5 text-muted-foreground" />
+        </div>
+      ) : <AssistantMark />}
 
       <div className={cn('max-w-[75%] space-y-1.5 flex flex-col', isUser ? 'items-end' : 'items-start')}>
         <div className={cn(
@@ -83,9 +88,7 @@ function MessageBubble({ msg }: { msg: Message }) {
 function TypingIndicator() {
   return (
     <div className="flex gap-3">
-      <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-muted border border-border">
-        <Bot className="w-3.5 h-3.5 text-primary" />
-      </div>
+      <AssistantMark />
       <div className="px-4 py-3 rounded-2xl rounded-tl-sm bg-card border border-border shadow-sm">
         <div className="flex gap-1 items-center h-4">
           {[0, 1, 2].map(i => (
@@ -173,8 +176,8 @@ function ChatContent() {
               <MessageSquare className="w-4 h-4 text-primary" />
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-foreground">Ask AI</h1>
-              <p className="text-xs text-muted-foreground">Natural language queries over your AWS infrastructure</p>
+              <h1 className="text-lg font-semibold text-foreground">Assistant</h1>
+              <p className="text-xs text-muted-foreground">Questions about your AWS estate, answered from your own data</p>
             </div>
           </div>
           {!isEmpty && (
@@ -193,11 +196,9 @@ function ChatContent() {
           {isEmpty ? (
             <div className="flex flex-col items-center justify-center h-full gap-6 text-center">
               <div className="space-y-2">
-                <div className="w-14 h-14 rounded-2xl bg-primary/8 border border-primary/15 flex items-center justify-center mx-auto">
-                  <Sparkles className="w-7 h-7 text-primary" />
-                </div>
-                <p className="text-foreground font-medium">Ask anything about your infrastructure</p>
-                <p className="text-muted-foreground text-sm">Queries your live AWS data in real time.</p>
+                <MessageSquare className="w-6 h-6 text-muted-foreground mx-auto" />
+                <p className="text-foreground font-medium">Ask about your AWS estate</p>
+                <p className="text-muted-foreground text-sm">Answers come from the latest data your agent sent.</p>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full max-w-lg">
                 {SUGGESTED.map((q) => (

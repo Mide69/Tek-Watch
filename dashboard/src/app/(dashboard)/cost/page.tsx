@@ -4,11 +4,12 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
-import { DollarSign, Download, TrendingUp, TrendingDown, Zap } from 'lucide-react'
+import { DollarSign, Download, TrendingUp, TrendingDown } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
 import { useCost } from '@/hooks/useData'
+import { useFixtureView } from '@/hooks/useFixtureView'
 import { BarChart } from '@/components/ui/MiniChart'
 import { cn } from '@/lib/utils'
 
@@ -110,6 +111,7 @@ export default function CostPage() {
 function CostContent() {
   const { timeRange } = useDashboard()
   const { data } = useCost()
+  const fixtureView = useFixtureView()
 
   const handleExport = () => {
     const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
@@ -273,17 +275,20 @@ function CostContent() {
           </Card>
         </div>
 
-        {/* AI cost insight */}
-        <Card className="border-primary/20 bg-primary/5">
+        {/* Sample insight, demo only.
+            This card is fixed text: a Lambda function called
+            acme-image-processor, a 38.7% rise, right-sizing "completed last
+            week". It was shown to every signed-in customer as if it described
+            their account, under an "AI" label. Nothing computes it, so only
+            the demo, which says it is sample data, may show it. */}
+        {fixtureView && (
+        <Card>
           <CardContent className="p-5">
             <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Zap className="w-4 h-4 text-primary" />
-              </div>
+              <TrendingUp className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
               <div>
                 <div className="flex items-center gap-2 mb-1.5">
-                  <span className="text-xs font-semibold text-primary">AI Cost Insight</span>
-                  <span className="text-xs text-muted-foreground">· Powered by Claude</span>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost insight</span>
                 </div>
                 <p className="text-sm text-foreground leading-relaxed">
                   Your{' '}
@@ -302,6 +307,7 @@ function CostContent() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
   )
 }

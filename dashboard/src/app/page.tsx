@@ -8,7 +8,7 @@ import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, ShieldCheck, Cloud, GitMerge,
   ArrowRight, Check, ChevronDown, ChevronRight, Menu, X, Gavel, PoundSterling, BarChart3,
-  Mail, MapPin, Bot, Sparkles, Key, Users, MessageSquare,
+  Mail, MapPin, MonitorPlay, Key, Users, MessageSquare,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -88,7 +88,7 @@ const previewTabs = [
   { id: 'overview', label: 'Overview', path: '/overview' },
   { id: 'security', label: 'Security', path: '/security' },
   { id: 'cost', label: 'Cost', path: '/cost' },
-  { id: 'assistant', label: 'AI Assistant', path: '/chat' },
+  { id: 'assistant', label: 'Assistant', path: '/chat' },
 ] as const
 
 type PreviewTabId = typeof previewTabs[number]['id']
@@ -243,59 +243,23 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   )
 }
 
-/** Fires once when the element scrolls into view; stays true afterwards. */
-function useReveal<T extends HTMLElement>() {
-  const ref = useRef<T>(null)
-  const [inView, setInView] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    // Reveal immediately where IntersectionObserver is unavailable. Revealed
-    // content starts at opacity 0, so failing closed would leave the page
-    // blank rather than merely unanimated.
-    if (typeof IntersectionObserver === 'undefined') {
-      setInView(true)
-      return
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -80px 0px' }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-  return [ref, inView] as const
-}
 
 /**
- * Fades a block up the first time it enters the viewport. prefers-reduced-motion
- * is handled globally in globals.css, which collapses the animation to ~0s.
+ * Wraps a block. It used to fade each one up as it scrolled into view, which
+ * is the most recognisable motion on a generated landing page. The wrapper is
+ * kept so the delay props at call sites stay harmless.
  */
-function Reveal({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const [ref, inView] = useReveal<HTMLDivElement>()
-  return (
-    <div
-      ref={ref}
-      className={`${className} ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}
-      style={inView && delay ? { animationDelay: `${delay}ms` } : undefined}
-    >
-      {children}
-    </div>
-  )
+function Reveal({ children, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
+  return <div className={className}>{children}</div>
 }
 
-/** Section heading in the reference style: bold black line, optional indigo line. */
+/** Section heading: one weight, one colour. A second line in the brand colour read as a template. */
 function SectionHeading({ title, accent, lead, center = false }: { title: string; accent?: string; lead?: string; center?: boolean }) {
   return (
     <div className={center ? 'text-center max-w-3xl mx-auto' : 'max-w-3xl'}>
       <h2 className="text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
         {title}
-        {accent && (<><br /><span className="text-indigo-700 dark:text-indigo-400">{accent}</span></>)}
+        {accent && <> {accent}</>}
       </h2>
       {lead && <p className="mt-5 text-base md:text-lg text-muted-foreground leading-relaxed">{lead}</p>}
     </div>
@@ -360,80 +324,14 @@ function PlatformMenu() {
 
 type IconType = typeof Activity
 
-function FlowNode({ x, y, w, title, sub, icon: Icon, accent = false }: {
-  x: number; y: number; w: number; title: string; sub: string; icon: IconType; accent?: boolean
-}) {
-  const h = 56
-  return (
-    <g>
-      {/* Theme colours as classes, so the diagram follows light and dark. */}
-      <rect x={x} y={y} width={w} height={h} rx={10} className={accent ? 'fill-card stroke-indigo-400' : 'fill-card stroke-border'} strokeWidth={accent ? 1.5 : 1} />
-      <rect x={x + 10} y={y + 12} width={32} height={32} rx={8} className={accent ? 'fill-indigo-600' : 'fill-indigo-50 dark:fill-indigo-500/15'} />
-      <Icon x={x + 18} y={y + 20} width={16} height={16} className={accent ? 'text-white' : 'text-indigo-600 dark:text-indigo-300'} strokeWidth={2} />
-      <text x={x + 52} y={y + 25} fontSize={12.5} fontWeight={600} className="fill-foreground">{title}</text>
-      <text x={x + 52} y={y + 42} fontSize={10.5} className="fill-muted-foreground">{sub}</text>
-      <circle cx={x} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
-      <circle cx={x + w} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
-    </g>
-  )
-}
 
-/** How TekWatch actually works, drawn as the pipeline it is. */
-function HeroFlow() {
-  const outputs = [
-    { y: 34,  title: 'Anomaly detection',    sub: '7-day baseline per metric', icon: Activity },
-    { y: 146, title: 'Compliance checks',    sub: 'UK GDPR · CE · ISO 27001',  icon: ShieldCheck },
-    { y: 258, title: 'Incident correlation', sub: 'Who changed what, when', icon: GitMerge },
-  ]
-  // Widths leave room for the longest label at the rendered font size.
-  const ax = 8, aw = 162, bx = 214, bw = 172, ox = 432, ow = 200, cy = 174
-  return (
-    <div
-      className="relative rounded-2xl border-2 border-border bg-card p-4 shadow-xl shadow-slate-900/5"
-      style={{ backgroundImage: 'radial-gradient(hsl(var(--border)) 1px, transparent 1px)', backgroundSize: '16px 16px' }}
-    >
-      <div className="flex items-center justify-between mb-2 px-1">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-1 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live pipeline
-        </span>
-        <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 15 minutes</span>
-      </div>
-      <svg viewBox="0 0 640 332" className="w-full h-auto" role="img" aria-label="Your AWS account sends read-only data to the TekWatch agent, which feeds anomaly detection, compliance checks and incident correlation">
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#78ccd8" strokeWidth={1.5} />
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#17707f" strokeWidth={1.5} className="animate-flow" />
-        {outputs.map(o => {
-          const d = `M${bx + bw} ${cy} C ${bx + bw + 30} ${cy}, ${ox - 30} ${o.y + 28}, ${ox} ${o.y + 28}`
-          return (
-            <g key={o.title}>
-              <path d={d} fill="none" stroke="#78ccd8" strokeWidth={1.5} />
-              <path d={d} fill="none" stroke="#17707f" strokeWidth={1.5} className="animate-flow" />
-            </g>
-          )
-        })}
-        <FlowNode x={ax} y={cy - 28} w={aw} title="AWS account" sub="EC2 · RDS · S3 · IAM" icon={Cloud} />
-        <FlowNode x={bx} y={cy - 28} w={bw} title="TekWatch agent" sub="Read-only, outbound" icon={Radio} accent />
-        {outputs.map(o => (
-          <FlowNode key={o.title} x={ox} y={o.y} w={ow} title={o.title} sub={o.sub} icon={o.icon} />
-        ))}
-      </svg>
-      <div className="mt-2 flex items-center gap-2 rounded-lg bg-card/95 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border">
-        <Mail className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-        Anything that needs you arrives by email or Slack, explained in plain English.
-      </div>
-    </div>
-  )
-}
 
 /**
- * What the agent reads, and what comes out the other side, animated as the
- * pipeline it is. On first view the boxes and connectors build in order; then
- * data keeps flowing: each service sends a packet to the agent, the agent
- * pulses as they land, and results travel out to each output, which lights up.
+ * What the agent reads, and what comes out the other side.
  *
- * The flow is SVG (SMIL) animation so every packet, pulse and glow runs on one
- * shared clock and stays in step. It is not rendered for visitors who asked
- * for reduced motion; the entrance is CSS and collapses to its end state
- * under the global reduced-motion rule.
+ * This was animated: packets travelling along the lines, rings pulsing as they
+ * landed, boxes building in on scroll. It read as a generated SaaS page rather
+ * than a product. The diagram says the same thing standing still.
  */
 function CoverageDiagram() {
   const top = [
@@ -446,100 +344,32 @@ function CoverageDiagram() {
     { x: 260, title: 'Alerts',     sub: 'Email & Slack' },
     { x: 435, title: 'Evidence',   sub: 'Compliance checks' },
   ]
-  const [ref, inView] = useReveal<HTMLDivElement>()
-  const [flowing, setFlowing] = useState(false)
-
-  useEffect(() => {
-    if (!inView) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // Let the build-in finish before anything moves along the lines.
-    const id = setTimeout(() => setFlowing(true), 1600)
-    return () => clearTimeout(id)
-  }, [inView])
-
-  // Timings in seconds. One cycle: packets leave the three services in turn,
-  // reach the agent, then leave the agent for the three outputs.
-  const CYCLE = 3.6
-  const TRAVEL = 0.32                      // share of the cycle a packet spends moving
-  const ARRIVE = TRAVEL * CYCLE            // seconds from leaving to landing
-  const IN = top.map((_, i) => 0.2 + i * 0.25)
-  const AGENT = IN[0] + ARRIVE
-  const OUT = bottom.map((_, i) => IN[2] + ARRIVE + 0.35 + i * 0.2)
-  const loop = { dur: `${CYCLE}s`, repeatCount: 'indefinite' as const }
-  const delay = (ms: number) => ({ animationDelay: `${ms}ms` })
-
-  const packet = (key: string, path: string, begin: number, tone: 'indigo' | 'emerald') => (
-    <g key={key} opacity={0}>
-      <circle r={7} className={tone === 'indigo' ? 'fill-indigo-500/20' : 'fill-emerald-500/20'} />
-      <circle r={3.2} className={tone === 'indigo' ? 'fill-indigo-500 dark:fill-indigo-300' : 'fill-emerald-500 dark:fill-emerald-300'} />
-      <animateMotion path={path} begin={`${begin}s`} {...loop} keyPoints="0;1;1" keyTimes={`0;${TRAVEL};1`} calcMode="linear" />
-      <animate attributeName="opacity" values="0;1;1;0;0" keyTimes={`0;0.03;${TRAVEL - 0.03};${TRAVEL};1`} begin={`${begin}s`} {...loop} />
-    </g>
-  )
-
-  // A ring that flashes once per cycle around a box, starting at `begin`.
-  const flash = (key: string, x: number, y: number, begin: number, className: string) => (
-    <rect key={key} x={x} y={y} width={162} height={54} rx={11} fill="none" strokeWidth={2} opacity={0} className={className}>
-      <animate attributeName="opacity" values="0;0.9;0;0" keyTimes="0;0.06;0.3;1" begin={`${begin}s`} {...loop} />
-    </rect>
-  )
-
-  const ringTimes = '0;0.05;0.3;1'
-  const ringBegin = `${AGENT}s`
-
   return (
-    <div ref={ref}>
-      <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
-        {/* Connectors draw in on first view. */}
-        {top.map((t, i) => (
-          <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} pathLength={1} strokeWidth={1.2}
-            className={`stroke-indigo-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(380 + i * 90)} />
-        ))}
-        {bottom.map((b, i) => (
-          <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} pathLength={1} strokeWidth={1.2}
-            className={`stroke-emerald-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(980 + i * 90)} />
-        ))}
-
-        {/* Packets travel under the boxes, so they vanish into them. */}
-        {flowing && top.map((t, i) => packet(`in-${t.title}`, `M${t.x} 58 L260 106`, IN[i], 'indigo'))}
-        {flowing && bottom.map((b, i) => packet(`out-${b.title}`, `M260 156 L${b.x} 204`, OUT[i], 'emerald'))}
-
-        {top.map((t, i) => (
-          <g key={t.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(i * 110)}>
-            <rect x={t.x - 78} y={10} width={156} height={48} rx={8} fill="#312e81" />
-            <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fbfbfd">{t.title}</text>
-            <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} fill="#c7d2fe">{t.sub}</text>
-          </g>
-        ))}
-        {flowing && top.map((t, i) => flash(`send-${t.title}`, t.x - 81, 7, IN[i], 'stroke-indigo-400'))}
-
-        {/* The agent pulses as packets land. */}
-        {flowing && (
-          <rect x={160} y={106} width={200} height={50} rx={12} fill="none" strokeWidth={1.5} opacity={0} className="stroke-indigo-400">
-            <animate attributeName="opacity" values="0;0.8;0;0" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="x" values="160;160;150;150" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="y" values="106;106;96;96" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="width" values="200;200;220;220" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="height" values="50;50;70;70" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-          </rect>
-        )}
-        <g className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(700)}>
-          <rect x={160} y={106} width={200} height={50} rx={10} className="fill-indigo-50 stroke-indigo-300 dark:fill-indigo-500/15 dark:stroke-indigo-500/50" />
-          <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} className="fill-indigo-900 dark:fill-indigo-200">TekWatch agent</text>
-          <text x={260} y={144} textAnchor="middle" fontSize={10} className="fill-indigo-600 dark:fill-indigo-300">Read-only · outbound only</text>
+    <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
+      {top.map(t => (
+        <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} strokeWidth={1.2} className="stroke-border" />
+      ))}
+      {bottom.map(b => (
+        <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} strokeWidth={1.2} className="stroke-border" />
+      ))}
+      {top.map(t => (
+        <g key={t.title}>
+          <rect x={t.x - 78} y={10} width={156} height={48} rx={6} className="fill-card stroke-border" />
+          <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-foreground">{t.title}</text>
+          <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} className="fill-muted-foreground">{t.sub}</text>
         </g>
-        {flowing && flash('agent', 157, 104, AGENT, 'stroke-indigo-500')}
-
-        {bottom.map((b, i) => (
-          <g key={b.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(1250 + i * 110)}>
-            <rect x={b.x - 78} y={204} width={156} height={48} rx={8} className="fill-emerald-50 stroke-emerald-300 dark:fill-emerald-500/10 dark:stroke-emerald-500/40" />
-            <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-emerald-800 dark:fill-emerald-300">{b.title}</text>
-            <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-emerald-700 dark:fill-emerald-400">{b.sub}</text>
-          </g>
-        ))}
-        {flowing && bottom.map((b, i) => flash(`land-${b.title}`, b.x - 81, 201, OUT[i] + ARRIVE, 'stroke-emerald-400'))}
-      </svg>
-    </div>
+      ))}
+      <rect x={160} y={106} width={200} height={50} rx={6} className="fill-indigo-600" />
+      <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} fill="#ffffff">TekWatch agent</text>
+      <text x={260} y={144} textAnchor="middle" fontSize={10} fill="#d4f1f4">Read-only · outbound only</text>
+      {bottom.map(b => (
+        <g key={b.title}>
+          <rect x={b.x - 78} y={204} width={156} height={48} rx={6} className="fill-card stroke-border" />
+          <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-foreground">{b.title}</text>
+          <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-muted-foreground">{b.sub}</text>
+        </g>
+      ))}
+    </svg>
   )
 }
 
@@ -550,20 +380,9 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<PreviewTabId>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
 
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const id = setTimeout(() => {
-      setActiveTab(prev => {
-        const idx = previewTabs.findIndex(t => t.id === prev)
-        return previewTabs[(idx + 1) % previewTabs.length].id
-      })
-    }, 6000)
-    return () => clearTimeout(id)
-  }, [activeTab])
-
   const activePath = previewTabs.find(t => t.id === activeTab)?.path ?? '/overview'
 
-  const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-600/25 hover:bg-indigo-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
+  const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
   const secondaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground hover:border-muted-foreground/40 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
 
   return (
@@ -624,33 +443,21 @@ export default function LandingPage() {
       <section className="px-6 pt-14 pb-20 md:pt-20 md:pb-24">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-14 items-center">
           <div>
-            <p className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-indigo-100 dark:border-indigo-500/25 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-              Cloud monitoring and compliance, built for UK SMEs
-            </p>
-            <h1
-              className="animate-fade-in-up text-[2.4rem] sm:text-5xl lg:text-[3.1rem] font-bold leading-[1.08] tracking-tight text-foreground"
-              style={{ animationDelay: '80ms' }}
-            >
-              Your AWS estate.<br />
-              <span className="text-indigo-700 dark:text-indigo-400">Fully visible.<br className="hidden sm:block" /> Risks caught early.</span>
+            <h1 className="text-[2.2rem] sm:text-[2.6rem] lg:text-[2.9rem] font-semibold leading-[1.12] tracking-tight text-foreground">
+              AWS monitoring and UK compliance evidence for small businesses
             </h1>
-            <p
-              className="animate-fade-in-up mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl"
-              style={{ animationDelay: '160ms' }}
-            >
-              Know the moment something&apos;s wrong in your AWS estate. TekWatch watches your
-              infrastructure around the clock, catching cost spikes, performance issues and
-              security risks as they happen, and checking your setup against UK GDPR,
-              Cyber Essentials and ISO 27001 from day one.
+            <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
+              TekWatch watches your AWS account through a read-only agent, tells you in plain
+              English when something changes or breaks, shows which UK GDPR, Cyber Essentials or
+              FCA obligation it touches, and keeps a dated record of every check and every fix.
             </p>
-            <div className="animate-fade-in-up mt-8 flex flex-col sm:flex-row gap-3" style={{ animationDelay: '240ms' }}>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link href="/overview/?demo=1" className={primaryBtn}>
                 Launch live demo <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/signup" className={secondaryBtn}>Start free trial</Link>
             </div>
-            <dl className="animate-fade-in-up mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6" style={{ animationDelay: '320ms' }}>
+            <dl className="mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6">
               {[
                 ['23', 'AWS services monitored'],
                 ['<30 min', 'to first dashboard'],
@@ -666,9 +473,31 @@ export default function LandingPage() {
             </dl>
           </div>
 
-          <div className="animate-fade-in-up hidden sm:block" style={{ animationDelay: '200ms' }}>
-            <HeroFlow />
-          </div>
+          {/* The product itself, not an illustration of it. */}
+          <figure className="hidden sm:block">
+            <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/product/overview-light.png"
+                alt="The TekWatch overview: monitored resources, active alerts, security findings and monthly cost"
+                width={1440}
+                height={900}
+                className="block w-full h-auto dark:hidden"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/product/overview-dark.png"
+                alt=""
+                aria-hidden="true"
+                width={1440}
+                height={900}
+                className="hidden w-full h-auto dark:block"
+              />
+            </div>
+            <figcaption className="mt-3 text-xs text-muted-foreground">
+              The overview page, from the demo account with sample data.
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -738,14 +567,14 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-emerald-400/70" />
                   <div className="flex-1 mx-4 min-w-0">
                     <div className="h-5 rounded-md bg-background border border-border max-w-72 mx-auto flex items-center justify-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       <span className="text-xs text-muted-foreground font-mono truncate">app.tekwatch.io{activePath}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Mock dashboard */}
-                <div key={activeTab} className="p-5 space-y-3 animate-fade-in">
+                <div key={activeTab} className="p-5 space-y-3">
                 {activeTab === 'overview' && (<>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {statTiles.map(s => (
@@ -954,7 +783,6 @@ export default function LandingPage() {
                         </div>
                       </div>
                       <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-300 flex-shrink-0 mt-0.5" />
                         <span className="text-[11px] text-foreground/80 leading-relaxed">
                           2 cost spikes flagged this month. The largest: an idle RDS instance running 24/7 in eu-west-1.
                         </span>
@@ -971,18 +799,17 @@ export default function LandingPage() {
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-white/5 border border-border flex items-center justify-center flex-shrink-0">
-                        <Bot className="w-3.5 h-3.5 text-indigo-300" />
-                      </div>
+                      <span className="w-7 h-7 rounded-md bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                        TW
+                      </span>
                       <div className="space-y-2 flex-1">
                         <div className="rounded-2xl rounded-tl-sm bg-background border border-border text-foreground/90 text-sm leading-relaxed px-4 py-3">
                           {chatExchange.answer}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {chatExchange.tools.map(t => (
-                            <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-200">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              {t}
+                            <span key={t} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted border border-border text-muted-foreground">
+                              Read: {t}
                             </span>
                           ))}
                         </div>
@@ -1230,7 +1057,7 @@ export default function LandingPage() {
             {[
               { icon: MessageSquare, title: 'Ready to get started?', desc: 'Talk to the team about your AWS estate and what you need to prove.', cta: 'Contact us', href: '/contact' },
               { icon: Mail, title: 'Questions?', desc: 'Setup, billing or compliance, email us and an engineer will get back to you.', cta: 'hello@tekwatch.io', href: 'mailto:hello@tekwatch.io' },
-              { icon: Sparkles, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
+              { icon: MonitorPlay, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
             ].map((c, i) => (
               <Reveal key={c.title} delay={i * 70}>
                 <div className="h-full flex flex-col rounded-xl bg-card p-6 ring-1 ring-border shadow-sm">
