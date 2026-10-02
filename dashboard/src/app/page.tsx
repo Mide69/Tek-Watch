@@ -223,23 +223,47 @@ const REGULATORY_DATES = [
   },
 ]
 
+// Managed Cloud Services. Our engineers do the remediation, using TekWatch as
+// the operating tool. Response targets apply during business hours unless the
+// customer contract says otherwise.
+const managedTiers = [
+  {
+    name: 'Foundation', monthly: 500,
+    desc: 'Micro and small businesses, community organisations.',
+    included: 'TekWatch Business included',
+    features: ['1 cloud account, up to 50 resources', 'UK GDPR and Cyber Essentials v3.3', 'Critical alert response: 4 business hours', 'Monthly patching', 'Monthly health report'],
+  },
+  {
+    name: 'Growth', monthly: 750,
+    desc: 'Growing SMEs and start-ups.',
+    included: 'TekWatch Business included',
+    features: ['Up to 3 accounts, 200 resources', 'Adds ISO 27001:2022 technical controls', 'Critical alert response: 2 hours', 'Fortnightly patching', 'Quarterly review call'],
+  },
+  {
+    name: 'Scale', monthly: 1000,
+    desc: 'Regulated mid-market businesses.',
+    included: 'TekWatch Enterprise included',
+    features: ['Up to 5 accounts, 500 resources', 'All four frameworks', 'Critical alert response: 1 hour', 'Weekly patching', 'Monthly review call'],
+  },
+]
+
 const pricingTiers = [
   {
     name: 'Starter', monthly: 79, discount: 0.10,
     desc: 'For micro-businesses, startups and charities getting started in the cloud.',
-    features: ['Up to 2 cloud accounts', '50 monitored resources', 'Anomaly detection', 'UK GDPR compliance checks'],
+    features: ['Up to 2 cloud accounts', '50 monitored resources', 'Statistical anomaly detection', 'UK GDPR checks'],
     highlight: false,
   },
   {
     name: 'Business', monthly: 199, discount: 0.10,
     desc: 'For growing SMEs, FinTech firms and professional services.',
-    features: ['Up to 5 cloud accounts', '500 monitored resources', 'Assistant + cost spike alerts', 'UK GDPR, Cyber Essentials & ISO 27001 checks', 'Email & Slack alerts'],
+    features: ['Up to 5 cloud accounts', '500 monitored resources', 'Full detection engine, Assistant and cost alerts', 'UK GDPR and Cyber Essentials v3.3 cloud controls', 'Email & Slack alerts'],
     highlight: true,
   },
   {
     name: 'Enterprise', monthly: 499, discount: 0.15,
     desc: 'For mid-market and regulated businesses with complex environments.',
-    features: ['Unlimited accounts & resources', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
+    features: ['Unlimited accounts & resources', 'All four frameworks: UK GDPR, Cyber Essentials, ISO 27001, FCA PS21/3', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
     highlight: false,
   },
 ]
@@ -1073,10 +1097,45 @@ export default function LandingPage() {
               )
             })}
           </div>
-          <p className="text-center text-sm text-muted-foreground mt-8">
-            Want it fully managed? Tek Tribe&apos;s Managed Cloud Services start from{' '}
-            <span className="font-semibold text-foreground">£500/month</span>, TekWatch included.
-          </p>
+          <div className="mt-16 pt-14 border-t border-border">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Managed Cloud Services</p>
+              <h3 className="mt-3 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                Or let our engineers do the fixing
+              </h3>
+              <p className="mt-3 text-muted-foreground">
+                TekWatch finds the problem. On a managed plan, Tek Tribe&apos;s engineers put it right,
+                using the same platform as their operating tool. Every plan includes a TekWatch subscription.
+              </p>
+            </div>
+
+            <div className="mt-10 grid md:grid-cols-3 gap-5">
+              {managedTiers.map(m => (
+                <div key={m.name} className="rounded-lg border border-border bg-card p-6 flex flex-col">
+                  <h4 className="text-lg font-semibold text-foreground">{m.name}</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">{m.desc}</p>
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-foreground">£{m.monthly.toLocaleString('en-GB')}</span>
+                    <span className="text-sm text-muted-foreground">/month</span>
+                  </div>
+                  <p className="mt-1 text-xs font-medium text-indigo-700 dark:text-indigo-400">{m.included}</p>
+                  <ul className="mt-5 mb-6 space-y-2 flex-1">
+                    {m.features.map(f => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-foreground/80">
+                        <Check className="w-4 h-4 mt-0.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/contact" className={secondaryBtn}>Talk to us</Link>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground mt-6">
+              Response targets apply during business hours unless otherwise agreed in the customer contract.
+            </p>
+          </div>
         </div>
       </section>
 
