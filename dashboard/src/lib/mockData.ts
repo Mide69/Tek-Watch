@@ -87,7 +87,11 @@ export function getMockOverview(timeRange: TimeRange = '24h') {
     ] as RegionCount[],
     resources_by_service: [] as Array<{ service: string; count: number }>,
     active_alarms: timeRange === '1h' ? 2 : 3,
-    security_findings: 2,
+    // The API defines this as active alerts at high or critical severity
+    // (api/routers/overview.py). The demo has 3 active alerts, one critical,
+    // so the rule gives 1. It was hardcoded to 2, which contradicted the
+    // Security page and put two different answers in the business plan.
+    security_findings: 1,
     estimated_monthly_cost: +(4247.80 * multiplier).toFixed(2),
     cost_trend: genDailyCosts(timeRange, 142, 28, 77),
     agent_status: { status: 'healthy' as const, last_seen: minsAgo(2) },
