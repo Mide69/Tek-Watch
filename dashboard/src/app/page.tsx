@@ -8,7 +8,7 @@ import {
   Radio, Activity, Shield, DollarSign, Zap, Server, Cpu, AlertTriangle,
   TrendingUp, TrendingDown, ShieldCheck, Cloud, GitMerge,
   ArrowRight, Check, ChevronDown, ChevronRight, Menu, X, Gavel, PoundSterling, BarChart3,
-  Mail, MapPin, Bot, Sparkles, Key, Users, MessageSquare,
+  Mail, MapPin, MonitorPlay, Key, Users, MessageSquare,
 } from 'lucide-react'
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -31,7 +31,7 @@ const spendData = spendCurrent.map((v, i) => ({ day: i + 1, spend: v, prevSpend:
 const avgSpend = Math.round(spendCurrent.reduce((s, v) => s + v, 0) / spendCurrent.length)
 const anomalyPoint = spendData[spendData.length - 1]
 
-const scoreData = [{ name: 'score', value: 91, fill: '#818cf8' }]
+const scoreData = [{ name: 'score', value: 91, fill: '#3aa9bb' }]
 
 const complianceFrameworks = [
   { label: 'UK GDPR', status: 'pass' as const },
@@ -49,7 +49,7 @@ const serviceCostData = [
 ]
 const maxServiceCost = Math.max(...serviceCostData.map(d => d.cost))
 
-const SERVICE_COLORS = ['#818cf8', '#a78bfa', '#38bdf8', '#fbbf24', '#f97316', '#34d399']
+const SERVICE_COLORS = ['#3aa9bb', '#a78bfa', '#38bdf8', '#fbbf24', '#f97316', '#34d399']
 const DONUT_R = 62, DONUT_CX = 78, DONUT_CY = 78
 const donutCirc = 2 * Math.PI * DONUT_R
 const donutTotal = serviceCostData.reduce((s, d) => s + d.cost, 0)
@@ -79,7 +79,7 @@ const securitySummaryTiles = [
 ]
 
 const chatExchange = {
-  question: 'Why did my AWS bill spike this week?',
+  question: 'Why did my cloud bill spike this week?',
   answer: 'Your spend jumped 18% on Tuesday, mostly EC2. Three on-demand instances in eu-west-2 have run at steady utilisation for 30 days straight; switching them to Reserved would save roughly £140/month.',
   tools: ['Cost breakdown', 'EC2 instances'],
 }
@@ -88,13 +88,13 @@ const previewTabs = [
   { id: 'overview', label: 'Overview', path: '/overview' },
   { id: 'security', label: 'Security', path: '/security' },
   { id: 'cost', label: 'Cost', path: '/cost' },
-  { id: 'assistant', label: 'AI Assistant', path: '/chat' },
+  { id: 'assistant', label: 'Assistant', path: '/chat' },
 ] as const
 
 type PreviewTabId = typeof previewTabs[number]['id']
 
 const PLATFORM_LINKS = [
-  { label: 'Continuous monitoring', href: '#capabilities', desc: '23 AWS services, every region' },
+  { label: 'Continuous monitoring', href: '#capabilities', desc: '23 cloud services, every region' },
   { label: 'Anomaly detection', href: '#platform', desc: 'Your own 7-day baseline' },
   { label: 'Compliance checks', href: '#capabilities', desc: 'UK GDPR, Cyber Essentials, ISO 27001' },
   { label: 'Incident correlation', href: '#platform', desc: 'Who changed what, and the fix' },
@@ -105,8 +105,8 @@ const FEATURES = [
   {
     icon: Activity,
     title: 'Continuous Visibility',
-    desc: 'EC2, RDS, Lambda, ECS/EKS, S3, DynamoDB and 14 more AWS services, giving you full visibility across every active region from your first dashboard load.',
-    points: ['23 AWS services monitored', 'Every active region, day one', '90-day metric history'],
+    desc: 'Compute, databases, storage, networking, messaging and security services, giving you full visibility across every active region from your first dashboard load.',
+    points: ['23 cloud services monitored', 'Every active region, day one', '90-day metric history'],
   },
   {
     icon: Zap,
@@ -117,7 +117,7 @@ const FEATURES = [
   {
     icon: Shield,
     title: 'UK Compliance Intelligence',
-    desc: 'Automated checks of your AWS setup, mapped to the UK frameworks SMEs actually face, naming each failing resource and how to fix it.',
+    desc: 'Automated checks of your cloud setup, mapped to the UK frameworks SMEs actually face, naming each failing resource and how to fix it.',
     points: ['UK GDPR, Cyber Essentials & ISO 27001', 'Incidents traced to who changed what', 'GuardDuty & Security Hub findings'],
   },
   {
@@ -135,7 +135,7 @@ const FEATURES = [
   {
     icon: Radio,
     title: 'Lightweight Agent',
-    desc: 'A single ECS Fargate task in your AWS account. Read-only IAM, outbound-only, zero firewall changes.',
+    desc: 'A single read-only container in your own cloud account. Outbound only, zero firewall changes.',
     points: ['ECS Fargate', 'Read-only IAM role', 'Auto-deploy CloudFormation'],
   },
 ]
@@ -147,7 +147,7 @@ const ONBOARDING_STEPS = [
   },
   {
     title: 'Deploy in under 30 minutes',
-    desc: 'When you are ready to connect your own AWS account, we hand you a pre-configured CloudFormation template for the read-only monitoring agent. No inbound firewall changes needed.',
+    desc: 'When you are ready to connect your own cloud account, we hand you a pre-configured template for the read-only monitoring agent. No inbound firewall changes needed.',
   },
   {
     title: 'See what’s really going on',
@@ -158,7 +158,7 @@ const ONBOARDING_STEPS = [
 const statTiles = [
   { icon: Cpu, label: 'Monitored Resources', value: '847', delta: '+12%', good: true, sub: 'vs last month', trend: [620, 640, 655, 670, 690, 705, 720, 735, 760, 780, 810, 847] },
   { icon: AlertTriangle, label: 'Active Alerts', value: '3', delta: '−40%', good: true, sub: 'vs last week', trend: [9, 8, 8, 7, 6, 6, 5, 5, 4, 4, 3, 3] },
-  { icon: DollarSign, label: 'Monthly AWS Spend', value: '£1,840', delta: '+4%', good: false, sub: 'vs last month', trend: [1650, 1700, 1680, 1720, 1750, 1690, 1730, 1760, 1740, 1780, 1810, 1840] },
+  { icon: DollarSign, label: 'Monthly cloud spend', value: '£1,840', delta: '+4%', good: false, sub: 'vs last month', trend: [1650, 1700, 1680, 1720, 1750, 1690, 1730, 1760, 1740, 1780, 1810, 1840] },
 ]
 
 // Every figure here is one a reader can open and check, which is why each
@@ -169,10 +169,10 @@ const statTiles = [
 const problemStats = [
   {
     icon: Gavel,
-    value: '£3.07m',
-    label: 'ICO fine after attackers reached systems through an account with no multi-factor authentication',
-    source: 'ICO enforcement, March 2025',
-    href: 'https://ico.org.uk/action-weve-taken/enforcement/2025/03/advanced-computer-software-group-limited/',
+    value: '£14m',
+    label: 'ICO fine on Capita in October 2025 over a breach that exposed the data of 6.6 million people',
+    source: 'ICO enforcement, October 2025',
+    href: 'https://ico.org.uk/about-the-ico/media-centre/news-and-blogs/2025/10/capita-fined-14m-for-data-breach-affecting-over-6m-people/',
   },
   {
     icon: PoundSterling,
@@ -190,30 +190,80 @@ const problemStats = [
   },
   {
     icon: TrendingUp,
-    value: '19%',
-    label: 'Growth in Cyber Essentials certificates issued that year',
-    source: 'NCSC Annual Review 2025',
-    href: 'https://www.ncsc.gov.uk/collection/ncsc-annual-review-2025',
+    value: '43%',
+    label: 'Of UK businesses identified a cyber breach or attack in the last twelve months',
+    source: 'Cyber Security Breaches Survey 2025, DSIT',
+    href: 'https://www.gov.uk/government/statistics/cyber-security-breaches-survey-2025/cyber-security-breaches-survey-2025',
+  },
+]
+
+// Three dates doing the work. Each one is published by the body that sets it,
+// and linked, because an unsourced deadline is just pressure.
+const REGULATORY_DATES = [
+  {
+    when: '27 April 2026',
+    what: 'Cyber Essentials v3.3',
+    detail: 'The updated requirements put cloud services firmly in scope and tighten the rules on multi-factor authentication.',
+    href: 'https://iasme.co.uk/articles/important-update-changes-to-cyber-essentials-for-april-2026/',
+    source: 'IASME',
+  },
+  {
+    when: 'In force now',
+    what: 'FCA PS21/3 operational resilience',
+    detail: 'The compliance deadline passed in March 2025. Regulated firms are now asked for evidence rather than plans.',
+    href: 'https://www.fca.org.uk/publications/policy-statements/ps21-3-building-operational-resilience',
+    source: 'FCA',
+  },
+  {
+    when: '72 hours',
+    what: 'UK GDPR Article 33',
+    detail: 'The time you have to tell the ICO about a personal data breach, counted from when you become aware of it.',
+    href: 'https://ico.org.uk/for-organisations/report-a-breach/personal-data-breach/',
+    source: 'ICO',
+  },
+]
+
+// Managed Cloud Services. Our engineers do the remediation, using TekWatch as
+// the operating tool. Response targets apply during business hours unless the
+// customer contract says otherwise.
+const managedTiers = [
+  {
+    name: 'Foundation', monthly: 500,
+    desc: 'Micro and small businesses, community organisations.',
+    included: 'TekWatch Business included',
+    features: ['1 cloud account, up to 50 resources', 'UK GDPR and Cyber Essentials v3.3', 'Critical alert response: 4 business hours', 'Monthly patching', 'Monthly health report'],
+  },
+  {
+    name: 'Growth', monthly: 750,
+    desc: 'Growing SMEs and start-ups.',
+    included: 'TekWatch Business included',
+    features: ['Up to 3 accounts, 200 resources', 'Adds ISO 27001:2022 technical controls', 'Critical alert response: 2 hours', 'Fortnightly patching', 'Quarterly review call'],
+  },
+  {
+    name: 'Scale', monthly: 1000,
+    desc: 'Regulated mid-market businesses.',
+    included: 'TekWatch Enterprise included',
+    features: ['Up to 5 accounts, 500 resources', 'All four frameworks', 'Critical alert response: 1 hour', 'Weekly patching', 'Monthly review call'],
   },
 ]
 
 const pricingTiers = [
   {
     name: 'Starter', monthly: 79, discount: 0.10,
-    desc: 'For micro-businesses, startups and charities getting started with AWS.',
-    features: ['Up to 2 AWS accounts', '50 monitored resources', 'Anomaly detection', 'UK GDPR compliance checks'],
+    desc: 'For micro-businesses, startups and charities getting started in the cloud.',
+    features: ['Up to 2 cloud accounts', '50 monitored resources', 'Statistical anomaly detection', 'UK GDPR checks'],
     highlight: false,
   },
   {
     name: 'Business', monthly: 199, discount: 0.10,
     desc: 'For growing SMEs, FinTech firms and professional services.',
-    features: ['Up to 5 AWS accounts', '500 monitored resources', 'AI assistant + cost spike alerts', 'UK GDPR, Cyber Essentials & ISO 27001 checks', 'Email & Slack alerts'],
+    features: ['Up to 5 cloud accounts', '500 monitored resources', 'Full detection engine, Assistant and cost alerts', 'UK GDPR and Cyber Essentials v3.3 cloud controls', 'Email & Slack alerts'],
     highlight: true,
   },
   {
     name: 'Enterprise', monthly: 499, discount: 0.15,
     desc: 'For mid-market and regulated businesses with complex environments.',
-    features: ['Unlimited accounts & resources', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
+    features: ['Unlimited accounts & resources', 'All four frameworks: UK GDPR, Cyber Essentials, ISO 27001, FCA PS21/3', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
     highlight: false,
   },
 ]
@@ -243,59 +293,23 @@ function Sparkline({ data, color }: { data: number[]; color: string }) {
   )
 }
 
-/** Fires once when the element scrolls into view; stays true afterwards. */
-function useReveal<T extends HTMLElement>() {
-  const ref = useRef<T>(null)
-  const [inView, setInView] = useState(false)
-  useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    // Reveal immediately where IntersectionObserver is unavailable. Revealed
-    // content starts at opacity 0, so failing closed would leave the page
-    // blank rather than merely unanimated.
-    if (typeof IntersectionObserver === 'undefined') {
-      setInView(true)
-      return
-    }
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true)
-          observer.disconnect()
-        }
-      },
-      { threshold: 0.15, rootMargin: '0px 0px -80px 0px' }
-    )
-    observer.observe(el)
-    return () => observer.disconnect()
-  }, [])
-  return [ref, inView] as const
-}
 
 /**
- * Fades a block up the first time it enters the viewport. prefers-reduced-motion
- * is handled globally in globals.css, which collapses the animation to ~0s.
+ * Wraps a block. It used to fade each one up as it scrolled into view, which
+ * is the most recognisable motion on a generated landing page. The wrapper is
+ * kept so the delay props at call sites stay harmless.
  */
-function Reveal({ children, delay = 0, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
-  const [ref, inView] = useReveal<HTMLDivElement>()
-  return (
-    <div
-      ref={ref}
-      className={`${className} ${inView ? 'animate-fade-in-up' : 'opacity-0'}`}
-      style={inView && delay ? { animationDelay: `${delay}ms` } : undefined}
-    >
-      {children}
-    </div>
-  )
+function Reveal({ children, className = '' }: { children: React.ReactNode; delay?: number; className?: string }) {
+  return <div className={className}>{children}</div>
 }
 
-/** Section heading in the reference style: bold black line, optional indigo line. */
+/** Section heading: one weight, one colour. A second line in the brand colour read as a template. */
 function SectionHeading({ title, accent, lead, center = false }: { title: string; accent?: string; lead?: string; center?: boolean }) {
   return (
     <div className={center ? 'text-center max-w-3xl mx-auto' : 'max-w-3xl'}>
       <h2 className="text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
         {title}
-        {accent && (<><br /><span className="text-indigo-700 dark:text-indigo-400">{accent}</span></>)}
+        {accent && <> {accent}</>}
       </h2>
       {lead && <p className="mt-5 text-base md:text-lg text-muted-foreground leading-relaxed">{lead}</p>}
     </div>
@@ -360,80 +374,14 @@ function PlatformMenu() {
 
 type IconType = typeof Activity
 
-function FlowNode({ x, y, w, title, sub, icon: Icon, accent = false }: {
-  x: number; y: number; w: number; title: string; sub: string; icon: IconType; accent?: boolean
-}) {
-  const h = 56
-  return (
-    <g>
-      {/* Theme colours as classes, so the diagram follows light and dark. */}
-      <rect x={x} y={y} width={w} height={h} rx={10} className={accent ? 'fill-card stroke-indigo-400' : 'fill-card stroke-border'} strokeWidth={accent ? 1.5 : 1} />
-      <rect x={x + 10} y={y + 12} width={32} height={32} rx={8} className={accent ? 'fill-indigo-600' : 'fill-indigo-50 dark:fill-indigo-500/15'} />
-      <Icon x={x + 18} y={y + 20} width={16} height={16} className={accent ? 'text-white' : 'text-indigo-600 dark:text-indigo-300'} strokeWidth={2} />
-      <text x={x + 52} y={y + 25} fontSize={12.5} fontWeight={600} className="fill-foreground">{title}</text>
-      <text x={x + 52} y={y + 42} fontSize={10.5} className="fill-muted-foreground">{sub}</text>
-      <circle cx={x} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
-      <circle cx={x + w} cy={y + h / 2} r={3.5} className="fill-card stroke-muted-foreground/60" />
-    </g>
-  )
-}
 
-/** How TekWatch actually works, drawn as the pipeline it is. */
-function HeroFlow() {
-  const outputs = [
-    { y: 34,  title: 'Anomaly detection',    sub: '7-day baseline per metric', icon: Activity },
-    { y: 146, title: 'Compliance checks',    sub: 'UK GDPR · CE · ISO 27001',  icon: ShieldCheck },
-    { y: 258, title: 'Incident correlation', sub: 'Who changed what, when', icon: GitMerge },
-  ]
-  // Widths leave room for the longest label at the rendered font size.
-  const ax = 8, aw = 162, bx = 214, bw = 172, ox = 432, ow = 200, cy = 174
-  return (
-    <div
-      className="relative rounded-2xl border-2 border-border bg-card p-4 shadow-xl shadow-slate-900/5"
-      style={{ backgroundImage: 'radial-gradient(hsl(var(--border)) 1px, transparent 1px)', backgroundSize: '16px 16px' }}
-    >
-      <div className="flex items-center justify-between mb-2 px-1">
-        <span className="inline-flex items-center gap-1.5 rounded-md bg-card/90 px-2 py-1 text-[11px] font-semibold text-muted-foreground ring-1 ring-border">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Live pipeline
-        </span>
-        <span className="rounded-md bg-card/90 px-2 py-1 text-[11px] text-muted-foreground ring-1 ring-border">every 15 minutes</span>
-      </div>
-      <svg viewBox="0 0 640 332" className="w-full h-auto" role="img" aria-label="Your AWS account sends read-only data to the TekWatch agent, which feeds anomaly detection, compliance checks and incident correlation">
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#a5b4fc" strokeWidth={1.5} />
-        <line x1={ax + aw} y1={cy} x2={bx} y2={cy} stroke="#4f46e5" strokeWidth={1.5} className="animate-flow" />
-        {outputs.map(o => {
-          const d = `M${bx + bw} ${cy} C ${bx + bw + 30} ${cy}, ${ox - 30} ${o.y + 28}, ${ox} ${o.y + 28}`
-          return (
-            <g key={o.title}>
-              <path d={d} fill="none" stroke="#a5b4fc" strokeWidth={1.5} />
-              <path d={d} fill="none" stroke="#4f46e5" strokeWidth={1.5} className="animate-flow" />
-            </g>
-          )
-        })}
-        <FlowNode x={ax} y={cy - 28} w={aw} title="AWS account" sub="EC2 · RDS · S3 · IAM" icon={Cloud} />
-        <FlowNode x={bx} y={cy - 28} w={bw} title="TekWatch agent" sub="Read-only, outbound" icon={Radio} accent />
-        {outputs.map(o => (
-          <FlowNode key={o.title} x={ox} y={o.y} w={ow} title={o.title} sub={o.sub} icon={o.icon} />
-        ))}
-      </svg>
-      <div className="mt-2 flex items-center gap-2 rounded-lg bg-card/95 px-3 py-2 text-xs text-muted-foreground ring-1 ring-border">
-        <Mail className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
-        Anything that needs you arrives by email or Slack, explained in plain English.
-      </div>
-    </div>
-  )
-}
 
 /**
- * What the agent reads, and what comes out the other side, animated as the
- * pipeline it is. On first view the boxes and connectors build in order; then
- * data keeps flowing: each service sends a packet to the agent, the agent
- * pulses as they land, and results travel out to each output, which lights up.
+ * What the agent reads, and what comes out the other side.
  *
- * The flow is SVG (SMIL) animation so every packet, pulse and glow runs on one
- * shared clock and stays in step. It is not rendered for visitors who asked
- * for reduced motion; the entrance is CSS and collapses to its end state
- * under the global reduced-motion rule.
+ * This was animated: packets travelling along the lines, rings pulsing as they
+ * landed, boxes building in on scroll. It read as a generated SaaS page rather
+ * than a product. The diagram says the same thing standing still.
  */
 function CoverageDiagram() {
   const top = [
@@ -446,100 +394,32 @@ function CoverageDiagram() {
     { x: 260, title: 'Alerts',     sub: 'Email & Slack' },
     { x: 435, title: 'Evidence',   sub: 'Compliance checks' },
   ]
-  const [ref, inView] = useReveal<HTMLDivElement>()
-  const [flowing, setFlowing] = useState(false)
-
-  useEffect(() => {
-    if (!inView) return
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    // Let the build-in finish before anything moves along the lines.
-    const id = setTimeout(() => setFlowing(true), 1600)
-    return () => clearTimeout(id)
-  }, [inView])
-
-  // Timings in seconds. One cycle: packets leave the three services in turn,
-  // reach the agent, then leave the agent for the three outputs.
-  const CYCLE = 3.6
-  const TRAVEL = 0.32                      // share of the cycle a packet spends moving
-  const ARRIVE = TRAVEL * CYCLE            // seconds from leaving to landing
-  const IN = top.map((_, i) => 0.2 + i * 0.25)
-  const AGENT = IN[0] + ARRIVE
-  const OUT = bottom.map((_, i) => IN[2] + ARRIVE + 0.35 + i * 0.2)
-  const loop = { dur: `${CYCLE}s`, repeatCount: 'indefinite' as const }
-  const delay = (ms: number) => ({ animationDelay: `${ms}ms` })
-
-  const packet = (key: string, path: string, begin: number, tone: 'indigo' | 'emerald') => (
-    <g key={key} opacity={0}>
-      <circle r={7} className={tone === 'indigo' ? 'fill-indigo-500/20' : 'fill-emerald-500/20'} />
-      <circle r={3.2} className={tone === 'indigo' ? 'fill-indigo-500 dark:fill-indigo-300' : 'fill-emerald-500 dark:fill-emerald-300'} />
-      <animateMotion path={path} begin={`${begin}s`} {...loop} keyPoints="0;1;1" keyTimes={`0;${TRAVEL};1`} calcMode="linear" />
-      <animate attributeName="opacity" values="0;1;1;0;0" keyTimes={`0;0.03;${TRAVEL - 0.03};${TRAVEL};1`} begin={`${begin}s`} {...loop} />
-    </g>
-  )
-
-  // A ring that flashes once per cycle around a box, starting at `begin`.
-  const flash = (key: string, x: number, y: number, begin: number, className: string) => (
-    <rect key={key} x={x} y={y} width={162} height={54} rx={11} fill="none" strokeWidth={2} opacity={0} className={className}>
-      <animate attributeName="opacity" values="0;0.9;0;0" keyTimes="0;0.06;0.3;1" begin={`${begin}s`} {...loop} />
-    </rect>
-  )
-
-  const ringTimes = '0;0.05;0.3;1'
-  const ringBegin = `${AGENT}s`
-
   return (
-    <div ref={ref}>
-      <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
-        {/* Connectors draw in on first view. */}
-        {top.map((t, i) => (
-          <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} pathLength={1} strokeWidth={1.2}
-            className={`stroke-indigo-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(380 + i * 90)} />
-        ))}
-        {bottom.map((b, i) => (
-          <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} pathLength={1} strokeWidth={1.2}
-            className={`stroke-emerald-400 ${inView ? 'animate-draw' : 'opacity-0'}`} style={delay(980 + i * 90)} />
-        ))}
-
-        {/* Packets travel under the boxes, so they vanish into them. */}
-        {flowing && top.map((t, i) => packet(`in-${t.title}`, `M${t.x} 58 L260 106`, IN[i], 'indigo'))}
-        {flowing && bottom.map((b, i) => packet(`out-${b.title}`, `M260 156 L${b.x} 204`, OUT[i], 'emerald'))}
-
-        {top.map((t, i) => (
-          <g key={t.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(i * 110)}>
-            <rect x={t.x - 78} y={10} width={156} height={48} rx={8} fill="#312e81" />
-            <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} fill="#fbfbfd">{t.title}</text>
-            <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} fill="#c7d2fe">{t.sub}</text>
-          </g>
-        ))}
-        {flowing && top.map((t, i) => flash(`send-${t.title}`, t.x - 81, 7, IN[i], 'stroke-indigo-400'))}
-
-        {/* The agent pulses as packets land. */}
-        {flowing && (
-          <rect x={160} y={106} width={200} height={50} rx={12} fill="none" strokeWidth={1.5} opacity={0} className="stroke-indigo-400">
-            <animate attributeName="opacity" values="0;0.8;0;0" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="x" values="160;160;150;150" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="y" values="106;106;96;96" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="width" values="200;200;220;220" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-            <animate attributeName="height" values="50;50;70;70" keyTimes={ringTimes} begin={ringBegin} {...loop} />
-          </rect>
-        )}
-        <g className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(700)}>
-          <rect x={160} y={106} width={200} height={50} rx={10} className="fill-indigo-50 stroke-indigo-300 dark:fill-indigo-500/15 dark:stroke-indigo-500/50" />
-          <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} className="fill-indigo-900 dark:fill-indigo-200">TekWatch agent</text>
-          <text x={260} y={144} textAnchor="middle" fontSize={10} className="fill-indigo-600 dark:fill-indigo-300">Read-only · outbound only</text>
+    <svg viewBox="0 0 520 262" className="w-full h-auto" role="img" aria-label="Compute, data and security services feed the TekWatch agent, which produces dashboards, alerts and compliance evidence">
+      {top.map(t => (
+        <line key={t.title} x1={t.x} y1={58} x2={260} y2={106} strokeWidth={1.2} className="stroke-border" />
+      ))}
+      {bottom.map(b => (
+        <line key={b.title} x1={260} y1={156} x2={b.x} y2={204} strokeWidth={1.2} className="stroke-border" />
+      ))}
+      {top.map(t => (
+        <g key={t.title}>
+          <rect x={t.x - 78} y={10} width={156} height={48} rx={6} className="fill-card stroke-border" />
+          <text x={t.x} y={30} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-foreground">{t.title}</text>
+          <text x={t.x} y={46} textAnchor="middle" fontSize={9.5} className="fill-muted-foreground">{t.sub}</text>
         </g>
-        {flowing && flash('agent', 157, 104, AGENT, 'stroke-indigo-500')}
-
-        {bottom.map((b, i) => (
-          <g key={b.title} className={inView ? 'animate-node-in' : 'opacity-0'} style={delay(1250 + i * 110)}>
-            <rect x={b.x - 78} y={204} width={156} height={48} rx={8} className="fill-emerald-50 stroke-emerald-300 dark:fill-emerald-500/10 dark:stroke-emerald-500/40" />
-            <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-emerald-800 dark:fill-emerald-300">{b.title}</text>
-            <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-emerald-700 dark:fill-emerald-400">{b.sub}</text>
-          </g>
-        ))}
-        {flowing && bottom.map((b, i) => flash(`land-${b.title}`, b.x - 81, 201, OUT[i] + ARRIVE, 'stroke-emerald-400'))}
-      </svg>
-    </div>
+      ))}
+      <rect x={160} y={106} width={200} height={50} rx={6} className="fill-indigo-600" />
+      <text x={260} y={127} textAnchor="middle" fontSize={12.5} fontWeight={700} fill="#ffffff">TekWatch agent</text>
+      <text x={260} y={144} textAnchor="middle" fontSize={10} fill="#d4f1f4">Read-only · outbound only</text>
+      {bottom.map(b => (
+        <g key={b.title}>
+          <rect x={b.x - 78} y={204} width={156} height={48} rx={6} className="fill-card stroke-border" />
+          <text x={b.x} y={224} textAnchor="middle" fontSize={12} fontWeight={600} className="fill-foreground">{b.title}</text>
+          <text x={b.x} y={240} textAnchor="middle" fontSize={9.5} className="fill-muted-foreground">{b.sub}</text>
+        </g>
+      ))}
+    </svg>
   )
 }
 
@@ -550,20 +430,9 @@ export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<PreviewTabId>('overview')
   const [menuOpen, setMenuOpen] = useState(false)
 
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-    const id = setTimeout(() => {
-      setActiveTab(prev => {
-        const idx = previewTabs.findIndex(t => t.id === prev)
-        return previewTabs[(idx + 1) % previewTabs.length].id
-      })
-    }, 6000)
-    return () => clearTimeout(id)
-  }, [activeTab])
-
   const activePath = previewTabs.find(t => t.id === activeTab)?.path ?? '/overview'
 
-  const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm shadow-indigo-600/25 hover:bg-indigo-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
+  const primaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
   const secondaryBtn = 'inline-flex items-center justify-center gap-2 rounded-lg border border-border bg-card px-6 py-3 text-sm font-semibold text-foreground hover:border-muted-foreground/40 hover:bg-accent transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2'
 
   return (
@@ -624,35 +493,25 @@ export default function LandingPage() {
       <section className="px-6 pt-14 pb-20 md:pt-20 md:pb-24">
         <div className="max-w-6xl mx-auto grid lg:grid-cols-[1.02fr_1fr] gap-12 lg:gap-14 items-center">
           <div>
-            <p className="animate-fade-in-up inline-flex items-center gap-2 rounded-full border border-indigo-100 dark:border-indigo-500/25 bg-indigo-50 dark:bg-indigo-500/15 px-3 py-1 text-xs font-semibold text-indigo-700 dark:text-indigo-400 mb-6">
-              <span className="w-1.5 h-1.5 rounded-full bg-indigo-600" />
-              Cloud monitoring and compliance, built for UK SMEs
-            </p>
-            <h1
-              className="animate-fade-in-up text-[2.4rem] sm:text-5xl lg:text-[3.1rem] font-bold leading-[1.08] tracking-tight text-foreground"
-              style={{ animationDelay: '80ms' }}
-            >
-              Your AWS estate.<br />
-              <span className="text-indigo-700 dark:text-indigo-400">Fully visible.<br className="hidden sm:block" /> Risks caught early.</span>
+            <h1 className="text-[2.2rem] sm:text-[2.6rem] lg:text-[2.9rem] font-semibold leading-[1.12] tracking-tight text-foreground">
+              Cloud monitoring and UK compliance evidence for small businesses
             </h1>
-            <p
-              className="animate-fade-in-up mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl"
-              style={{ animationDelay: '160ms' }}
-            >
-              Know the moment something&apos;s wrong in your AWS estate. TekWatch watches your
-              infrastructure around the clock, catching cost spikes, performance issues and
-              security risks as they happen, and checking your setup against UK GDPR,
-              Cyber Essentials and ISO 27001 from day one.
+            <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
+              TekWatch watches the cloud you already run, through a read-only agent, tells you
+              in plain English when something changes or breaks, shows which UK GDPR, Cyber
+              Essentials or FCA obligation it touches, and keeps a dated record of every check and
+              every fix. There is nothing to migrate: we watch your infrastructure, we do not
+              host it.
             </p>
-            <div className="animate-fade-in-up mt-8 flex flex-col sm:flex-row gap-3" style={{ animationDelay: '240ms' }}>
+            <div className="mt-8 flex flex-col sm:flex-row gap-3">
               <Link href="/overview/?demo=1" className={primaryBtn}>
                 Launch live demo <ArrowRight className="w-4 h-4" />
               </Link>
               <Link href="/signup" className={secondaryBtn}>Start free trial</Link>
             </div>
-            <dl className="animate-fade-in-up mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6" style={{ animationDelay: '320ms' }}>
+            <dl className="mt-10 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-2 xl:grid-cols-4 gap-6 border-t border-border pt-6">
               {[
-                ['23', 'AWS services monitored'],
+                ['23', 'cloud services monitored'],
                 ['<30 min', 'to first dashboard'],
                 ['£79', 'starting price /mo'],
                 ['0', 'firewall changes needed'],
@@ -666,9 +525,31 @@ export default function LandingPage() {
             </dl>
           </div>
 
-          <div className="animate-fade-in-up hidden sm:block" style={{ animationDelay: '200ms' }}>
-            <HeroFlow />
-          </div>
+          {/* The product itself, not an illustration of it. */}
+          <figure className="hidden sm:block">
+            <div className="overflow-hidden rounded-lg border border-border bg-card shadow-sm">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/product/overview-light.png"
+                alt="The TekWatch overview: monitored resources, active alerts, security findings and monthly cost"
+                width={1440}
+                height={900}
+                className="block w-full h-auto dark:hidden"
+              />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/product/overview-dark.png"
+                alt=""
+                aria-hidden="true"
+                width={1440}
+                height={900}
+                className="hidden w-full h-auto dark:block"
+              />
+            </div>
+            <figcaption className="mt-3 text-xs text-muted-foreground">
+              The overview page, from the demo account with sample data.
+            </figcaption>
+          </figure>
         </div>
       </section>
 
@@ -738,14 +619,14 @@ export default function LandingPage() {
                   <div className="w-3 h-3 rounded-full bg-emerald-400/70" />
                   <div className="flex-1 mx-4 min-w-0">
                     <div className="h-5 rounded-md bg-background border border-border max-w-72 mx-auto flex items-center justify-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
                       <span className="text-xs text-muted-foreground font-mono truncate">app.tekwatch.io{activePath}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Mock dashboard */}
-                <div key={activeTab} className="p-5 space-y-3 animate-fade-in">
+                <div key={activeTab} className="p-5 space-y-3">
                 {activeTab === 'overview' && (<>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     {statTiles.map(s => (
@@ -769,7 +650,7 @@ export default function LandingPage() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2 min-w-0 rounded-xl border border-border bg-background/60 p-4">
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-xs text-muted-foreground">Daily AWS Spend (Last 30 Days)</div>
+                        <div className="text-xs text-muted-foreground">Daily cloud spend (last 30 days)</div>
                         <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
                           <span className="flex items-center gap-1.5"><span className="inline-block w-3 h-[2px] rounded-full bg-indigo-400" />This month</span>
                           <span className="flex items-center gap-1.5"><span className="inline-block w-3 border-t-2 border-dashed border-slate-500" />Last month</span>
@@ -779,9 +660,9 @@ export default function LandingPage() {
                         <AreaChart data={spendData} margin={{ top: 14, right: 60, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#818cf8" stopOpacity={0.2} />
-                              <stop offset="60%" stopColor="#818cf8" stopOpacity={0.04} />
-                              <stop offset="100%" stopColor="#818cf8" stopOpacity={0} />
+                              <stop offset="0%" stopColor="#3aa9bb" stopOpacity={0.2} />
+                              <stop offset="60%" stopColor="#3aa9bb" stopOpacity={0.04} />
+                              <stop offset="100%" stopColor="#3aa9bb" stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid vertical={false} stroke="rgba(255,255,255,0.06)" />
@@ -796,9 +677,9 @@ export default function LandingPage() {
                           <ReferenceLine y={avgSpend} stroke="rgba(255,255,255,0.18)" strokeDasharray="3 3" />
                           <Area type="monotone" dataKey="prevSpend" stroke="#64748b" strokeWidth={1.5} strokeDasharray="4 3"
                             fill="none" dot={false} activeDot={{ r: 3, fill: '#64748b', stroke: '#0e1525', strokeWidth: 1.5 }} />
-                          <Area type="monotone" dataKey="spend" stroke="#818cf8" strokeWidth={2}
+                          <Area type="monotone" dataKey="spend" stroke="#3aa9bb" strokeWidth={2}
                             fill="url(#spendFill)" dot={false}
-                            activeDot={{ r: 4, fill: '#818cf8', stroke: '#0e1525', strokeWidth: 2 }} />
+                            activeDot={{ r: 4, fill: '#3aa9bb', stroke: '#0e1525', strokeWidth: 2 }} />
                           <ReferenceDot
                             x={anomalyPoint.day} y={anomalyPoint.spend} r={5}
                             fill="#fbbf24" stroke="#0e1525" strokeWidth={2}
@@ -836,7 +717,7 @@ export default function LandingPage() {
                   </div>
 
                   <div className="rounded-xl border border-border bg-background/60 p-4">
-                    <div className="text-xs text-muted-foreground mb-2">Top AWS Services by Cost (This Month)</div>
+                    <div className="text-xs text-muted-foreground mb-2">Top services by cost (this month)</div>
                     <div aria-hidden="true"><ResponsiveContainer width="100%" height={150}>
                       <BarChart data={serviceCostData} layout="vertical" margin={{ top: 0, right: 16, left: 0, bottom: 0 }}>
                         <CartesianGrid horizontal={false} vertical={false} />
@@ -845,7 +726,7 @@ export default function LandingPage() {
                         <Tooltip contentStyle={TIP_STY} formatter={(v: number) => [`£${v}`, 'Cost']} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
                         <Bar dataKey="cost" radius={[0, 4, 4, 0]} barSize={14}>
                           {serviceCostData.map((d, i) => (
-                            <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#818cf8'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.7} />
+                            <Cell key={i} fill={d.cost === maxServiceCost ? '#fbbf24' : '#3aa9bb'} fillOpacity={d.cost === maxServiceCost ? 1 : 0.7} />
                           ))}
                         </Bar>
                       </BarChart>
@@ -954,7 +835,6 @@ export default function LandingPage() {
                         </div>
                       </div>
                       <div className="mt-4 flex items-start gap-2 rounded-lg border border-indigo-500/20 bg-indigo-500/5 p-2.5">
-                        <Sparkles className="w-3.5 h-3.5 text-indigo-300 flex-shrink-0 mt-0.5" />
                         <span className="text-[11px] text-foreground/80 leading-relaxed">
                           2 cost spikes flagged this month. The largest: an idle RDS instance running 24/7 in eu-west-1.
                         </span>
@@ -971,18 +851,17 @@ export default function LandingPage() {
                       </div>
                     </div>
                     <div className="flex items-start gap-2.5">
-                      <div className="w-7 h-7 rounded-full bg-white/5 border border-border flex items-center justify-center flex-shrink-0">
-                        <Bot className="w-3.5 h-3.5 text-indigo-300" />
-                      </div>
+                      <span className="w-7 h-7 rounded-md bg-indigo-600 text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                        TW
+                      </span>
                       <div className="space-y-2 flex-1">
                         <div className="rounded-2xl rounded-tl-sm bg-background border border-border text-foreground/90 text-sm leading-relaxed px-4 py-3">
                           {chatExchange.answer}
                         </div>
                         <div className="flex flex-wrap gap-1.5">
                           {chatExchange.tools.map(t => (
-                            <span key={t} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-indigo-500/10 border border-indigo-500/20 text-indigo-200">
-                              <Sparkles className="w-2.5 h-2.5" />
-                              {t}
+                            <span key={t} className="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-medium bg-muted border border-border text-muted-foreground">
+                              Read: {t}
                             </span>
                           ))}
                         </div>
@@ -990,7 +869,7 @@ export default function LandingPage() {
                     </div>
                   </div>
                   <div className="rounded-xl border border-border bg-background/60 p-3 flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="flex-1">Ask about cost, security, or anything in your AWS estate...</span>
+                    <span className="flex-1">Ask about cost, security, or anything in your cloud estate...</span>
                     <span className="w-6 h-6 rounded-md bg-indigo-600 flex items-center justify-center flex-shrink-0">
                       <ArrowRight className="w-3 h-3 text-white" />
                     </span>
@@ -1029,9 +908,23 @@ export default function LandingPage() {
               </Reveal>
             ))}
           </div>
+          <div className="mt-10 grid md:grid-cols-3 gap-4">
+            {REGULATORY_DATES.map(d => (
+              <div key={d.what} className="h-full rounded-lg border border-border bg-card p-5">
+                <div className="text-xs font-semibold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">{d.when}</div>
+                <div className="mt-1.5 text-base font-semibold text-foreground">{d.what}</div>
+                <p className="mt-2 text-sm text-muted-foreground leading-relaxed">{d.detail}</p>
+                <a href={d.href} target="_blank" rel="noopener noreferrer"
+                   className="mt-3 inline-block text-[11px] text-muted-foreground/80 hover:text-foreground hover:underline">
+                  {d.source}
+                </a>
+              </div>
+            ))}
+          </div>
+
           <Reveal className="mt-8">
-            <p className="rounded-xl border-l-4 border-indigo-600 bg-indigo-50/60 dark:bg-indigo-500/10 px-6 py-5 text-base md:text-lg font-medium text-foreground/90">
-              Built by engineers who monitor AWS for a living. Made for the businesses who don&apos;t have one on staff.
+            <p className="rounded-lg border-l-4 border-indigo-600 bg-indigo-50/60 dark:bg-indigo-500/10 px-6 py-5 text-base md:text-lg font-medium text-foreground/90">
+              Built by engineers who monitor cloud infrastructure for a living. Made for the businesses who don&apos;t have one on staff.
             </p>
           </Reveal>
         </div>
@@ -1076,17 +969,18 @@ export default function LandingPage() {
           <Reveal>
             <SectionHeading
               title="Connected in 30 Minutes. No Firewall Changes."
-              lead="The agent runs as one ECS Fargate task inside your own AWS account, with a read-only IAM role, and only ever sends data out. Nothing to open, nothing to install on your servers."
+              lead="The agent runs as one container inside your own cloud account, with a read-only role, and only ever sends data out. Nothing to open, nothing to install on your servers."
             />
           </Reveal>
           <div className="mt-10 grid lg:grid-cols-2 gap-10 items-center">
             <Reveal>
               <ul className="space-y-4">
                 {[
-                  'Read-only IAM role, created for you by CloudFormation',
+                  'Read-only role, created for you by the deployment template',
                   'Outbound only: no inbound ports, no VPN, no firewall rules',
-                  '23 AWS services across every active region',
-                  'Your data stays in the UK (AWS London, eu-west-2)',
+                  '23 cloud services across every active region',
+                  'Your data stays in the UK (London region)',
+                  'AWS today. Azure is next on the roadmap',
                 ].map(p => (
                   <li key={p} className="flex items-start gap-3 text-base text-foreground/80">
                     <span className="mt-0.5 w-5 h-5 rounded-full bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center flex-shrink-0">
@@ -1097,7 +991,7 @@ export default function LandingPage() {
                 ))}
               </ul>
               <Link href="/signup" className="mt-8 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-700 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-200">
-                Connect your AWS account <ChevronRight className="w-4 h-4" />
+                Connect your cloud account <ChevronRight className="w-4 h-4" />
               </Link>
             </Reveal>
             <Reveal delay={100}>
@@ -1114,8 +1008,8 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto">
           <Reveal>
             <SectionHeading
-              title="Stop Guessing About Your AWS,"
-              accent="Start Seeing It"
+              title="Stop guessing about your cloud."
+              accent="Start seeing it."
               lead="No sales call. No credit card. No specialist knowledge required."
             />
           </Reveal>
@@ -1203,10 +1097,45 @@ export default function LandingPage() {
               )
             })}
           </div>
-          <p className="text-center text-sm text-muted-foreground mt-8">
-            Want it fully managed? Tek Tribe&apos;s Managed Cloud Services start from{' '}
-            <span className="font-semibold text-foreground">£500/month</span>, TekWatch included.
-          </p>
+          <div className="mt-16 pt-14 border-t border-border">
+            <div className="text-center max-w-2xl mx-auto">
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Managed Cloud Services</p>
+              <h3 className="mt-3 text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+                Or let our engineers do the fixing
+              </h3>
+              <p className="mt-3 text-muted-foreground">
+                TekWatch finds the problem. On a managed plan, Tek Tribe&apos;s engineers put it right,
+                using the same platform as their operating tool. Every plan includes a TekWatch subscription.
+              </p>
+            </div>
+
+            <div className="mt-10 grid md:grid-cols-3 gap-5">
+              {managedTiers.map(m => (
+                <div key={m.name} className="rounded-lg border border-border bg-card p-6 flex flex-col">
+                  <h4 className="text-lg font-semibold text-foreground">{m.name}</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">{m.desc}</p>
+                  <div className="mt-4 flex items-baseline gap-1">
+                    <span className="text-3xl font-bold text-foreground">£{m.monthly.toLocaleString('en-GB')}</span>
+                    <span className="text-sm text-muted-foreground">/month</span>
+                  </div>
+                  <p className="mt-1 text-xs font-medium text-indigo-700 dark:text-indigo-400">{m.included}</p>
+                  <ul className="mt-5 mb-6 space-y-2 flex-1">
+                    {m.features.map(f => (
+                      <li key={f} className="flex items-start gap-2 text-sm text-foreground/80">
+                        <Check className="w-4 h-4 mt-0.5 text-indigo-600 dark:text-indigo-400 flex-shrink-0" />
+                        {f}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link href="/contact" className={secondaryBtn}>Talk to us</Link>
+                </div>
+              ))}
+            </div>
+
+            <p className="text-center text-xs text-muted-foreground mt-6">
+              Response targets apply during business hours unless otherwise agreed in the customer contract.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -1217,7 +1146,7 @@ export default function LandingPage() {
             <div className="text-center max-w-3xl mx-auto">
               <p className="text-sm font-bold uppercase tracking-[0.18em] text-indigo-600 dark:text-indigo-400">Get started</p>
               <h2 className="mt-3 text-3xl md:text-[2.6rem] font-bold tracking-tight leading-[1.12] text-foreground">
-                See your AWS estate clearly,<br className="hidden sm:block" /> starting today
+                See your cloud clearly,<br className="hidden sm:block" /> starting today
               </h2>
               <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
                 <Link href="/overview/?demo=1" className={primaryBtn}>Launch live demo <ArrowRight className="w-4 h-4" /></Link>
@@ -1228,9 +1157,9 @@ export default function LandingPage() {
 
           <div className="mt-14 grid md:grid-cols-3 gap-5">
             {[
-              { icon: MessageSquare, title: 'Ready to get started?', desc: 'Talk to the team about your AWS estate and what you need to prove.', cta: 'Contact us', href: '/contact' },
+              { icon: MessageSquare, title: 'Ready to get started?', desc: 'Talk to the team about your cloud estate and what you need to prove.', cta: 'Contact us', href: '/contact' },
               { icon: Mail, title: 'Questions?', desc: 'Setup, billing or compliance, email us and an engineer will get back to you.', cta: 'hello@tekwatch.io', href: 'mailto:hello@tekwatch.io' },
-              { icon: Sparkles, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
+              { icon: MonitorPlay, title: 'Live demo', desc: 'Explore a fully populated sample dashboard. No account needed.', cta: 'Explore now', href: '/overview/?demo=1' },
             ].map((c, i) => (
               <Reveal key={c.title} delay={i * 70}>
                 <div className="h-full flex flex-col rounded-xl bg-card p-6 ring-1 ring-border shadow-sm">
@@ -1302,7 +1231,7 @@ export default function LandingPage() {
 
           <div className="pt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
             <p>© 2026 Tek Tribe Ltd. All rights reserved.</p>
-            <p>AWS monitoring and UK compliance checks, built for SMEs.</p>
+            <p>Cloud monitoring and UK compliance evidence, built for SMEs.</p>
           </div>
         </div>
       </footer>

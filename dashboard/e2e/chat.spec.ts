@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test'
 
-test.describe('Chat / Ask AI page', () => {
+test.describe('Assistant page', () => {
   test('renders input and welcome state', async ({ page }) => {
     await page.goto('/chat')
     await expect(page.locator('body')).not.toContainText('Application error')

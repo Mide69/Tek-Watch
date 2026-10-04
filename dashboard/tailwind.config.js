@@ -19,6 +19,19 @@ module.exports = {
         mono: ["var(--font-mono)", "ui-monospace", "SFMono-Regular", "monospace"],
       },
       colors: {
+        indigo: {
+          50:  "#eefafb",
+          100: "#d4f1f4",
+          200: "#aee3ea",
+          300: "#78ccd8",
+          400: "#3aa9bb",
+          500: "#1f8c9e",
+          600: "#17707f",
+          700: "#145c69",
+          800: "#134b56",
+          900: "#123e48",
+          950: "#0a2830",
+        },
         border:      "hsl(var(--border) / <alpha-value>)",
         input:       "hsl(var(--input) / <alpha-value>)",
         ring:        "hsl(var(--ring) / <alpha-value>)",
@@ -64,6 +77,11 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // Squarer than Tailwind's defaults (0.75rem and 1rem). Enterprise
+        // software reads as solid with tight corners; soft ones read as a
+        // consumer app.
+        xl: "0.5rem",
+        "2xl": "0.75rem",
       },
       keyframes: {
         "fade-in": { from: { opacity: "0", transform: "translateY(8px)" }, to: { opacity: "1", transform: "translateY(0)" } },

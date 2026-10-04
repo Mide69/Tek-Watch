@@ -11,13 +11,15 @@ export function Badge({ className, variant = 'default', children, ...props }: Ba
     warning: 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/25',
     error:   'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/25',
     info:    'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/25',
-    ai:      'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/25',
+    // Kept as a name so existing callers still compile. It used to be its own
+    // purple, which marked anything a model touched as special. It is a tag.
+    ai:      'bg-muted text-foreground/80 border-border',
   }
 
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors',
+        'inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold transition-colors',
         variants[variant],
         className
       )}

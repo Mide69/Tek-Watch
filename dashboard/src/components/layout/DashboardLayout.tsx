@@ -42,7 +42,7 @@ const navigation = [
   { name: 'Cost',       href: '/cost',       icon: DollarSign },
   { name: 'Alerts',     href: '/alerts',     icon: AlertTriangle },
   { name: 'Agent',      href: '/agent',      icon: Activity },
-  { name: 'Ask AI',     href: '/chat',       icon: MessageSquare },
+  { name: 'Assistant',  href: '/chat',       icon: MessageSquare },
   { name: 'Settings',   href: '/settings',   icon: Settings },
 ]
 
@@ -296,14 +296,9 @@ function Inner({ children, customerId }: DashboardLayoutProps) {
             <span className="hidden md:inline tabular-nums">{secondsToRefresh}s</span>
           </button>
 
-          {/* Live indicator */}
-          <div className="hidden sm:flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            LIVE
-          </div>
+          {/* There was a pinging "LIVE" badge here. The agent reports every
+              fifteen minutes, so it overstated the data as well as looking like
+              a template. The refresh countdown beside it says what is true. */}
 
           {/* Notification bell */}
           <NotificationBell />

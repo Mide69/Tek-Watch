@@ -229,7 +229,7 @@ function AgentContent({ customerId }: { customerId: string | null }) {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-xl font-bold text-foreground capitalize">{a.status}</span>
-                  <span className={`w-2 h-2 rounded-full ${a.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'} animate-pulse`} />
+                  <span className={`w-2 h-2 rounded-full ${a.status === 'healthy' ? 'bg-emerald-400' : 'bg-amber-400'}`} />
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Customer <span className="text-foreground font-mono">{a.customer_id}</span> · Version {a.version} · Up {fmtCount(a.uptime_hours)}h

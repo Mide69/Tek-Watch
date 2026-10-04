@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/Badge'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import {
-  AlertTriangle, CheckCircle, Clock, Download, Zap,
+  AlertTriangle, CheckCircle, Clock, Download,
   ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import { formatRelativeTime } from '@/lib/utils'
@@ -162,9 +162,7 @@ function AlertsContent() {
                           {alert.severity.toUpperCase()}
                         </Badge>
                         {alert.type === 'ai_anomaly' && (
-                          <Badge variant="ai">
-                            <Zap className="w-3 h-3 mr-1 inline" />Anomaly
-                          </Badge>
+                          <Badge variant="ai">Anomaly</Badge>
                         )}
                         <Badge variant="default">{alert.service}</Badge>
                         {alert.status === 'acknowledged' && (

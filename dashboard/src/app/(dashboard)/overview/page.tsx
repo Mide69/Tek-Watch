@@ -8,7 +8,7 @@ import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { Sparkline, BarChart } from '@/components/ui/MiniChart'
 import {
   Activity, AlertTriangle, DollarSign, Server,
-  CheckCircle, TrendingDown, Zap,
+  CheckCircle, TrendingDown, TrendingUp,
 } from 'lucide-react'
 import { formatCurrency, formatRelativeTime, fmtPercent } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
@@ -113,7 +113,7 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
               : 'bg-amber-500/10 border-amber-500/25 text-amber-600 dark:text-amber-400',
           )}>
             <span className={cn(
-              'w-1.5 h-1.5 rounded-full animate-pulse',
+              'w-1.5 h-1.5 rounded-full',
               data.agent_status.status === 'healthy' ? 'bg-emerald-500' : 'bg-amber-500',
             )} />
             Agent {data.agent_status.status}
@@ -217,7 +217,7 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
                       )}
                     >
                       <div className={cn(
-                        'w-2 h-2 rounded-full mt-1.5 flex-shrink-0 animate-pulse',
+                        'w-2 h-2 rounded-full mt-1.5 flex-shrink-0',
                         a.severity === 'critical' ? 'bg-red-500' : 'bg-amber-500',
                       )} />
                       <div className="flex-1 min-w-0">
@@ -225,7 +225,7 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
                           <Badge variant={a.severity === 'critical' ? 'error' : 'warning'}>
                             {a.severity.toUpperCase()}
                           </Badge>
-                          {a.type === 'ai_anomaly' && <Badge variant="ai">✦ Anomaly</Badge>}
+                          {a.type === 'ai_anomaly' && <Badge variant="ai">Anomaly</Badge>}
                           <span className="text-xs text-muted-foreground">{a.service}</span>
                         </div>
                         <p className="text-sm text-foreground leading-snug">{a.description}</p>
@@ -312,13 +312,11 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
               names a Lambda function in an account that is not the customer's.
               Shown only where the page is honestly labelled as sample data. */}
           {fixtureView && (
-          <Card className="border-primary/20 bg-primary/5">
+          <Card>
             <CardContent className="p-5">
                 <div className="flex items-center gap-2 mb-3">
-                  <div className="w-7 h-7 rounded-lg bg-primary/20 border border-primary/30 flex items-center justify-center">
-                    <Zap className="w-3.5 h-3.5 text-primary" />
-                  </div>
-                  <span className="text-xs font-semibold text-primary">AI Insight</span>
+                  <TrendingUp className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cost insight</span>
                 </div>
                 <p className="text-sm text-foreground leading-relaxed mb-4">
                   Lambda spend is up{' '}
@@ -331,10 +329,6 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
                   <span className="text-primary font-medium">Recommendation:</span> Investigate recent
                   dependency changes. Consider enabling Lambda SnapStart.
                 </p>
-                <div className="mt-4 pt-4 border-t border-border flex items-center gap-1.5 text-xs text-muted-foreground">
-                  <Zap className="w-3 h-3 text-primary" />
-                  Powered by Claude AI
-                </div>
               </CardContent>
           </Card>
           )}

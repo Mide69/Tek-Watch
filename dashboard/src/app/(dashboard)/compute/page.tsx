@@ -196,7 +196,7 @@ function ComputeContent() {
                                   {i.state === 'running' && i.metrics?.cpu ? (
                                     <Sparkline
                                       data={i.metrics.cpu.map((p: { value: number }) => ({ value: p.value }))}
-                                      color={(i.cpu ?? 0) > 80 ? '#ef4444' : (i.cpu ?? 0) > 60 ? '#f59e0b' : '#6366f1'}
+                                      color={(i.cpu ?? 0) > 80 ? '#ef4444' : (i.cpu ?? 0) > 60 ? '#f59e0b' : '#1f8c9e'}
                                       height={28}
                                     />
                                   ) : <span className="text-xs text-muted-foreground/40">—</span>}
@@ -282,7 +282,7 @@ function ComputeContent() {
                                     {fn.metrics?.invocations ? (
                                       <Sparkline
                                         data={fn.metrics.invocations.map((p: { value: number }) => ({ value: p.value }))}
-                                        color={fn.function_name === 'acme-image-processor' ? '#f97316' : '#6366f1'}
+                                        color={fn.function_name === 'acme-image-processor' ? '#f97316' : '#1f8c9e'}
                                         height={28}
                                       />
                                     ) : null}

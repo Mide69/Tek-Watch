@@ -135,7 +135,7 @@ function DatabasesContent() {
                           <p className="text-xs text-muted-foreground mb-1">CPU over {TIME_RANGE_LABELS[timeRange]}</p>
                           <Sparkline
                             data={db.metrics.cpu.map((p: { value: number }) => ({ value: p.value }))}
-                            color={(db.cpu ?? 0) > 70 ? '#fbbf24' : '#6366f1'}
+                            color={(db.cpu ?? 0) > 70 ? '#fbbf24' : '#1f8c9e'}
                             height={40}
                           />
                         </div>
