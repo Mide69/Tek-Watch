@@ -220,12 +220,14 @@ edge says how sure it is.
 |---|---|---|
 | CloudFront distribution serves an S3 bucket | direct | The distribution's own origin list |
 | Resource runs inside a VPC | direct | The resource's own VPC placement |
-| Resources share a security group | inferred | Shared group membership; they can usually reach each other |
+| Resources share a security group | inferred | Shared group membership; connectivity not verified |
 
-We do not collect VPC flow logs or security group rules, so the strongest claim
-anywhere in the output is "can usually reach", never "talks to". Impact stops
-at one hop: two hops through a shared VPC reaches the whole account and tells
-the reader nothing.
+We do not collect VPC flow logs or security group rules. Shared membership
+does not establish permitted traffic or actual connectivity; the output says
+"connectivity not verified". The API retains the legacy `reachable_from`
+field for compatibility, but its entries are shared-group associations.
+The graph view stops at one hop to avoid treating an entire shared VPC as
+affected.
 
 ---
 
@@ -492,8 +494,8 @@ Manager via `SECRETS_MANAGER_SECRET_ARN`.
 
 Stated here so nobody has to find out.
 
-- No traffic analysis. Without flow logs, the graph says resources *can* reach
-  each other, never that they do.
+- No traffic or network-reachability analysis. Shared security-group membership
+  is an association; connectivity is not verified.
 - No device or endpoint checks, so two of the five Cyber Essentials controls are
   out of scope.
 - No impact-tolerance testing or scenario exercises for PS21/3, only the
