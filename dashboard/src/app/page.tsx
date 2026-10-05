@@ -263,7 +263,7 @@ const pricingTiers = [
   {
     name: 'Enterprise', monthly: 499, discount: 0.15,
     desc: 'For mid-market and regulated businesses with complex environments.',
-    features: ['Unlimited accounts & resources', 'All four frameworks: UK GDPR, Cyber Essentials, ISO 27001, FCA PS21/3', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
+    features: ['Unlimited accounts & resources', 'Scoped technical checks: UK GDPR, Cyber Essentials, ISO 27001 and FCA PS21/3', 'Incident reports with UK GDPR impact', 'Full API access', 'Dedicated 2-hour support'],
     highlight: false,
   },
 ]
@@ -498,8 +498,8 @@ export default function LandingPage() {
             </h1>
             <p className="mt-6 text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
               TekWatch watches the cloud you already run, through a read-only agent, tells you
-              in plain English when something changes or breaks, shows which UK GDPR, Cyber
-              Essentials or FCA obligation it touches, and keeps a dated record of every check and
+              in plain English when something changes or breaks, maps findings to scoped UK GDPR and Cyber
+              Essentials controls and FCA technical evidence, and keeps a dated record of every check and
               every fix. There is nothing to migrate: we watch your infrastructure, we do not
               host it.
             </p>
@@ -979,7 +979,7 @@ export default function LandingPage() {
                   'Read-only role, created for you by the deployment template',
                   'Outbound only: no inbound ports, no VPN, no firewall rules',
                   '23 cloud services across every active region',
-                  'Your data stays in the UK (London region)',
+                  'Core storage is in AWS London; global AWS services, optional AI and external timestamping may involve processing outside the UK',
                   'AWS today. Azure is next on the roadmap',
                 ].map(p => (
                   <li key={p} className="flex items-start gap-3 text-base text-foreground/80">
