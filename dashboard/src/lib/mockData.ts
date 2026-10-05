@@ -849,7 +849,7 @@ export const MOCK_INCIDENTS: Incident[] = [
     ],
     service_impact: {
       total: 1,
-      summary: 'Also affected: it is published to the internet by CloudFront distribution cdn.acme.co.uk.',
+      summary: 'Related resources: it is published to the internet by CloudFront distribution cdn.acme.co.uk.',
       serves: [{ key: 'cloudfront:E1ACME', service: 'cloudfront', resource_id: 'E1ACME',
                  name: 'cdn.acme.co.uk', region: 'global', relationship: 'serves', confidence: 'direct',
                  why: 'This distribution serves acme-marketing-assets as an origin.' }],

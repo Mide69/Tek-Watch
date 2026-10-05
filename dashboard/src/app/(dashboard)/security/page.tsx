@@ -108,7 +108,7 @@ function CalendarCard({ calendar }: { calendar: RegulatoryCalendar }) {
   )
 }
 
-/** What else a finding reaches, from the customer's own dependency graph. */
+/** Related resources from the customer's own configuration graph. */
 function ServiceImpactBlock({ nodes, heading }: { nodes: ServiceImpactNode[]; heading: string }) {
   if (!nodes || nodes.length === 0) return null
   return (
@@ -480,7 +480,7 @@ function IncidentCard({ incident }: { incident: Incident }) {
                     />
                     <ServiceImpactBlock
                       nodes={incident.service_impact.reachable_from}
-                      heading="What can reach it"
+                      heading="Resources sharing a security group"
                     />
                   </>
                 )}

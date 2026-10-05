@@ -75,9 +75,9 @@ class TestGraph:
         graph = topology.build(inv)
         [edge] = [e for e in graph.edges if e.relationship == topology.SHARES_SECURITY_GROUP]
         assert {edge.source, edge.target} == {"ec2:i-1", "rds:prod-db"}
-        # We cannot see the group's rules or any traffic, so this is a "usually".
+        # Shared membership does not establish connectivity.
         assert edge.confidence == topology.INFERRED
-        assert "usually" in edge.why
+        assert edge.as_dict()["why"] == "Both share security group sg-app; connectivity not verified."
 
     def test_a_security_group_with_one_member_joins_nothing(self):
         inv = {"ec2": [res("ec2", "i-1", {"security_groups": "sg-lonely"})]}
@@ -112,15 +112,22 @@ class TestImpact:
         assert result["serves"][0]["name"] == "cdn.acme.co.uk"
         assert "published to the internet" in topology.summarise(result)
 
-    def test_a_database_reports_what_can_reach_it(self):
+    @pytest.mark.parametrize("count", [1, 2])
+    def test_a_database_reports_shared_group_associations(self, count):
         inv = {
             "ec2": [res("ec2", "i-1", {"security_groups": "sg-app"}, name="web-1"),
-                    res("ec2", "i-2", {"security_groups": "sg-app"}, name="web-2")],
+                    res("ec2", "i-2", {"security_groups": "sg-app"}, name="web-2")][:count],
             "rds": [res("rds", "prod-db", {"engine": "postgres", "security_groups": "sg-app"})],
         }
         result = topology.impact(topology.build(inv), "rds:prod-db")
-        assert {e["name"] for e in result["reachable_from"]} == {"web-1", "web-2"}
-        assert "can usually reach it" in topology.summarise(result)
+        names = [f"web-{i}" for i in range(1, count + 1)]
+        assert {e["name"] for e in result["reachable_from"]} == set(names)
+        assert result["total"] == count
+        noun = "resource shares" if count == 1 else "resources share"
+        assert topology.summarise(result) == (
+            f"Related resources: {count} other {noun} a security group with it "
+            f"({', '.join(names)}); connectivity not verified."
+        )
 
     def test_a_resource_we_have_never_seen_returns_nothing_rather_than_failing(self):
         result = topology.impact(topology.build({}), "s3:ghost")
@@ -155,7 +162,7 @@ class TestIncidentsCarryTheImpact:
         assert impact["serves"][0]["name"] == "cdn.acme.co.uk"
         assert "cdn.acme.co.uk" in impact["summary"]
 
-    def test_a_database_incident_names_what_can_reach_the_database(self):
+    def test_a_database_incident_names_shared_group_associations(self):
         inv = {
             "rds": [res("rds", "prod-db", {"engine": "postgres", "publicly_accessible": "True",
                                            "security_groups": "sg-app"})],
@@ -163,7 +170,15 @@ class TestIncidentsCarryTheImpact:
             "cloudtrail": [],
         }
         [incident] = [i for i in correlation.correlate(inv) if i["type"] == "database_publicly_reachable"]
-        assert incident["service_impact"]["reachable_from"][0]["name"] == "web-1"
+        impact = incident["service_impact"]
+        assert impact["reachable_from"][0]["name"] == "web-1"
+        assert impact["reachable_from"][0]["why"] == (
+            "Both share security group sg-app; connectivity not verified."
+        )
+        assert impact["summary"] == (
+            "Related resources: 1 other resource shares a security group with it "
+            "(web-1); connectivity not verified."
+        )
 
     def test_every_incident_carries_the_field_even_when_nothing_is_joined(self):
         inv = {"s3": [bucket("lonely")], "cloudtrail": []}

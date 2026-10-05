@@ -1,21 +1,12 @@
-"""What else a change touches: the customer's own service dependency graph.
+"""Relationships between resources in the customer's AWS inventory.
 
-Until now TekWatch could say "this bucket is public". It could not say "and it
-is being served to the world by this CloudFront distribution", or "these two
-application servers can reach that database". Those are the questions a
-business owner actually asks after a finding, and answering them is the
-difference between an alert and an impact assessment.
+The graph uses only relationships the agent reports:
+* direct — an explicit configuration relationship, such as a CloudFront
+  origin or VPC placement.
+* inferred — a possible association based on shared security-group membership.
 
-The graph is built only from relationships the agent really reports, and every
-edge says how sure it is:
-
-* direct   — AWS itself joins the two resources. A CloudFront origin naming a
-             bucket is not an opinion.
-* inferred — the two share something that usually means they talk, such as a
-             security group or a VPC. Useful, and not presented as fact.
-
-Nothing here guesses at traffic. We do not see flow logs, so "can reach" is
-the strongest claim made, and it is worded that way in the output.
+Shared membership does not establish permitted traffic or actual connectivity.
+We do not collect security-group rules or flow logs; connectivity is not verified.
 """
 from __future__ import annotations
 
@@ -172,11 +163,10 @@ def _add_vpc_membership(graph: Graph, inventory: Dict[str, List[Dict[str, Any]]]
 
 
 def _add_shared_security_groups(graph: Graph, inventory: Dict[str, List[Dict[str, Any]]]) -> None:
-    """Resources sharing a security group can usually reach each other.
+    """Record shared security-group membership, without inferring connectivity.
 
-    Usually, not certainly: a group's rules decide, and we do not collect
-    those. So the edge is inferred and says "can usually reach", never "talks
-    to".
+    Membership alone does not establish that traffic is permitted. The edge
+    remains an inferred association because rules and traffic are not assessed.
     """
     by_group: Dict[str, List[Tuple[str, Dict[str, Any]]]] = {}
     for service in ("ec2", "lambda", "rds"):
@@ -196,7 +186,7 @@ def _add_shared_security_groups(graph: Graph, inventory: Dict[str, List[Dict[str
                     target=_node(service_b, b).key,
                     relationship=SHARES_SECURITY_GROUP,
                     confidence=INFERRED,
-                    why=f"Both are in security group {group}, so they can usually reach each other.",
+                    why=f"Both share security group {group}; connectivity not verified.",
                 ))
 
 
@@ -210,7 +200,10 @@ def _neighbours(graph: Graph, key: str) -> Iterable[Tuple[Edge, str, str]]:
 
 
 def impact(graph: Graph, key: str) -> Dict[str, Any]:
-    """What a change to this resource reaches.
+    """Resources related to this resource.
+
+    The legacy reachable_from field holds shared-group associations, not
+    verified network reachability. Keep the field name for API compatibility.
 
     Deliberately one hop. Two hops through a shared VPC reaches everything in
     the account and tells the reader nothing.
@@ -259,10 +252,13 @@ def summarise(impact_result: Dict[str, Any]) -> str:
     others = impact_result.get("reachable_from", [])
     if others:
         names = ", ".join(sorted({e["name"] for e in others})[:3])
-        parts.append(f"{len(others)} other resource{'s' if len(others) != 1 else ''} can usually reach it ({names})")
+        parts.append(
+            f"{len(others)} other resource{'s share' if len(others) != 1 else ' shares'} "
+            f"a security group with it ({names}); connectivity not verified"
+        )
     if not parts:
         return ""
-    return "Also affected: " + "; ".join(parts) + "."
+    return "Related resources: " + "; ".join(parts) + "."
 
 
 def load_inventory(ts: Any, customer_id: str, window: str = "24h") -> Dict[str, List[Dict[str, Any]]]:
