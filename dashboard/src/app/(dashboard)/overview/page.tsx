@@ -15,7 +15,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useProfile } from '@/hooks/useProfile'
 import { useFixtureView } from '@/hooks/useFixtureView'
 import { useDashboard, TIME_RANGE_LABELS } from '@/contexts/DashboardContext'
-import { useOverview, useAlerts, useEC2 } from '@/hooks/useData'
+import { useOverview, useAlerts, useEC2, useSecurity } from '@/hooks/useData'
 import { cn } from '@/lib/utils'
 
 // Region display names. The agent reports region codes; only the codes an
@@ -65,6 +65,8 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
   const { data }   = useOverview()
   const { data: alertsData }  = useAlerts()
   const { data: ec2 }         = useEC2()
+  const { data: security }    = useSecurity()
+  const guardduty = security?.guardduty ?? []
 
   if (!data) {
     return (
@@ -149,14 +151,14 @@ function OverviewContent({ customerId }: { customerId: string | null }) {
               sparkColor: '#ef4444',
             },
             {
-              title: 'Security Findings',
-              value: data.security_findings.toString(),
-              change: `${activeAlerts.filter(a => a.severity === 'high').length} high severity`,
+              title: 'GuardDuty Findings',
+              value: guardduty.length.toString(),
+              change: `${guardduty.filter(f => f.severity.toUpperCase() === 'HIGH').length} high severity`,
               positive: false,
               icon: Activity,
               colorClass: 'text-amber-500 dark:text-amber-400',
               iconBg: 'bg-amber-500/10 border-amber-500/20',
-              spark: trend.map((_, i) => ({ value: i < 6 ? 1 : 2 })),
+              spark: [],
               sparkColor: '#f59e0b',
             },
             {
