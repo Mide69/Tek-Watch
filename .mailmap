@@ -1,0 +1,10 @@
+# Canonical author identity.
+#
+# Commits were made under two display names, "Mide69" and "Olamide Kosile",
+# from the same GitHub account and the same address. Git reports those as two
+# contributors, which misrepresents a single-author project. This file maps
+# both to the legal name used everywhere else, without rewriting any commit.
+#
+# Check it with:  git shortlog -sne --all
+
+Olamide Kosile <64154023+Mide69@users.noreply.github.com>
