@@ -14,6 +14,7 @@ function AssistantMark() {
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import apiClient from '@/lib/api'
+import { useFixtureView } from '@/hooks/useFixtureView'
 import { cn } from '@/lib/utils'
 
 interface Message {
@@ -32,6 +33,85 @@ const SUGGESTED = [
   'Give me an overview of my infrastructure',
   'Show me all active alerts',
 ]
+
+/**
+ * What the Assistant replies with in the demo.
+ *
+ * The demo has no Cognito session, so the real endpoint cannot be called. Every
+ * figure below is read from the same fixtures the Overview, Cost and Security
+ * pages render, so a visitor who checks one against another finds them equal.
+ * The tools listed are the ones the live Assistant uses for that question.
+ */
+const DEMO_ANSWERS: { match: RegExp; content: string; toolCalls: string[] }[] = [
+  {
+    match: /forecast|this month|spend|bill/i,
+    content:
+      'Month to date you have spent $2,891.40. On the current trend the month lands at about ' +
+      '$4,180.00, against $4,247.80 last month, so roughly 1.6% lower.\n\n' +
+      'The movement worth watching is Lambda, up 38.7% month on month. Invocations are up, but ' +
+      'cold-start duration has also risen sharply on acme-image-processor, which usually points ' +
+      'to a recent package change rather than extra traffic.',
+    toolCalls: ['get_cost_summary', 'get_cost_breakdown'],
+  },
+  {
+    match: /ec2|instances/i,
+    content:
+      'You have 12 EC2 instances: 10 running and 2 stopped, all in eu-west-2.\n\n' +
+      'web-server-01 is the one to look at. CPU is 92.4%, which is above the 80% threshold and ' +
+      'has been for more than fifteen minutes.',
+    toolCalls: ['get_ec2_instances', 'get_overview'],
+  },
+  {
+    match: /critical|security alert|threat|guardduty/i,
+    content:
+      'One critical alert is open: CPU on web-server-01 at 92.4%, past the 80% threshold for ' +
+      'over fifteen minutes.\n\n' +
+      'On the compliance side, 9 of the 24 controls are failing, including public access on the ' +
+      'acme-marketing-assets bucket and three IAM users without multi-factor authentication. ' +
+      'Two controls could not be measured because AWS Config and Security Hub are switched off, ' +
+      'and those are left out of the scores rather than counted as passes.',
+    toolCalls: ['get_alerts', 'get_security_summary'],
+  },
+  {
+    match: /costs? the most|most expensive|top service/i,
+    content:
+      'Amazon EC2, at $1,080.40 month to date, which is about 37% of the $2,891.40 total.\n\n' +
+      'After that: RDS $620.80, CloudFront $340.20, S3 $220.60, Lambda $180.30 and ECS $160.40. ' +
+      'EC2 is down 4.2% on last month, so the growth is not there. Lambda is the line moving, ' +
+      'up 38.7%.',
+    toolCalls: ['get_cost_breakdown', 'get_cost_summary'],
+  },
+  {
+    match: /overview|infrastructure|estate|summary/i,
+    content:
+      'You are running 847 resources in eu-west-2, 7 more than the previous period.\n\n' +
+      'Three alarms are active, one of them critical. Estimated monthly cost is $4,247.80, down ' +
+      '3.2% on last month. On compliance, 9 of 24 controls are failing across UK GDPR, Cyber ' +
+      'Essentials v3.3, ISO 27001:2022 and the FCA PS21/3 technical checks.\n\n' +
+      'The thing I would deal with first is the acme-marketing-assets bucket, which lost its ' +
+      'public access block three hours ago and is being served to the internet by a CloudFront ' +
+      'distribution.',
+    toolCalls: ['get_overview', 'get_alerts', 'get_security_summary'],
+  },
+  {
+    match: /active alerts|all alerts|show me.*alerts/i,
+    content:
+      'Three alerts are active.\n\n' +
+      'Critical, EC2: CPU on web-server-01 is 92.4%, above the 80% threshold for more than ' +
+      'fifteen minutes.\n\n' +
+      'Warning, RDS: active connections on prod-db-01 are 187 against a limit of 210, so the ' +
+      'connection pool is 89% used.\n\n' +
+      'Warning, Lambda: cold-start duration on acme-image-processor averaged 3.4 seconds over ' +
+      'the last hour, which is 6.1 standard deviations above its seven-day baseline of 0.8 ' +
+      'seconds.',
+    toolCalls: ['get_alerts'],
+  },
+]
+
+const DEMO_FALLBACK =
+  'This demonstration answers the suggested questions from the sample account, so the figures ' +
+  'match the other pages you can see. It does not call the live assistant, which needs a ' +
+  'connected AWS account. Start a free trial to ask this against your own data.'
 
 const TOOL_LABELS: Record<string, string> = {
   get_overview: 'Overview',
@@ -117,6 +197,7 @@ export default function ChatPage() {
 }
 
 function ChatContent() {
+  const fixtureView = useFixtureView()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -138,6 +219,22 @@ function ChatContent() {
 
     const history = messages.map(m => ({ role: m.role, content: m.content }))
 
+    // The demo has no session, so calling the API would 401 and bounce the
+    // visitor to sign-in, ending the demo on their first click.
+    if (fixtureView) {
+      const hit = DEMO_ANSWERS.find(a => a.match.test(trimmed))
+      await new Promise(r => setTimeout(r, 450))
+      setMessages(prev => [...prev, {
+        id: `a-${Date.now()}`,
+        role: 'assistant',
+        content: hit ? hit.content : DEMO_FALLBACK,
+        toolCalls: hit ? hit.toolCalls : undefined,
+      }])
+      setIsLoading(false)
+      textareaRef.current?.focus()
+      return
+    }
+
     try {
       const data = await apiClient.chat(trimmed, history)
       setMessages(prev => [...prev, {
@@ -158,7 +255,7 @@ function ChatContent() {
       setIsLoading(false)
       textareaRef.current?.focus()
     }
-  }, [isLoading, messages])
+  }, [isLoading, messages, fixtureView])
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input) }
