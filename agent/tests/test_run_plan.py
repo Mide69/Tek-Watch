@@ -86,7 +86,11 @@ def test_a_stuck_region_does_not_hold_the_run_open(monkeypatch):
     monkeypatch.setattr(main, "discover_active_regions", lambda s: ["eu-west-2", "ap-south-1"])
     monkeypatch.setattr(main, "collect_region", collect_region)
     monkeypatch.setattr(main, "collect_global", lambda *a, **k: ([], 0))
-    monkeypatch.setattr(main, "deadline_seconds", lambda i: 0.3)
+    # Long enough that a loaded machine still schedules eu-west-2's collector
+    # before the deadline fires, short enough that it fires well inside the
+    # 5-second hang above. At 0.3s this raced the thread pool and failed about
+    # one run in twenty when the CPU was busy.
+    monkeypatch.setattr(main, "deadline_seconds", lambda i: 1.5)
     monkeypatch.setattr(main, "SQSPublisher", lambda **kw: MagicMock(publish_batch=published.extend))
     monkeypatch.setattr(main.os, "_exit", exited.append)
 
