@@ -173,9 +173,13 @@ async def evidence_recording_loop() -> None:
             for customer in await asyncio.to_thread(db_service.list_customers):
                 if customer.get("status") != "active":
                     continue
-                written = await asyncio.to_thread(
-                    record_for_customer, customer["customer_id"], ts_service, db_service
-                )
+                try:
+                    written = await asyncio.to_thread(
+                        record_for_customer, customer["customer_id"], ts_service, db_service
+                    )
+                except Exception:
+                    logger.exception("Evidence customer pass failed for %s", customer["customer_id"])
+                    continue
                 if written:
                     logger.info(
                         "Recorded %d evidence entr%s for %s",

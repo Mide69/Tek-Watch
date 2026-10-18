@@ -1,5 +1,6 @@
 """Unit tests for the compliance rule engine."""
 from services import compliance
+from datetime import datetime, timezone
 
 
 def res(resource_id, metrics=None, dims=None, **extra):
@@ -9,7 +10,7 @@ def res(resource_id, metrics=None, dims=None, **extra):
         "region": extra.pop("region", "eu-west-2"),
         "metrics": metrics or {},
         "dimensions": dims or {},
-        "last_seen": "2026-09-11T10:00:00+00:00",
+        "last_seen": datetime.now(timezone.utc).isoformat(),
         **extra,
     }
 
@@ -89,7 +90,8 @@ class TestNoData:
 class TestHealthyAccount:
     def test_every_check_passes(self):
         report = compliance.evaluate(healthy_inventory())
-        assert {c["status"] for c in report["controls"]} == {compliance.PASS}
+        assert all(c["status"] == compliance.PASS for c in report["controls"] if c["id"] != "LAM-01")
+        assert control(report, "LAM-01")["status"] == compliance.UNKNOWN
 
     def test_every_framework_scores_100(self):
         report = compliance.evaluate(healthy_inventory())
@@ -194,7 +196,7 @@ class TestScoring:
         inv = healthy_inventory()
         inv["iam"] = []                                  # 3 IAM checks become unknown
         fw = framework(compliance.evaluate(inv), "cyber_essentials")
-        assert fw["unknown"] == 3
+        assert fw["unknown"] == 4  # IAM evidence plus quarantined LAM-01
         assert fw["failed"] == 0
         # Unknown checks neither pass nor drag the score down.
         assert fw["score"] == 100
@@ -351,7 +353,7 @@ class TestTheRestOfTheEstate:
     def test_a_retired_lambda_runtime_fails_and_names_the_runtime(self):
         inv = healthy_inventory()
         inv["lambda"] = [res("legacy-fn", {"function_runtime": "python3.7"}, {"runtime": "python3.7"})]
-        c = control(compliance.evaluate(inv), "LAM-01")
+        c = compliance._lambda_supported_runtimes(inv).as_dict()
         assert c["status"] == compliance.FAIL
         assert "python3.7" in c["findings"][0]["detail"]
 
@@ -359,7 +361,7 @@ class TestTheRestOfTheEstate:
         # A runtime we have never heard of is more likely to be new than retired.
         inv = healthy_inventory()
         inv["lambda"] = [res("future-fn", {"function_runtime": "python3.15"}, {"runtime": "python3.15"})]
-        assert control(compliance.evaluate(inv), "LAM-01")["status"] == compliance.PASS
+        assert control(compliance.evaluate(inv), "LAM-01")["status"] == compliance.UNKNOWN
 
     def test_failing_config_rules_fail_the_control(self):
         inv = healthy_inventory()
@@ -377,7 +379,7 @@ class TestTheRestOfTheEstate:
         for service in ("dynamodb", "sqs", "sns", "eks", "elasticache", "cloudfront", "lambda"):
             inv[service] = []
         report = compliance.evaluate(inv)
-        for cid in ("DDB-01", "SQS-01", "SNS-01", "EKS-01", "EC-01", "CF-01", "LAM-01"):
+        for cid in ("DDB-01", "SQS-01", "SNS-01", "EKS-01", "EC-01", "CF-01"):
             assert control(report, cid)["status"] == compliance.NOT_APPLICABLE, cid
 
     def test_the_engine_now_covers_seventeen_services(self):

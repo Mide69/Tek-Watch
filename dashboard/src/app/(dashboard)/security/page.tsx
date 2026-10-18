@@ -39,7 +39,7 @@ const URGENCY: Record<string, { variant: 'error' | 'warning' | 'info' | 'default
 }
 
 function whenDue(entry: CalendarEntry): string {
-  if (entry.days_remaining == null) return 'Date not set'
+  if (entry.days_remaining == null) return entry.kind === 'triage' ? 'Assessment required' : 'Date not set'
   if (entry.overdue) return `${Math.abs(entry.days_remaining)} days ago`
   if (entry.days_remaining === 0) return 'Today'
   return `In ${entry.days_remaining} day${entry.days_remaining === 1 ? '' : 's'}`
@@ -48,8 +48,8 @@ function whenDue(entry: CalendarEntry): string {
 /**
  * Dates this account has to meet.
  *
- * Every row is driven by something real: a 72-hour clock started by an
- * exposure we actually saw, an expiry date AWS reported, or a renewal date the
+ * Every row is driven by something real: a deadline based on confirmed
+ * breach awareness, an expiry date AWS reported, or a renewal date the
  * customer gave us. A date nobody has told us stays blank and asks for it,
  * rather than becoming an invented reminder.
  */
@@ -154,11 +154,11 @@ function RecheckButton({ controlId, onResult }: { controlId: string; onResult: (
       )
       const status = response.data?.control?.status ?? 'unknown'
       setResult(
-        status === 'pass' ? 'Fixed. Recorded in your evidence log.'
+        status === 'pass' ? (response.data?.remediation_verified ? 'Fresh evidence verifies the fix.' : 'Latest stored observation passes. A new collection is required to verify your change.')
         : status === 'fail' ? 'Still failing against your latest agent data.'
         : 'Not measurable yet. Give the agent one collection cycle.',
       )
-      onResult(status)
+      onResult(status === 'pass' && !response.data?.remediation_verified ? 'unknown' : status)
     } catch {
       setResult('Could not check right now. Please try again shortly.')
     } finally {
@@ -266,7 +266,7 @@ const EVIDENCE_KIND: Record<string, { label: string; variant: 'success' | 'error
   resolved: { label: 'RESOLVED', variant: 'success' },
   regressed: { label: 'REGRESSED', variant: 'error' },
   snapshot: { label: 'ASSESSED', variant: 'info' },
-  anchor: { label: 'TIMESTAMPED', variant: 'default' },
+  anchor: { label: 'TSA RESPONSE', variant: 'default' },
 }
 
 /** The audit trail: what was assessed, what changed, and proof it is unedited. */
@@ -286,7 +286,7 @@ function EvidenceCard({ evidence }: { evidence: EvidenceLog }) {
       const url = URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
-      link.download = 'tekwatch-compliance-evidence.csv'
+      link.download = 'tekwatch-compliance-evidence.zip'
       link.click()
       URL.revokeObjectURL(url)
     } catch {
@@ -306,7 +306,7 @@ function EvidenceCard({ evidence }: { evidence: EvidenceLog }) {
               <h3 className="font-semibold text-foreground">Compliance evidence</h3>
               <p className="text-xs text-muted-foreground mt-0.5">
                 {evidence.total_recorded > 0
-                  ? `${evidence.total_recorded} entries recorded. Every assessment and every change, in order.`
+                  ? `${evidence.total_recorded} entries recorded: assessment snapshots and detected verdict changes.`
                   : 'Entries appear here once the agent has reported and the first assessment runs.'}
               </p>
             </div>
@@ -316,12 +316,12 @@ function EvidenceCard({ evidence }: { evidence: EvidenceLog }) {
               <Badge variant={verification.intact ? 'success' : 'error'}>
                 {verification.intact
                   ? `CHAIN INTACT · ${verification.entries_checked} CHECKED`
-                  : `BROKEN AT ENTRY ${verification.broken_at}`}
+                  : verification.broken_at ? `BROKEN AT ENTRY ${verification.broken_at}` : 'VERIFICATION INCOMPLETE'}
               </Badge>
             )}
             {verification?.anchors ? (
               <Badge variant="info">
-                TIMESTAMPED {verification.last_anchored_at ? formatRelativeTime(verification.last_anchored_at) : ''}
+                TSA RESPONSE {verification.last_anchored_at ? formatRelativeTime(verification.last_anchored_at) : ''}
               </Badge>
             ) : null}
             <button

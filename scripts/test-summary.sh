@@ -17,24 +17,35 @@ rows=""
 # pytest -q ends with a line like "471 passed in 4.63s" or
 # "1 failed, 290 passed in 22.68s".
 run_pytest() {
-    local dir="$1" out p f
-    out=$(cd "$dir" && python -m pytest -q 2>&1 | tail -1)
+    local dir="$1" out p f rc
+    out=$(cd "$dir" && python -m pytest -q 2>&1)
+    rc=$?
     p=$(printf '%s' "$out" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+') || p=0
     f=$(printf '%s' "$out" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+') || f=0
     printf -v rows '%s  %-18s %5s passed %s\n' "$rows" "$dir" "${p:-0}" \
         "$( [ "${f:-0}" -gt 0 ] && printf '%s failed' "$f" )"
+    if [ "$rc" -ne 0 ] || [ "${p:-0}" -eq 0 ]; then
+        f=$(( ${f:-0} + 1 ))
+        printf '  %s: runner failed (exit %s) or no tests passed\n' "$dir" "$rc" >&2
+    fi
     pass_total=$(( pass_total + ${p:-0} ))
     fail_total=$(( fail_total + ${f:-0} ))
 }
 
 # jest prints "Tests:  88 passed, 88 total" (and "N failed," before it if any).
 run_jest() {
-    local dir="$1" out p f
-    out=$(cd "$dir" && npx jest 2>&1 | grep -E '^Tests:')
+    local dir="$1" out p f rc
+    out=$(cd "$dir" && npx jest --ci --runInBand 2>&1)
+    rc=$?
+    out=$(printf '%s\n' "$out" | grep -E '^Tests:')
     p=$(printf '%s' "$out" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+') || p=0
     f=$(printf '%s' "$out" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+') || f=0
     printf -v rows '%s  %-18s %5s passed %s\n' "$rows" "$dir" "${p:-0}" \
         "$( [ "${f:-0}" -gt 0 ] && printf '%s failed' "$f" )"
+    if [ "$rc" -ne 0 ] || [ "${p:-0}" -eq 0 ]; then
+        f=$(( ${f:-0} + 1 ))
+        printf '  %s: runner failed (exit %s) or no tests passed\n' "$dir" "$rc" >&2
+    fi
     pass_total=$(( pass_total + ${p:-0} ))
     fail_total=$(( fail_total + ${f:-0} ))
 }

@@ -1,25 +1,9 @@
-"""The compliance evidence record: append-only, hash-chained, checkable.
+"""Hash-chained assessment evidence with optional RFC 3161 responses.
 
-A compliance page tells you what is wrong today. It cannot tell you what was
-wrong in March, when you fixed it, or prove to anyone that the answer has not
-been edited since. That is the thing a Cyber Essentials assessor or an ICO
-caseworker actually asks for, and it is what this module keeps.
-
-Every entry carries the hash of the entry before it, so the log can be checked
-from end to end: change one stored entry and every hash after it stops
-matching. Nobody has to trust our word for it, because verify() recomputes the
-whole chain from the stored bodies.
-
-Chaining alone proves nobody edited an entry afterwards. It cannot prove when
-an entry was made, because every time in the chain is one we wrote. So once a
-day the head of the chain is sent to an independent RFC 3161 timestamping
-authority and its signed token is recorded as an anchor (see
-services/timestamping.py). From then on the log carries proof of age that does
-not depend on trusting us.
-
-What is still true and worth saying out loud: an anchor proves the chain
-existed at that time, not that our records are correct, and a log with no
-anchors yet says so rather than borrowing the claim.
+Hash links expose changes relative to a trusted head. A complete rewrite cannot
+be detected without an independently retained head or verified external anchor.
+Timestamp responses require signature and trust-chain verification; neither a
+hash chain nor a timestamp proves the accuracy of the underlying observations.
 """
 from __future__ import annotations
 
@@ -36,18 +20,18 @@ REGRESSED = "regressed"     # a control that was passing now fails
 ANCHOR = "anchor"           # an independent timestamp over the chain so far
 
 STATEMENT = (
-    "Each entry is chained to the one before it with SHA-256, so any later edit to a "
-    "stored entry breaks every hash after it. Once a day the head of the chain is sent to "
-    "an independent timestamping authority, which returns a signed RFC 3161 token proving "
-    "the chain existed at that time. You can check a token yourself with openssl, without "
-    "TekWatch."
+    "SHA-256 links allow internal chain consistency to be checked. This log contains "
+    "RFC 3161 responses: verify their signatures and target hashes independently with "
+    "openssl and a trusted authority certificate. Only a successful external anchor or "
+    "separately trusted chain head detects a fully rewritten history. Neither establishes "
+    "that the original observation or assessment was correct."
 )
 
 # Said instead when a log has no anchors yet, so nothing claims proof it lacks.
 STATEMENT_WITHOUT_ANCHORS = (
-    "Each entry is chained to the one before it with SHA-256, so any later edit to a "
-    "stored entry breaks every hash after it. This log has not been anchored to an "
-    "independent timestamp yet; anchoring runs daily."
+    "SHA-256 links permit internal consistency checks. This log has not been anchored "
+    "to an independent timestamp yet; anchoring runs daily on a best-effort basis. "
+    "Without a separately trusted head, rewritten history cannot be excluded."
 )
 
 
@@ -100,11 +84,12 @@ def anchor_body(stamp: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def verify(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
+def verify(entries: List[Dict[str, Any]], expected_head: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Recompute the chain. Returns where it breaks, if it breaks."""
     ordered = sorted(entries, key=lambda e: int(e.get("seq", 0)))
     anchors = [e for e in ordered if e.get("kind") == ANCHOR]
     prev = GENESIS
+    sequence = 1
     for entry in ordered:
         expected = entry_hash(
             prev,
@@ -113,7 +98,7 @@ def verify(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
             str(entry.get("kind", "")),
             entry.get("body") or {},
         )
-        if entry.get("prev_hash") != prev or entry.get("hash") != expected:
+        if int(entry.get("seq", 0)) != sequence or entry.get("prev_hash") != prev or entry.get("hash") != expected:
             return {
                 "intact": False,
                 "entries_checked": len(ordered),
@@ -123,8 +108,15 @@ def verify(entries: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "statement": statement_for(ordered),
             }
         prev = str(entry["hash"])
+        sequence += 1
+    complete = expected_head is not None and (
+        int(expected_head.get("seq", 0)) == len(ordered)
+        and str(expected_head.get("hash", GENESIS)) == prev
+    )
     return {
-        "intact": True,
+        "intact": complete if expected_head is not None else True,
+        "complete": complete,
+        "verification_scope": "hash_links_and_sequence; timestamp signatures require independent verification",
         "entries_checked": len(ordered),
         "broken_at": None,
         "anchors": len(anchors),
@@ -152,6 +144,7 @@ def snapshot_body(report: Dict[str, Any], exposure: Optional[Dict[str, Any]] = N
     """
     body: Dict[str, Any] = {
         "evaluated_at": report.get("evaluated_at"),
+        "pack": report.get("pack"),
         "frameworks": [
             {k: fw.get(k) for k in ("id", "name", "score", "passed", "failed", "unknown", "total")}
             for fw in report.get("frameworks", [])
@@ -163,6 +156,10 @@ def snapshot_body(report: Dict[str, Any], exposure: Optional[Dict[str, Any]] = N
                 "status": c.get("status"),
                 "severity": c.get("severity"),
                 "failing_resources": len(c.get("findings") or []),
+                "observed_at": c.get("observed_at"),
+                "rule_version": c.get("rule_version"),
+                "observations": c.get("observations", []),
+                "references": c.get("references", []),
             }
             for c in report.get("controls", [])
         ],
@@ -205,9 +202,20 @@ def transitions(
             "from": old,
             "to": new,
             "detail": control.get("detail"),
-            "observed_at": report.get("evaluated_at"),
+            "observed_at": control.get("observed_at"),
+            "assessed_at": report.get("evaluated_at"),
+            "rule_version": control.get("rule_version"),
+            "pack": report.get("pack"),
         }
         if old == "fail" and new == "pass":
+            # A changed verdict is not proof of a fix without a newer observation.
+            try:
+                observed = datetime.fromisoformat(str(control.get("observed_at")).replace("Z", "+00:00"))
+                prior = datetime.fromisoformat(str(previous.get("evaluated_at")).replace("Z", "+00:00"))
+                if observed.tzinfo is None or prior.tzinfo is None or observed <= prior:
+                    continue
+            except (ValueError, TypeError):
+                continue
             out.append((RESOLVED, f"{cid} now passes: {control.get('title')}", body))
         elif old == "pass" and new == "fail":
             out.append((REGRESSED, f"{cid} started failing: {control.get('title')}", body))

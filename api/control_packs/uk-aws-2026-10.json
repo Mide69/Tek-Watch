@@ -1,0 +1,404 @@
+{
+  "id": "uk-aws-2026-10",
+  "version": "1.0.0",
+  "effective_from": "2026-10-18",
+  "jurisdiction": "UK",
+  "scope": "selected AWS technical controls only",
+  "review_status": "engineering baseline; independent regulatory review pending",
+  "frameworks": [
+    {
+      "id": "uk_gdpr",
+      "name": "UK GDPR"
+    },
+    {
+      "id": "cyber_essentials",
+      "name": "Cyber Essentials v3.3",
+      "scope": "cloud_controls_only",
+      "scope_note": "The cloud side only. From an AWS account TekWatch can evidence firewalls and internet gateways, secure configuration, user access control, and the cloud half of security update management, such as functions left on retired runtimes. Malware protection, and patching on the laptops and phones your people use, are not visible to TekWatch and are not assessed here. Version 3.3 applies to assessments from 27 April 2026 and puts cloud services firmly in scope."
+    },
+    {
+      "id": "iso27001",
+      "name": "ISO 27001:2022"
+    },
+    {
+      "id": "fca_ps21_3",
+      "name": "FCA PS21/3 operational resilience",
+      "scope": "technical_evidence_only",
+      "scope_note": "Technical evidence only. These checks show whether the AWS resources behind a service can survive a failure and be restored, which supports the resource mapping a firm must do under PS21/3. Identifying important business services, setting impact tolerances and scenario testing are governance work that cannot be read from AWS configuration, and are not assessed here."
+    }
+  ],
+  "controls": {
+    "IAM-02": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(b) confidentiality of processing systems"
+        },
+        {
+          "framework": "cyber_essentials",
+          "reference": "User access control"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.5 Secure authentication"
+        }
+      ],
+      "enabled": true
+    },
+    "IAM-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(b) confidentiality of processing systems"
+        },
+        {
+          "framework": "cyber_essentials",
+          "reference": "User access control"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.5 Secure authentication"
+        }
+      ],
+      "enabled": true
+    },
+    "GD-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(d) testing and assessing security measures"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.16 Monitoring activities"
+        }
+      ],
+      "enabled": true
+    },
+    "IAM-03": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "cyber_essentials",
+          "reference": "User access control"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.5.17 Authentication information"
+        }
+      ],
+      "enabled": true
+    },
+    "CT-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 5(2) accountability"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.15 Logging"
+        }
+      ],
+      "enabled": true
+    },
+    "RES-04": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Detecting an incident in time to stay within impact tolerance"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.16 Monitoring activities"
+        }
+      ],
+      "enabled": true
+    },
+    "CFG-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(d) testing and assessing security measures"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.9 Configuration management"
+        }
+      ],
+      "enabled": true
+    },
+    "RES-02": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Ability to restore an important business service after an incident"
+        },
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(c) ability to restore availability and access"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.13 Information backup"
+        }
+      ],
+      "enabled": true
+    },
+    "RDS-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(b) confidentiality of processing systems"
+        },
+        {
+          "framework": "cyber_essentials",
+          "reference": "Firewalls and internet gateways"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.20 Network security"
+        }
+      ],
+      "enabled": true
+    },
+    "S3-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(b) confidentiality of processing systems"
+        },
+        {
+          "framework": "cyber_essentials",
+          "reference": "Secure configuration"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.3 Information access restriction"
+        }
+      ],
+      "enabled": true
+    },
+    "GD-02": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 33 assessing and notifying personal data breaches"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.5.26 Response to information security incidents"
+        }
+      ],
+      "enabled": true
+    },
+    "RES-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Remaining within impact tolerance when a data centre is lost"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.14 Redundancy of information processing facilities"
+        }
+      ],
+      "enabled": true
+    },
+    "DDB-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(c) ability to restore availability and access"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.13 Information backup"
+        },
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Ability to recover data supporting an important business service"
+        }
+      ],
+      "enabled": true
+    },
+    "EKS-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "cyber_essentials",
+          "reference": "Firewalls and internet gateways"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.20 Network security"
+        }
+      ],
+      "enabled": true
+    },
+    "SH-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(d) testing and assessing security measures"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.5.26 Response to information security incidents"
+        }
+      ],
+      "enabled": true
+    },
+    "S3-02": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "ACM-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data in transit"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "RES-03": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Resilience of the entry point to an important business service"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.14 Redundancy of information processing facilities"
+        }
+      ],
+      "enabled": true
+    },
+    "SQS-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "SNS-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "EC-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "CF-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(a) encryption of personal data in transit"
+        },
+        {
+          "framework": "cyber_essentials",
+          "reference": "Secure configuration"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.24 Use of cryptography"
+        }
+      ],
+      "enabled": true
+    },
+    "LAM-01": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "cyber_essentials",
+          "reference": "Security update management"
+        },
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(b) ongoing security of processing systems"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.8 Management of technical vulnerabilities"
+        }
+      ],
+      "enabled": false
+    },
+    "S3-03": {
+      "rule_version": "1.0.0",
+      "references": [
+        {
+          "framework": "uk_gdpr",
+          "reference": "Art. 32(1)(c) ability to restore availability and access"
+        },
+        {
+          "framework": "iso27001",
+          "reference": "A.8.13 Information backup"
+        },
+        {
+          "framework": "fca_ps21_3",
+          "reference": "Ability to recover data supporting an important business service"
+        }
+      ],
+      "enabled": true
+    }
+  }
+}

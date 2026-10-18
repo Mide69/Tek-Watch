@@ -29,6 +29,7 @@ from services.inventory_view import dim, num
 DEADLINE = "deadline"
 EXPIRY = "expiry"
 RENEWAL = "renewal"
+TRIAGE = "triage"
 
 # Article 33(1): the ICO must be told within 72 hours of becoming aware of a
 # personal data breach, unless it is unlikely to risk people's rights.
@@ -107,24 +108,18 @@ def _entry(
 
 
 def _breach_clocks(incidents: List[Dict[str, Any]], now: datetime) -> List[Entry]:
-    """The 72-hour clock on anything that exposed data.
-
-    Counted from when TekWatch first saw the exposure, which is the earliest
-    defensible reading of "became aware" and the one that gives the customer
-    the least comfortable, most useful answer.
-    """
+    """Triage configuration alerts; calculate deadlines only from confirmed awareness."""
     entries: List[Entry] = []
     for incident in incidents:
         if incident.get("type") not in ("s3_public_exposure", "database_publicly_reachable"):
             continue
-        detected = _parse(incident.get("detected_at"))
-        if not detected:
-            continue
-        due = detected + timedelta(hours=ICO_NOTIFICATION_HOURS)
+        aware = _parse(incident.get("aware_at"))
+        confirmed = incident.get("personal_data_breach_confirmed") is True
+        due = aware + timedelta(hours=ICO_NOTIFICATION_HOURS) if aware and confirmed else None
         resource = (incident.get("affected") or [{}])[0].get("resource", "a resource")
         entries.append(_entry(
             id=f"ico-72h:{incident.get('id')}",
-            kind=DEADLINE,
+            kind=DEADLINE if due else TRIAGE,
             title=f"Decide whether the ICO must be told about {resource}",
             due=due, now=now,
             detail=(
@@ -134,7 +129,8 @@ def _breach_clocks(incidents: List[Dict[str, Any]], now: datetime) -> List[Entry
             ),
             framework="UK GDPR",
             source=ICO_ARTICLE_33,
-            action="Check what was in it, decide, and write the decision down either way.",
+            action=("Check what was in it, decide, and write the decision down either way. "
+                    "A configuration alert alone does not establish breach awareness; no statutory due date is inferred without confirmed context."),
         ))
     return entries
 

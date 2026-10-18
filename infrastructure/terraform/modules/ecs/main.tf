@@ -586,9 +586,10 @@ resource "aws_iam_role" "agent_task" {
 # Same permission shape as the per-customer CFN template (read-only AWS
 # visibility + permission to publish collected records back to our own
 # ingest queue + Cost Explorer, which ReadOnlyAccess does not cover).
-resource "aws_iam_role_policy_attachment" "agent_task_readonly" {
-  role       = aws_iam_role.agent_task.name
-  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+resource "aws_iam_role_policy" "agent_task_readonly" {
+  name   = "collected-observations-only"
+  role   = aws_iam_role.agent_task.id
+  policy = file("${path.module}/../../../../api/services/agent_policy.json")
 }
 
 resource "aws_iam_role_policy" "agent_task" {
@@ -607,11 +608,6 @@ resource "aws_iam_role_policy" "agent_task" {
         Effect   = "Allow"
         Action   = ["ce:GetCostAndUsage", "ce:GetCostForecast"]
         Resource = ["*"] # Cost Explorer has no resource-level ARNs
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = [var.secrets_manager_arn]
       }
     ]
   })

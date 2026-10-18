@@ -384,6 +384,7 @@ class TimestreamQueryService:
                     "service": "",
                     "last_seen": "",
                     "metrics": {},
+                    "field_observed_at": {},
                 },
             )
 
@@ -398,6 +399,7 @@ class TimestreamQueryService:
 
             metric = row.get("metric_name")
             if metric:
+                entry["field_observed_at"][str(metric)] = row.get("time")
                 value = row.get("value")
                 # Metric rows store Decimal, event rows store the raw string.
                 # Callers want a number wherever the value is one, so that a
@@ -409,6 +411,8 @@ class TimestreamQueryService:
 
             dimensions = row.get("dimensions")
             if isinstance(dimensions, dict):
+                for key in dimensions:
+                    entry["field_observed_at"][str(key)] = row.get("time")
                 entry.setdefault("dimensions", {}).update(
                     {str(k): v for k, v in dimensions.items()}
                 )
@@ -456,6 +460,24 @@ class TimestreamQueryService:
         inventory = list(self._fold_rows(rows).values())
         inventory.sort(key=lambda r: str(r.get("resource_name") or ""))
         return inventory
+
+    def get_services_inventory(self, customer_id: str, services, time_range: str = _INVENTORY_WINDOW):
+        """One numeric-history query per assessment, not one per control service."""
+        cid = _safe(customer_id)
+        _safe(time_range, _SAFE_RANGE_RE)
+        since = self._since_iso(time_range)
+        grouped = {svc: [] for svc in services}
+        for row in self._iter_metrics_by_customer(cid, since, strict=True):
+            if row.get("service") in grouped:
+                grouped[row["service"]].append(row)
+        result = {}
+        for svc in services:
+            _safe(svc)
+            # Errors propagate: a partial service read must not look like absence.
+            rows = self._paginated_query(self._events_table,
+                                        Key("pk").eq(f"{cid}#{svc}") & Key("sk").gte(since))
+            result[svc] = list(self._fold_rows(rows + grouped[svc]).values())
+        return result
 
     def get_resource_inventory(
         self, customer_id: str, time_range: str = _INVENTORY_WINDOW
@@ -527,6 +549,7 @@ class TimestreamQueryService:
         service: Optional[str] = None,
         metric_name: Optional[str] = None,
         projection: Optional[List[str]] = None,
+        strict: bool = False,
     ) -> Iterator[Dict[str, Any]]:
         """Stream this customer's metric rows, one page at a time.
 
@@ -554,6 +577,8 @@ class TimestreamQueryService:
             )
         except ClientError as exc:
             logger.error("DynamoDB GSI query failed: %s", exc)
+            if strict:
+                raise
 
     def _query_metrics_by_customer(self, customer_id: str, since_iso: str) -> List[Dict[str, Any]]:
         return list(self._iter_metrics_by_customer(customer_id, since_iso))
@@ -566,6 +591,7 @@ class TimestreamQueryService:
         scan_forward: bool = True,
         filter_expression=None,
         projection: Optional[List[str]] = None,
+        strict: bool = False,
     ) -> Iterator[Dict[str, Any]]:
         """Every item a query matches, one page in memory at a time."""
         kwargs: Dict[str, Any] = {

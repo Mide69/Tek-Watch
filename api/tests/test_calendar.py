@@ -16,6 +16,8 @@ def incident(kind="s3_public_exposure", detected=None, resource="customer-export
         "id": f"{kind}:{resource}",
         "type": kind,
         "detected_at": (detected or NOW - timedelta(hours=1)).isoformat(),
+        "aware_at": (detected or NOW - timedelta(hours=1)).isoformat(),
+        "personal_data_breach_confirmed": True,
         "affected": [{"service": "S3", "resource": resource, "region": "eu-west-2"}],
     }
 
@@ -33,7 +35,7 @@ def entry(result, entry_id):
 
 
 class TestBreachClock:
-    def test_an_exposure_starts_a_72_hour_clock_from_when_we_saw_it(self):
+    def test_confirmed_breach_awareness_starts_a_72_hour_clock(self):
         result = calendar.build({}, [incident(detected=NOW - timedelta(hours=2))], now=NOW)
         e = entry(result, "ico-72h")
         assert e["kind"] == calendar.DEADLINE
@@ -58,9 +60,9 @@ class TestBreachClock:
         result = calendar.build({}, [incident(kind="root_login_without_mfa")], now=NOW)
         assert [e for e in result["entries"] if e["kind"] == calendar.DEADLINE] == []
 
-    def test_an_incident_with_no_detection_time_starts_no_clock(self):
+    def test_an_incident_with_no_awareness_time_starts_no_clock(self):
         broken = incident()
-        broken["detected_at"] = None
+        broken["aware_at"] = None
         assert [e for e in calendar.build({}, [broken], now=NOW)["entries"]
                 if e["kind"] == calendar.DEADLINE] == []
 
@@ -160,10 +162,10 @@ class TestEndpoints:
         ts = MagicMock()
         ts.get_service_inventory.side_effect = lambda cid, svc, *a: (
             [{"resource_id": "iam", "resource_name": "iam", "region": "eu-west-2",
-              "metrics": {"root_mfa_active": "true"}, "dimensions": {}}] if svc == "iam" else []
+              "metrics": {"root_mfa_active": "true"}, "dimensions": {}, "last_seen": datetime.now(timezone.utc).isoformat()}] if svc == "iam" else []
         )
         with patch("routers.security.TimestreamQueryService", return_value=ts), \
-             patch("routers.security.DynamoDBService", return_value=MagicMock()), \
+             patch("routers.security.DynamoDBService", return_value=MagicMock(recheck_request=MagicMock(return_value="2026-01-01T00:00:00+00:00"))), \
              patch("routers.security.evidence_recorder.record_for_customer", return_value=1):
             result = await security.recheck_control(control_id="IAM-02", customer=CTX)
         assert result["control"]["id"] == "IAM-02"

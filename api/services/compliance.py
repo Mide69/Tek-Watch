@@ -37,10 +37,13 @@ The firm still has to do the rest.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from services.inventory_view import dim, dim_num, flag, num, text
+from services.control_packs import load_pack
+from pathlib import Path
+import hashlib
 
 PASS = "pass"
 FAIL = "fail"
@@ -794,7 +797,7 @@ def _lambda_supported_runtimes(inv: Inventory) -> ControlResult:
             _ref("iso27001", "A.8.8 Management of technical vulnerabilities"),
         ],
     )
-    functions = [r for r in inv.get("lambda", []) if dim(r, "runtime")]
+    functions = inv.get("lambda", [])
     if not functions:
         return ControlResult(status=NOT_APPLICABLE, detail="No Lambda functions reported.", **base)
 
@@ -806,6 +809,8 @@ def _lambda_supported_runtimes(inv: Inventory) -> ControlResult:
             findings=[{"resource": _name(f), "detail": f"Runtime {dim(f, 'runtime')} is no longer supported"} for f in failing],
             **base,
         )
+    if any(not dim(f, "runtime") or dim(f, "runtime") not in SUPPORTED_RUNTIMES for f in functions):
+        return ControlResult(status=UNKNOWN, detail="Runtime evidence is missing or outside the reviewed catalogue; container images require separate assessment.", **base)
     return ControlResult(status=PASS, detail=f"All {len(functions)} functions run supported runtimes.", **base)
 
 
@@ -813,12 +818,19 @@ def _lambda_supported_runtimes(inv: Inventory) -> ControlResult:
 # dead rather than a list of what is alive: a new runtime we have not heard of
 # must not be reported as a failure.
 DEPRECATED_RUNTIME_PREFIXES = (
+    "python3.9", "nodejs18.x", "nodejs20.x", "ruby3.2", "provided.al2",
     "python2.7", "python3.6", "python3.7", "python3.8",
     "nodejs", "nodejs4.3", "nodejs6.10", "nodejs8.10", "nodejs10.x", "nodejs12.x",
     "nodejs14.x", "nodejs16.x",
     "ruby2.5", "ruby2.7", "dotnetcore2.1", "dotnetcore3.1", "dotnet5.0", "dotnet6",
     "java8", "go1.x",
 )
+
+# Pinned engineering catalogue, reviewed against AWS runtime documentation on
+# 2026-10-18. LAM-01 remains disabled in the release pack pending review.
+SUPPORTED_RUNTIMES = {"python3.10", "python3.11", "python3.12", "python3.13", "python3.14",
+                      "nodejs22.x", "nodejs24.x", "java11", "java17", "java21", "java25",
+                      "dotnet8", "dotnet10", "ruby3.3", "ruby3.4", "provided.al2023"}
 
 
 def _is_deprecated_runtime(runtime: str) -> bool:
@@ -910,13 +922,55 @@ CONTROLS: List[Callable[[Inventory], ControlResult]] = [
 ]
 
 
-def evaluate(inventory: Inventory, now: Optional[datetime] = None) -> Dict[str, Any]:
+def evaluate(inventory: Inventory, now: Optional[datetime] = None, *, pack_id: str = "uk-aws-2026-10") -> Dict[str, Any]:
     """Run every control and score each framework from the results."""
     now = now or datetime.now(timezone.utc)
+    pack = load_pack(pack_id)
+    pack["engine_sha256"] = hashlib.sha256(Path(__file__).read_bytes() + Path(__file__).with_name("inventory_view.py").read_bytes()).hexdigest()
     results = [control(inventory) for control in CONTROLS]
+    provenance = {}
+    service_for = {"S3": "s3", "IAM": "iam", "ACM": "acm", "GD": "guardduty", "CT": "cloudtrail",
+                   "RDS": "rds", "DDB": "dynamodb", "SQS": "sqs", "SNS": "sns", "EC": "elasticache",
+                   "EKS": "eks", "CF": "cloudfront", "LAM": "lambda", "CFG": "config", "SH": "security_hub"}
+    for result in results:
+        definition = pack["controls"][result.id]
+        result.references = definition["references"]
+        svc = {"RES-01": "rds", "RES-02": "rds", "RES-03": "elb", "RES-04": "cloudwatch_alarms"}.get(result.id)
+        svc = svc or service_for[result.id.split("-")[0]]
+        rows = inventory.get(svc, [])
+        observations, times = [], []
+        for resource in rows:
+            # Per-field times avoid a fresh CPU metric refreshing an old security setting.
+            field_times = resource.get("field_observed_at") or {}
+            stamps = list(field_times.values()) or [resource.get("last_seen")]
+            parsed = []
+            for stamp in stamps:
+                try:
+                    when = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
+                    if when.tzinfo is None:
+                        raise ValueError("timezone required")
+                    parsed.append(when)
+                except (ValueError, TypeError):
+                    parsed = []
+                    break
+            observed = min(parsed) if parsed else None
+            times.append(observed)
+            observations.append({"resource_id": resource.get("resource_id"), "service": svc,
+                                 "observed_at": observed.isoformat() if observed else None,
+                                 "metrics": resource.get("metrics", {}), "dimensions": resource.get("dimensions", {})})
+        fresh = bool(times) and all(t and timedelta(0) <= now - t <= timedelta(hours=24) for t in times)
+        if not definition["enabled"]:
+            result.status, result.detail = UNKNOWN, "Control quarantined from customer decisions pending validation."
+            result.findings = []
+        elif result.status == PASS and not fresh:
+            result.status, result.detail = UNKNOWN, "Required observations are missing, stale or have invalid timestamps."
+        observed_at = min(t for t in times if t).isoformat() if times and all(times) else None
+        provenance[result.id] = {"observed_at": observed_at, "assessed_at": now.isoformat(),
+                                 "rule_version": definition["rule_version"], "eligible": definition["enabled"],
+                                 "observations": observations, "references": definition["references"]}
 
     frameworks = []
-    for fw in FRAMEWORKS:
+    for fw in pack["frameworks"]:
         relevant = [r for r in results if any(ref["framework"] == fw["id"] for ref in r.references)]
         passed = sum(1 for r in relevant if r.status == PASS)
         failed = sum(1 for r in relevant if r.status == FAIL)
@@ -944,12 +998,17 @@ def evaluate(inventory: Inventory, now: Optional[datetime] = None) -> Dict[str, 
 
     return {
         "evaluated_at": now.isoformat(),
+        "pack": {k: pack[k] for k in ("id", "version", "sha256", "engine_sha256", "effective_from", "jurisdiction", "scope", "review_status")},
+        "eligible_controls": sum(c["enabled"] for c in pack["controls"].values()),
         "frameworks": frameworks,
-        "controls": [r.as_dict() for r in results],
+        "controls": [dict(r.as_dict(), **provenance[r.id]) for r in results],
         "disclaimer": DISCLAIMER,
     }
 
 
 def load_inventory(ts: Any, customer_id: str, window: str = INVENTORY_WINDOW) -> Inventory:
     """The latest folded state of every service the checks read."""
+    # Type lookup avoids silently treating a dynamic mock/adapter as this capability.
+    if hasattr(type(ts), "get_services_inventory"):
+        return ts.get_services_inventory(customer_id, INVENTORY_SERVICES, window)
     return {svc: ts.get_service_inventory(customer_id, svc, window) for svc in INVENTORY_SERVICES}
