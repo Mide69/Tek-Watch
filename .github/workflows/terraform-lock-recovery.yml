@@ -1,0 +1,84 @@
+name: Recover abandoned Terraform dev lock
+
+on:
+  workflow_dispatch:
+    inputs:
+      lock_id:
+        description: 'Exact abandoned dev lock ID from the failed plan'
+        required: true
+        default: 'eb2cc735-bb92-6c8f-72f2-0493f9d00a1d'
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: terraform-state-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Recover the known abandoned dev plan lock
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: dev
+    defaults:
+      run:
+        shell: bash
+        working-directory: infrastructure/terraform
+    env:
+      EXPECTED_LOCK_ID: ${{ inputs.lock_id }}
+      LOCK_PATH: tek-watch-terraform-state/tek-watch/dev/terraform.tfstate
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check for another running Terraform workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, {
+              owner: context.repo.owner, repo: context.repo.repo, status: 'in_progress', per_page: 100
+            });
+            const others = runs.filter(run => run.id !== context.runId &&
+              ['.github/workflows/terraform.yml', '.github/workflows/terraform-lock-recovery.yml'].includes(run.path));
+            if (others.length) throw new Error('Another Terraform run is active; recovery refused.');
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: eu-west-2
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.7.5'
+      - name: Verify the exact old lock
+        run: |
+          set -euo pipefail
+          test "$EXPECTED_LOCK_ID" = 'eb2cc735-bb92-6c8f-72f2-0493f9d00a1d'
+          aws dynamodb get-item \
+            --table-name tek-watch-terraform-locks \
+            --key '{"LockID":{"S":"tek-watch-terraform-state/tek-watch/dev/terraform.tfstate"}}' \
+            --consistent-read --output json > "$RUNNER_TEMP/dev-lock.json"
+          python - <<'PY'
+          import json, os
+          from datetime import datetime, timezone, timedelta
+          from pathlib import Path
+          item = json.loads((Path(os.environ['RUNNER_TEMP']) / 'dev-lock.json').read_text()).get('Item', {})
+          info = json.loads(item.get('Info', {}).get('S', '{}'))
+          if info.get('ID') != os.environ['EXPECTED_LOCK_ID'] or info.get('Path') != os.environ['LOCK_PATH']:
+              raise SystemExit('Lock changed or absent; recovery refused.')
+          if info.get('Operation') != 'OperationTypePlan' or not info.get('Created', '').startswith('2026-09-02T22:09:24'):
+              raise SystemExit('Not the reviewed abandoned plan lock; recovery refused.')
+          created = datetime.fromisoformat(info['Created'].replace('Z', '+00:00'))
+          if datetime.now(timezone.utc) - created < timedelta(days=1):
+              raise SystemExit('Lock is too recent; recovery refused.')
+          print('Verified the reviewed abandoned dev plan lock.')
+          PY
+      - name: Initialise dev backend
+        run: terraform init -input=false -backend-config="key=tek-watch/dev/terraform.tfstate"
+      - name: Release only the verified lock
+        run: terraform force-unlock -force "$EXPECTED_LOCK_ID"
+      - name: Recovery summary
+        run: echo 'Dev lock released. Run Terraform Infrastructure with environment dev and action plan. No apply was performed.' >> "$GITHUB_STEP_SUMMARY"
