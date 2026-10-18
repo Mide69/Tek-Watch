@@ -8,6 +8,15 @@ from routers import security
 CTX = MagicMock(customer_id="TT-1")
 
 
+@pytest.mark.asyncio
+async def test_topology_note_does_not_infer_network_reachability():
+    with patch("routers.security.TimestreamQueryService", return_value=inventory({})):
+        result = await security.get_topology(customer=CTX)
+    note = result["confidence_note"]
+    assert "connectivity is not verified" in note
+    assert "can reach" not in note and "only that they can" not in note
+
+
 def inventory(by_service):
     ts = MagicMock()
     ts.get_service_inventory.side_effect = lambda cid, svc, *a: by_service.get(svc, [])

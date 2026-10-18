@@ -59,6 +59,24 @@ def test_fresh_metric_cannot_refresh_an_old_security_setting():
     assert control({"s3": [r]})["status"] == "unknown"
 
 
+def test_valid_field_cannot_hide_another_fields_future_timestamp():
+    r = bucket()
+    r["field_observed_at"] = {
+        "cpu": NOW.isoformat(),
+        "public_access_blocked": (NOW + timedelta(hours=1)).isoformat(),
+    }
+    assert control({"s3": [r]})["status"] == "unknown"
+
+
+def test_public_database_flag_is_not_described_as_verified_network_exposure():
+    r = {"resource_id": "db", "last_seen": NOW.isoformat(),
+         "dimensions": {"engine": "postgres", "publicly_accessible": "True"}}
+    result = control({"rds": [r]}, "RDS-01")
+    assert result["status"] == "fail"
+    assert result["title"] == "Databases have public access disabled"
+    assert "network exposure is not verified" in result["findings"][0]["detail"]
+
+
 def test_assessment_retains_observation_rule_and_pack_identity():
     r = compliance.evaluate({"s3": [bucket()]}, now=NOW)
     c = next(c for c in r["controls"] if c["id"] == "S3-01")

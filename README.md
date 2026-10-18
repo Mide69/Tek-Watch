@@ -333,12 +333,12 @@ cd agent && pip install -r requirements.txt && python main.py
 
 ## Testing
 
-**877 automated tests**, all passing.
+**917 automated tests** passed locally on the review branch (501 API, 300 agent, 28 ingest and 88 dashboard). This does not establish production deployment or independent security assurance.
 
 | Suite | Tests | Command |
 |---|---|---|
-| API | 470 | `cd api && pytest` |
-| Agent | 291 | `cd agent && pytest` |
+| API | 501 | `cd api && pytest` |
+| Agent | 300 | `cd agent && pytest` |
 | Ingest consumer | 28 | `cd ingest-consumer && pytest` |
 | Dashboard | 88 | `cd dashboard && npm test` |
 

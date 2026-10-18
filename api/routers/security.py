@@ -310,16 +310,16 @@ async def get_topology(
     """The customer's own dependency graph: what is joined to what, and how surely.
 
     See services/topology.py. Direct edges are stated by AWS itself; inferred
-    edges mean the two resources share something that usually means they talk.
+    edges identify shared security-group membership, not verified connectivity.
     """
     ts = TimestreamQueryService()
     graph = topology.build(topology.load_inventory(ts, customer.customer_id))
     payload = graph.as_dict()
     payload["confidence_note"] = (
         "Direct edges come from AWS itself, such as a CloudFront distribution naming the "
-        "bucket it serves. Inferred edges mean the resources share a security group, which "
-        "usually means they can reach each other. TekWatch cannot see traffic, so it never "
-        "claims two resources do talk, only that they can."
+        "bucket it serves. Inferred edges mean the resources share a security group; "
+        "connectivity is not verified. TekWatch does not collect security-group rules "
+        "or traffic data, so shared membership does not establish permitted or active traffic."
     )
     return payload
 

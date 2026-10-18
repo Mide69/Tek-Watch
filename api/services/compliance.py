@@ -631,10 +631,10 @@ def _rds_not_public(inv: Inventory) -> ControlResult:
     return _flag_control(
         inv, "rds", "publicly_accessible",
         cid="RDS-01",
-        title="Databases are not reachable from the internet",
+        title="Databases have public access disabled",
         severity="critical",
         noun="databases",
-        fail_detail="This database has a public endpoint",
+        fail_detail="Public access is enabled; network exposure is not verified",
         remediation=(
             "Turn off public access: aws rds modify-db-instance --db-instance-identifier "
             "<id> --no-publicly-accessible --apply-immediately, and reach it through your VPC."
@@ -953,7 +953,9 @@ def evaluate(inventory: Inventory, now: Optional[datetime] = None, *, pack_id: s
                 except (ValueError, TypeError):
                     parsed = []
                     break
-            observed = min(parsed) if parsed else None
+            # Taking only the minimum can hide a future-dated setting behind
+            # another field's valid timestamp. Reject the whole observation.
+            observed = min(parsed) if parsed and all(when <= now for when in parsed) else None
             times.append(observed)
             observations.append({"resource_id": resource.get("resource_id"), "service": svc,
                                  "observed_at": observed.isoformat() if observed else None,
