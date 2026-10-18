@@ -3,6 +3,7 @@ import hashlib
 import logging
 import secrets
 import uuid
+from boto3.dynamodb.types import TypeSerializer
 from decimal import Decimal
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -14,6 +15,11 @@ from botocore.exceptions import ClientError
 from config import load_config
 
 logger = logging.getLogger(__name__)
+
+
+class EvidenceReadError(RuntimeError):
+    """An evidence read failed or was truncated; never treat it as an empty log."""
+
 
 
 def _now_iso() -> str:
@@ -45,15 +51,15 @@ class DynamoDBService:
 
     def list_customers(self) -> List[Dict[str, Any]]:
         """Scan all customer profiles (admin only)."""
-        try:
-            response = self._customers.scan(
-                FilterExpression="SK = :sk",
-                ExpressionAttributeValues={":sk": "PROFILE"},
-            )
-            return response.get("Items", [])
-        except ClientError as exc:
-            logger.error("list_customers failed: %s", exc)
-            return []
+        profiles = []
+        kwargs = {"FilterExpression": "SK = :sk", "ExpressionAttributeValues": {":sk": "PROFILE"}}
+        while True:
+            response = self._customers.scan(**kwargs)
+            profiles.extend(response.get("Items", []))
+            key = response.get("LastEvaluatedKey")
+            if not key:
+                return profiles
+            kwargs["ExclusiveStartKey"] = key
 
     def create_customer(
         self,
@@ -323,12 +329,36 @@ class DynamoDBService:
     _EVIDENCE_PREFIX = "EVIDENCE#"
     _EVIDENCE_HEAD = "EVIDENCE_HEAD"
 
+    def recheck_request(self, customer_id: str, control_id: str, now: str) -> str:
+        """Keep a stable collection boundary across repeated verification requests."""
+        key = {"customer_id": customer_id, "SK": "RECHECK#" + control_id}
+        try:
+            self._customers.put_item(Item={**key, "requested_at": now, "verified": False},
+                                     ConditionExpression="attribute_not_exists(SK) OR verified = :yes",
+                                     ExpressionAttributeValues={":yes": True})
+            return now
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") != "ConditionalCheckFailedException":
+                raise EvidenceReadError("Cannot initiate recheck") from exc
+            item = self._customers.get_item(Key=key, ConsistentRead=True).get("Item", {})
+            if not item.get("requested_at"):
+                raise EvidenceReadError("Cannot read recheck boundary")
+            return item["requested_at"]
+
+    def complete_recheck(self, customer_id: str, control_id: str, requested_at: str) -> None:
+        self._customers.update_item(
+            Key={"customer_id": customer_id, "SK": "RECHECK#" + control_id},
+            UpdateExpression="SET verified = :yes",
+            ConditionExpression="requested_at = :at",
+            ExpressionAttributeValues={":yes": True, ":at": requested_at},
+        )
+
     def evidence_head(self, customer_id: str) -> Dict[str, Any]:
         """The last entry's sequence and hash, or the starting point."""
         from services.evidence import GENESIS
         try:
             item = self._customers.get_item(
-                Key={"customer_id": customer_id, "SK": self._EVIDENCE_HEAD}
+                Key={"customer_id": customer_id, "SK": self._EVIDENCE_HEAD}, ConsistentRead=True
             ).get("Item")
         except ClientError as exc:
             logger.error("Evidence head read failed for %s: %s", customer_id, exc)
@@ -356,49 +386,89 @@ class DynamoDBService:
         racing for the same sequence means the loser is rejected rather than
         silently replacing an entry somebody may already have downloaded.
         """
-        try:
-            self._customers.put_item(
-                Item={
-                    "customer_id": customer_id,
-                    "SK": f"{self._EVIDENCE_PREFIX}{int(entry['seq']):012d}",
-                    **entry,
-                },
-                ConditionExpression="attribute_not_exists(SK)",
-            )
-        except ClientError as exc:
-            code = exc.response.get("Error", {}).get("Code", "")
-            if code == "ConditionalCheckFailedException":
-                logger.warning("Evidence entry %s already exists for %s", entry.get("seq"), customer_id)
-            else:
-                logger.error("Evidence append failed for %s: %s", customer_id, exc)
+        # Entry creation and compare-and-swap of its head must commit together.
+        from services.evidence import GENESIS
+        from services.evidence import canonical
+        if len(canonical(entry).encode("utf-8")) > 350_000:
+            logger.error("Evidence entry exceeds safe item size for %s; not written", customer_id)
             return False
-
-        # Updated field by field rather than written whole: the head also holds
-        # the last snapshot and the last anchor time, and an append that knows
-        # about neither must not wipe them.
-        sets = ["seq = :seq", "#h = :hash", "updated_at = :now"]
-        values: Dict[str, Any] = {
-            ":seq": int(entry["seq"]), ":hash": entry["hash"], ":now": _now_iso(),
-        }
+        seq = int(entry["seq"])
+        if seq < 1:
+            return False
+        serializer = TypeSerializer()
+        def encode(values):
+            # DynamoDB forbids Python floats, including nested assessment metrics.
+            def normal(value):
+                if isinstance(value, float):
+                    return Decimal(str(value))
+                if isinstance(value, dict):
+                    return {k: normal(v) for k, v in value.items()}
+                if isinstance(value, list):
+                    return [normal(v) for v in value]
+                return value
+            return {k: serializer.serialize(normal(v)) for k, v in values.items()}
+        sets = ["#s = :seq", "#h = :hash", "updated_at = :now"]
+        values = {":seq": seq, ":hash": entry["hash"], ":now": entry["recorded_at"],
+                  ":prev_seq": seq - 1, ":prev_hash": entry["prev_hash"]}
         if last_snapshot is not None:
             sets.append("last_snapshot = :snapshot")
             values[":snapshot"] = last_snapshot
         if last_anchor_at is not None:
             sets.append("last_anchor_at = :anchored")
             values[":anchored"] = last_anchor_at
+        condition = "#s = :prev_seq AND #h = :prev_hash"
+        if seq == 1 and entry["prev_hash"] == GENESIS:
+            condition = "attribute_not_exists(#s) OR (" + condition + ")"
+        request = [
+            {"Put": {"TableName": self._customers.name,
+                     "Item": encode({"customer_id": customer_id, "SK": f"{self._EVIDENCE_PREFIX}{seq:012d}", **entry}),
+                     "ConditionExpression": "attribute_not_exists(SK)"}},
+            {"Update": {"TableName": self._customers.name,
+                        "Key": encode({"customer_id": customer_id, "SK": self._EVIDENCE_HEAD}),
+                        "UpdateExpression": "SET " + ", ".join(sets), "ConditionExpression": condition,
+                        "ExpressionAttributeNames": {"#s": "seq", "#h": "hash"},
+                        "ExpressionAttributeValues": encode(values)}}]
         try:
+            client = getattr(self, "_transaction_client", None) or boto3.client("dynamodb", region_name=load_config().aws_region)
+            client.transact_write_items(
+                TransactItems=request,
+                ClientRequestToken=str(uuid.uuid5(uuid.NAMESPACE_URL, customer_id + ":" + str(seq) + ":" + entry["hash"])),
+            )
+            return True
+        except ClientError as exc:
+            logger.warning("Evidence transaction rejected for %s sequence %s: %s", customer_id, seq, exc.response.get("Error", {}).get("Code"))
+            return False
+
+    def recover_evidence_head(self, customer_id: str, apply: bool = False) -> Dict[str, Any]:
+        """Explicit recovery of a legacy non-atomic write, after full chain validation."""
+        from services import evidence
+        head = self.evidence_head(customer_id)
+        if not head.get("readable", True):
+            raise EvidenceReadError("Head unavailable")
+        entries = self.all_evidence(customer_id)
+        if not evidence.verify(entries)["intact"]:
+            raise EvidenceReadError("Recovery requires a complete consistent chain")
+        seq = int(head.get("seq", 0))
+        if seq > len(entries) or (seq and head["hash"] != entries[seq - 1]["hash"]):
+            raise EvidenceReadError("Stored head conflicts with available history")
+        if not entries or seq == len(entries):
+            return {"recovery_needed": False, "seq": seq}
+        snapshots = [e for e in entries if e["kind"] == evidence.SNAPSHOT]
+        anchors = [e for e in entries if e["kind"] == evidence.ANCHOR]
+        new_head = {"seq": entries[-1]["seq"], "hash": entries[-1]["hash"]}
+        if apply:
+            snapshot = snapshots[-1] if snapshots else None
             self._customers.update_item(
                 Key={"customer_id": customer_id, "SK": self._EVIDENCE_HEAD},
-                UpdateExpression="SET " + ", ".join(sets),
-                ExpressionAttributeNames={"#h": "hash"},
-                ExpressionAttributeValues=values,
+                UpdateExpression="SET #s = :s, #h = :h, last_snapshot = :snapshot, last_anchor_at = :anchor",
+                ConditionExpression="(#s = :old AND #h = :oldhash) OR attribute_not_exists(#s)",
+                ExpressionAttributeNames={"#s": "seq", "#h": "hash"},
+                ExpressionAttributeValues={":s": new_head["seq"], ":h": new_head["hash"], ":old": seq,
+                                           ":oldhash": head["hash"],
+                                           ":snapshot": {k: snapshot[k] for k in ("seq", "recorded_at", "body")} if snapshot else None,
+                                           ":anchor": anchors[-1]["recorded_at"] if anchors else None},
             )
-        except ClientError as exc:
-            # The entry is written; only the shortcut is stale. The next append
-            # reads a lower sequence and its condition rejects it, which is
-            # noisy but never loses or rewrites an entry.
-            logger.error("Evidence head update failed for %s: %s", customer_id, exc)
-        return True
+        return {"recovery_needed": True, "applied": apply, **new_head}
 
     def list_evidence(self, customer_id: str, limit: int = 50, newest_first: bool = True) -> List[Dict[str, Any]]:
         """Entries for one customer, newest first by default."""
@@ -414,26 +484,28 @@ class DynamoDBService:
             return []
         return [self._evidence_item(i) for i in response.get("Items", [])]
 
-    def all_evidence(self, customer_id: str, cap: int = 2000) -> List[Dict[str, Any]]:
+    def all_evidence(self, customer_id: str, cap: Optional[int] = None) -> List[Dict[str, Any]]:
         """Every entry, oldest first. Used to verify the chain end to end."""
         entries: List[Dict[str, Any]] = []
         kwargs: Dict[str, Any] = {
             "KeyConditionExpression": Key("customer_id").eq(customer_id)
             & Key("SK").begins_with(self._EVIDENCE_PREFIX),
             "ScanIndexForward": True,
+            "ConsistentRead": True,
         }
-        while len(entries) < cap:
+        while True:
             try:
                 response = self._customers.query(**kwargs)
             except ClientError as exc:
-                logger.error("Evidence read failed for %s: %s", customer_id, exc)
-                break
+                raise EvidenceReadError("Evidence read unavailable") from exc
             entries.extend(self._evidence_item(i) for i in response.get("Items", []))
+            if cap is not None and len(entries) > cap:
+                raise EvidenceReadError("Evidence read exceeds explicit limit")
             key = response.get("LastEvaluatedKey")
             if not key:
                 break
             kwargs["ExclusiveStartKey"] = key
-        return entries[:cap]
+        return entries
 
     @staticmethod
     def _evidence_item(item: Dict[str, Any]) -> Dict[str, Any]:

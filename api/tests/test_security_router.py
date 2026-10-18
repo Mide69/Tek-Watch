@@ -123,6 +123,7 @@ async def test_verify_endpoint_checks_the_stored_chain_not_a_stored_answer():
         prev = e["hash"]
     db = MagicMock()
     db.all_evidence.return_value = good
+    db.evidence_head.return_value = {"seq": 3, "hash": good[-1]["hash"]}
     with patch("routers.security.DynamoDBService", return_value=db):
         assert (await security.verify_evidence(customer=CTX))["intact"] is True
 
@@ -134,16 +135,16 @@ async def test_verify_endpoint_checks_the_stored_chain_not_a_stored_answer():
 
 
 @pytest.mark.asyncio
-async def test_export_is_a_csv_attachment_with_the_hashes():
+async def test_export_is_a_complete_zip_attachment():
+    import io, zipfile, json
+    from services import evidence
     db = MagicMock()
-    db.all_evidence.return_value = [
-        {"seq": 1, "recorded_at": "2026-09-17T12:00:00+00:00", "kind": "snapshot",
-         "summary": "Compliance assessment: 8 passed, 2 failed", "hash": "abc", "prev_hash": "0" * 64},
-    ]
+    entry = evidence.build_entry(prev_hash=evidence.GENESIS, seq=1, kind="snapshot", summary="assessment", body={"verdict": "unknown"})
+    db.all_evidence.return_value = [entry]
+    db.evidence_head.return_value = {"seq": 1, "hash": entry["hash"]}
     with patch("routers.security.DynamoDBService", return_value=db):
         response = await security.export_evidence(customer=CTX)
-    assert response.media_type == "text/csv"
-    assert "attachment" in response.headers["content-disposition"]
-    text = response.body.decode()
-    assert "seq,recorded_at,kind,summary,hash,prev_hash" in text
-    assert "abc" in text
+    assert response.media_type == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.body)) as bundle:
+        assert json.loads(bundle.read("entries.json"))[0]["body"] == entry["body"]
+        assert {"manifest.json", "verify.py", "evidence.py"} <= set(bundle.namelist())

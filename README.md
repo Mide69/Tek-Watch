@@ -2,12 +2,14 @@
 
 > Cloud regulatory intelligence for UK small businesses running on AWS. Built by Tek Tribe Ltd.
 
-TekWatch watches a customer's AWS account through a read-only agent, decides for
-itself when something has changed or gone wrong, works out which UK regulatory
-obligation that touches, says what it could cost using published figures, tells
-the owner what to do in plain English, checks the fix when the evidence shows
-it, and keeps a tamper-evident, independently timestamped record of the whole
-sequence.
+TekWatch evaluates selected AWS technical controls against UK framework mappings,
+helps investigate findings, and records assessment snapshots and detected verdict
+changes. Coverage is partial: it does not certify legal compliance or establish
+that a personal data breach has occurred. Evidence verification requires a trusted
+head or independently verified timestamp for external assurance.
+
+See [evidence hardening and release checks](docs/EVIDENCE_HARDENING.md) for the
+current implementation scope and deployment validation still required.
 
 **Live:** [app.tekwatch.io](https://app.tekwatch.io) · **Demo:** [app.tekwatch.io/overview/?demo=1](https://app.tekwatch.io/overview/?demo=1) · **Region:** eu-west-2 (London)
 
@@ -54,7 +56,7 @@ against the code.
 | **4. Quantify** | Each failing control carries published figures: the statutory maximum, ICO or FCA penalties for the same failing, and the certification body's prices. Three separate numbers, never added. | [`api/services/exposure.py`](api/services/exposure.py) |
 | **5. Resolve** | A prioritised plain-English remediation plan ordered by severity, with the AWS CLI command where one exists. | `compliance.py`, `correlation.py` |
 | **6. Verify** | A control moving from fail to pass is recorded the moment the agent's data shows it. "I have fixed this, check now" re-runs the check on demand. | [`api/services/evidence_recorder.py`](api/services/evidence_recorder.py) |
-| **7. Record** | Every assessment and change is appended to a SHA-256 hash chain, anchored daily with an RFC 3161 token from an independent timestamping authority. | [`api/services/evidence.py`](api/services/evidence.py), [`timestamping.py`](api/services/timestamping.py) |
+| **7. Record** | Assessment snapshots and detected verdict changes are hash-chained; daily RFC 3161 responses are requested on a best-effort basis. | [`api/services/evidence.py`](api/services/evidence.py), [`timestamping.py`](api/services/timestamping.py) |
 
 Across the chain sits a **regulatory calendar**
 ([`api/services/calendar.py`](api/services/calendar.py)): the Article 33
@@ -137,7 +139,7 @@ Cyber Essentials and PS21/3 carry a scope note in the API payload and on the
 page, so a score against part of a scheme is never read as a score against the
 whole of it.
 
-**The 24 controls**
+**24 defined controls; 23 eligible, with LAM-01 quarantined**
 
 | Area | Controls |
 |---|---|
@@ -181,33 +183,20 @@ and in the data.
 
 ## The evidence record
 
-A compliance page says what is wrong today. The evidence record says what was
-wrong, when it was fixed, and proves nobody has edited the answer since.
+The record preserves assessment snapshots and detected verdict changes. Each
+entry includes its predecessor hash, rule-pack identity and source observation
+provenance. The API checks contiguous sequence numbers and the stored head.
 
-- **Chained.** Each entry carries the SHA-256 hash of the one before it. Edit a
-  stored entry and every hash after it stops matching.
-- **Verified from the data.** `GET /api/v1/security/evidence/verify` recomputes
-  the whole chain from the stored entries, not from a stored answer.
-- **Independently timestamped.** Once a day the head of the chain goes to an
-  RFC 3161 timestamping authority, which returns a signed token saying it saw
-  that hash at that time. Best effort and off the hot path: if the authority is
-  down, the log carries on and tries again tomorrow.
-- **Checkable without us.** The CSV export carries the verification command.
-  With the token saved as `token.tsr` and the authority's certificates:
+Export downloads a ZIP containing full entry bodies, a manifest, timestamp
+response bytes, and an offline verifier. Run `python verify.py` after extraction;
+use `--expected-head` with an independently retained head to detect a complete
+rewrite. Use a verifier from a trusted release: an altered archive could also
+contain an altered verifier.
 
-```bash
-openssl ts -verify -digest <anchored_hash> -in token.tsr -CAfile cacert.pem -untrusted tsa.crt
-```
-
-The RFC 3161 request is built by hand
-([`timestamping.py`](api/services/timestamping.py)) rather than through an
-ASN.1 library: about sixty bytes and a status check. It has been confirmed
-against FreeTSA, with `openssl ts -reply -text` showing the granted status, the
-SHA-256 algorithm and our exact hash.
-
-What an anchor does not prove, and the product says so: that the chain existed
-at that time, not that the records are correct. A log with no anchor yet says
-so instead of borrowing the claim.
+RFC 3161 responses are recorded on a best-effort basis. Internal hash verification
+does not validate their signatures. The offline verifier supports `--ca-file`
+and `--tsa-cert` for OpenSSL verification. A verified timestamp establishes the
+anchored hash existed by that time; it does not establish observation accuracy.
 
 ---
 
@@ -237,7 +226,7 @@ Every entry has something real behind it.
 
 | Kind | Example | Driven by |
 |---|---|---|
-| Deadline | Decide whether the ICO must be told about a bucket | The 72 hours of Article 33, counted from when TekWatch first saw the exposure |
+| Deadline | Decide whether the ICO must be told about a bucket | Triage first; a deadline requires confirmed personal-data-breach awareness |
 | Expiry | TLS certificate for app.example.com expires | The expiry date AWS reports |
 | Renewal | Cyber Essentials certificate, ICO data protection fee | Dates only the customer knows. Until entered, the entry says "no date set" rather than inventing one |
 
@@ -280,7 +269,7 @@ and exits.
 | | |
 |---|---|
 | Collectors | 23: EC2, RDS, Lambda, ECS, EKS, S3, DynamoDB, ELB, VPC, Route53, CloudFront, ElastiCache, SNS, SQS, ACM, IAM, GuardDuty, Security Hub, Config, CloudTrail, CloudWatch Alarms, Cost Explorer, Trusted Advisor |
-| Permissions | AWS `ReadOnlyAccess` plus sending to one SQS queue. No inbound access |
+| Permissions | Explicit collected-operation allowlist plus sending to one SQS queue; customer payload reads denied. No inbound access |
 | Schedule | Home region every run (default 15 minutes). All enabled regions every 30 minutes. Cost Explorer every 6 hours, because it bills per request |
 | Deadline | A run stops one minute short of its interval and publishes what it has, so runs can never pile up |
 | Rule | A fact it could not read is left out, never reported as a convenient false |
@@ -443,7 +432,7 @@ All customer endpoints require a Cognito JWT.
 - `POST /api/v1/security/controls/{id}/recheck` — re-run the checks now and record the result
 - `GET /api/v1/security/evidence` — the evidence log
 - `GET /api/v1/security/evidence/verify` — recompute the chain
-- `GET /api/v1/security/evidence/export` — CSV with hashes and verification instructions
+- `GET /api/v1/security/evidence/export` — ZIP with complete bodies, manifest, timestamp responses and offline verifier
 - `GET /api/v1/security/{guardduty,iam,acm,alarms}`
 
 **Agent**

@@ -94,12 +94,13 @@ def report(*controls, evaluated_at="2026-09-17T12:00:00+00:00"):
 
 def ctrl(cid, status, title="A control", severity="high", findings=()):
     return {"id": cid, "status": status, "title": title, "severity": severity,
-            "detail": "detail", "findings": list(findings)}
+            "detail": "detail", "findings": list(findings),
+            "observed_at": "2026-09-17T11:59:00+00:00"}
 
 
 class TestTransitions:
     def test_a_fix_is_recorded_as_resolved(self):
-        before = report(ctrl("S3-01", "fail"))
+        before = report(ctrl("S3-01", "fail"), evaluated_at="2026-09-17T11:00:00+00:00")
         after = report(ctrl("S3-01", "pass"))
         kinds = evidence.transitions(before, after)
         assert len(kinds) == 1
@@ -179,7 +180,7 @@ class TestRecorder:
             "readable": True,
             "last_snapshot": {
                 "recorded_at": NOW.isoformat(),
-                "body": evidence.snapshot_body(report(ctrl("S3-01", "fail"))),
+                "body": evidence.snapshot_body(report(ctrl("S3-01", "fail"), evaluated_at="2026-09-17T11:00:00+00:00")),
             },
         }
         count, db = self._run(monkeypatch, head=head, controls=[ctrl("S3-01", "pass")])
@@ -193,7 +194,7 @@ class TestRecorder:
         head = {
             "seq": 1, "hash": "b" * 64, "readable": True,
             "last_snapshot": {"recorded_at": NOW.isoformat(),
-                              "body": evidence.snapshot_body(report(ctrl("S3-01", "fail")))},
+                              "body": evidence.snapshot_body(report(ctrl("S3-01", "fail"), evaluated_at="2026-09-17T11:00:00+00:00"))},
         }
         _, db = self._run(monkeypatch, head=head, controls=[ctrl("S3-01", "pass")])
         first, second = [c.args[1] for c in db.append_evidence.call_args_list]
@@ -235,7 +236,7 @@ class TestRecorder:
         ts, db, written = recorder_services(
             head={"seq": 2, "hash": "d" * 64, "readable": True,
                   "last_snapshot": {"recorded_at": NOW.isoformat(),
-                                    "body": evidence.snapshot_body(report(ctrl("S3-01", "fail")))}},
+                                    "body": evidence.snapshot_body(report(ctrl("S3-01", "fail"), evaluated_at="2026-09-17T11:00:00+00:00"))}},
             controls=[ctrl("S3-01", "pass")],
         )
         db.append_evidence.return_value = False

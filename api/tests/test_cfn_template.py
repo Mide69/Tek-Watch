@@ -129,6 +129,7 @@ class TestApiKeyIsNeverInPlaintext:
             for p in doc["Resources"]["AgentTaskRole"]["Properties"]["Policies"]
             for s in p["PolicyDocument"]["Statement"]
             for action in (s["Action"] if isinstance(s["Action"], list) else [s["Action"]])
+            if s["Effect"] == "Allow"
         }
         assert "secretsmanager:GetSecretValue" not in task_role_actions
 

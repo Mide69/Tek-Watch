@@ -5,6 +5,8 @@ stay in sync: there is exactly one place that defines what the agent stack
 looks like.
 """
 import yaml
+import json
+from pathlib import Path
 
 from config import APIConfig
 
@@ -118,8 +120,9 @@ def generate_agent_template(
                             "Action": "sts:AssumeRole",
                         }],
                     },
-                    "ManagedPolicyArns": ["arn:aws:iam::aws:policy/ReadOnlyAccess"],
-                    "Policies": [{
+
+                    "Policies": [{"PolicyName": "TekWatchCollectedObservations",
+                                  "PolicyDocument": json.loads((Path(__file__).with_name("agent_policy.json")).read_text())}, {
                         "PolicyName": "TekWatchSQSSend",
                         "PolicyDocument": {
                             "Version": "2012-10-17",

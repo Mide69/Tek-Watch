@@ -465,7 +465,7 @@ export interface ServiceImpact {
 
 export interface CalendarEntry {
   id: string
-  kind: 'deadline' | 'expiry' | 'renewal'
+  kind: 'deadline' | 'expiry' | 'renewal' | 'triage'
   title: string
   due_at: string | null
   days_remaining: number | null

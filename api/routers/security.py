@@ -1,6 +1,4 @@
 """Security router — GuardDuty, IAM, ACM, alarms, compliance, incidents, evidence."""
-import csv
-import io
 import logging
 from typing import Optional
 
@@ -13,7 +11,8 @@ from auth.dependencies import CustomerContext, get_current_customer
 from services import (
     calendar, compliance, correlation, evidence, evidence_recorder, exposure, timestamping, topology,
 )
-from services.dynamodb import DynamoDBService
+from services.dynamodb import DynamoDBService, EvidenceReadError
+from services.evidence_bundle import build_bundle
 from services.inventory_view import dim, num, text, wants_region_filter
 from services.timestream import TimestreamQueryService
 
@@ -274,40 +273,34 @@ async def verify_evidence(
     fails if any entry has been altered since it was written.
     """
     db = DynamoDBService()
-    return evidence.verify(db.all_evidence(customer.customer_id))
+    try:
+        entries = db.all_evidence(customer.customer_id)
+        head = db.evidence_head(customer.customer_id)
+        if not head.get("readable", True):
+            raise EvidenceReadError("Head unavailable")
+        return evidence.verify(entries, expected_head=head)
+    except EvidenceReadError as exc:
+        raise HTTPException(status_code=503, detail="Evidence unavailable; verification not completed") from exc
 
 
 @router.get("/evidence/export")
 async def export_evidence(
     customer: CustomerContext = Depends(get_current_customer),
 ):
-    """The log as a CSV file, with the hashes, for an audit pack."""
-    entries = DynamoDBService().all_evidence(customer.customer_id)
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-    writer.writerow(["seq", "recorded_at", "kind", "summary", "hash", "prev_hash"])
-    for entry in entries:
-        writer.writerow([
-            entry.get("seq"),
-            entry.get("recorded_at"),
-            entry.get("kind"),
-            entry.get("summary"),
-            entry.get("hash"),
-            entry.get("prev_hash"),
-        ])
-    # The verification note rides with the file: an auditor who has only the
-    # CSV should be able to check an anchor without coming back to us.
-    writer.writerow([])
-    writer.writerow(["How to check this record"])
-    writer.writerow([evidence.statement_for(entries)])
-    writer.writerow([timestamping.VERIFY_INSTRUCTIONS])
-
-    filename = f"tekwatch-compliance-evidence-{customer.customer_id}.csv"
-    return Response(
-        content=buffer.getvalue(),
-        media_type="text/csv",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    """A complete ZIP evidence bundle with bodies, manifest and offline verifier."""
+    db = DynamoDBService()
+    try:
+        entries = db.all_evidence(customer.customer_id)
+        head = db.evidence_head(customer.customer_id)
+        if not head.get("readable", True):
+            raise EvidenceReadError("Head unavailable")
+        payload = build_bundle(entries, head)
+    except EvidenceReadError as exc:
+        raise HTTPException(status_code=503, detail="Evidence unavailable; export not completed") from exc
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=409, detail="Evidence changed or is incomplete; retry or request recovery") from exc
+    return Response(content=payload, media_type="application/zip",
+                    headers={"Content-Disposition": f'attachment; filename="tekwatch-evidence-{customer.customer_id}.zip"'})
 
 
 @router.get("/topology")
@@ -390,6 +383,7 @@ async def recheck_control(
     It proves nothing on its own: if the agent has not reported since the fix,
     the control still fails and the answer says so.
     """
+    requested_at = datetime.now(timezone.utc)
     ts = TimestreamQueryService()
     db = DynamoDBService()
     written = evidence_recorder.record_for_customer(customer.customer_id, ts, db)
@@ -399,8 +393,27 @@ async def recheck_control(
     if control is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No control {control_id}")
 
+    # This request never triggers collection itself. It can report current state,
+    # but must not present an old pass as verification of the user's new change.
+    try:
+        boundary = db.recheck_request(customer.customer_id, control_id, requested_at.isoformat())
+        requested_at = datetime.fromisoformat(boundary)
+    except (EvidenceReadError, ValueError, TypeError) as exc:
+        raise HTTPException(status_code=503, detail="Cannot retain verification boundary") from exc
+    observed = control.get("observed_at")
+    verified = False
+    if observed and control["status"] == compliance.PASS:
+        try:
+            verified = datetime.fromisoformat(observed) > requested_at
+        except ValueError:
+            pass
+    if verified:
+        db.complete_recheck(customer.customer_id, control_id, requested_at.isoformat())
     return {
         "control": control,
+        "remediation_verified": verified,
+        "requested_at": requested_at.isoformat(),
+        "observed_at": observed,
         "checked_at": report["evaluated_at"],
         "evidence_entries_written": written,
         "note": (
