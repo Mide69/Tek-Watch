@@ -190,4 +190,4 @@ class TestEndpoints:
         with patch("routers.security.TimestreamQueryService", return_value=ts):
             result = await security.get_topology(customer=CTX)
         assert result["nodes"] == [] and result["edges"] == []
-        assert "never claims two resources do talk" in result["confidence_note"]
+        assert "connectivity is not verified" in result["confidence_note"]

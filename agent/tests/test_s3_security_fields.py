@@ -69,7 +69,9 @@ class TestEncryptionAlgorithm:
         s3.get_bucket_encryption.side_effect = _client_error("AccessDenied")
         s3.get_public_access_block.return_value = {"PublicAccessBlockConfiguration": {}}
 
-        assert _dims(c.collect())["encryption_enabled"] == "False"
+        dims = _dims(c.collect())
+        assert "encryption_enabled" not in dims
+        assert "encryption_algorithm" not in dims
 
 
 class TestPublicAccessBlock:

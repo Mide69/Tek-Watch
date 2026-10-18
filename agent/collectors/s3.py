@@ -49,7 +49,7 @@ class S3Collector(BaseCollector):
             pass
 
         # Versioning status
-        versioning = "Disabled"
+        versioning: Optional[str] = None
         try:
             v = self._s3.get_bucket_versioning(Bucket=name)
             versioning = v.get("Status", "Disabled") or "Disabled"
@@ -59,13 +59,14 @@ class S3Collector(BaseCollector):
         # Encryption status, and which algorithm. The dashboard names the
         # algorithm next to the padlock, so "encrypted: true" was never enough
         # to render the column it was collected for.
-        encryption_enabled = False
+        encryption_enabled: Optional[bool] = None
         encryption_algorithm = ""
         try:
             enc = self._s3.get_bucket_encryption(Bucket=name)
             rules = (
                 enc.get("ServerSideEncryptionConfiguration", {}).get("Rules", [])
             )
+            encryption_enabled = False
             for rule in rules:
                 algorithm = (
                     rule.get("ApplyServerSideEncryptionByDefault", {})
@@ -75,8 +76,12 @@ class S3Collector(BaseCollector):
                     encryption_enabled = True
                     encryption_algorithm = algorithm
                     break
-        except (ClientError, EndpointResolutionError):
-            pass  # No configuration, or no permission to read it — not encrypted
+        except ClientError as exc:
+            if exc.response.get("Error", {}).get("Code") == "ServerSideEncryptionConfigurationNotFoundError":
+                encryption_enabled = False
+            # AccessDenied, throttling and other read failures leave the fact unknown.
+        except EndpointResolutionError:
+            pass
 
         # Public access block. This is the single most consequential fact about
         # a bucket and the storage page has a column for it, but nothing
@@ -108,10 +113,12 @@ class S3Collector(BaseCollector):
 
         base_dims = {
             "bucket_region":       bucket_region,
-            "versioning_enabled":  str(versioning == "Enabled"),
-            "encryption_enabled":  str(encryption_enabled),
-            "encryption_algorithm": encryption_algorithm,
         }
+        if versioning is not None:
+            base_dims["versioning_enabled"] = str(versioning == "Enabled")
+        if encryption_enabled is not None:
+            base_dims["encryption_enabled"] = str(encryption_enabled)
+            base_dims["encryption_algorithm"] = encryption_algorithm
         if public_access_blocked is not None:
             base_dims["public_access_blocked"] = str(public_access_blocked)
 
