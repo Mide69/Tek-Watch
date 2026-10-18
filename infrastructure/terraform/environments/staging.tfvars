@@ -25,3 +25,6 @@ sqs_dlq_max_receive_count      = 3
 
 domain_name         = "staging.tekwatch.io"
 acm_certificate_arn = "" # Set via GitHub secret ACM_CERT_ARN_STAGING
+
+# Same TekWatch publisher organisation boundary as production.
+publisher_org_id = "o-vvi9eethqx"
