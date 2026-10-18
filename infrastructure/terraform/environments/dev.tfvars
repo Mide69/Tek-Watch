@@ -38,3 +38,6 @@ sqs_dlq_max_receive_count      = 3
 # Domain — no cert needed for dev (HTTP only via ALB DNS)
 domain_name         = "dev.tekwatch.io"
 acm_certificate_arn = "" # Set via GitHub secret ACM_CERT_ARN_DEV
+
+# Same TekWatch publisher organisation boundary as production.
+publisher_org_id = "o-vvi9eethqx"

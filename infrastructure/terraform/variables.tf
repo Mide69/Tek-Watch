@@ -255,5 +255,10 @@ variable "cognito_ses_from_email" {
 # Organization whose accounts may publish to the ingest queue. Agents run in the
 # customer's own account, so the queue has to name who is allowed to send.
 variable "publisher_org_id" {
-  type = string
+  description = "AWS organisation allowed to publish observations to the ingest queue"
+  type        = string
+  validation {
+    condition     = can(regex("^o-[a-z0-9]{10,32}$", var.publisher_org_id))
+    error_message = "publisher_org_id must be an explicit AWS organisation ID (o- followed by 10-32 lowercase letters or digits)."
+  }
 }
