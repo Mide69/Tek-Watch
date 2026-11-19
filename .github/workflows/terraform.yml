@@ -336,6 +336,108 @@ jobs:
       - name: Terraform Init
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform init -backend-config="key=tek-watch/prod/terraform.tfstate"
+      - name: Empty TekWatch production data before destroy
+        env:
+          AWS_REGION: ${{ env.AWS_REGION }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import subprocess
+          import tempfile
+
+          def aws(args, allow_missing=False):
+              result = subprocess.run(
+                  ["aws", *args, "--output", "json"],
+                  text=True, capture_output=True
+              )
+              if result.returncode:
+                  if allow_missing and (
+                      "NotFound" in result.stderr
+                      or "Not Found" in result.stderr
+                      or "NoSuchBucket" in result.stderr
+                      or "404" in result.stderr
+                  ):
+                      return None
+                  raise RuntimeError(result.stderr.strip() or "AWS CLI command failed")
+              return json.loads(result.stdout or "{}")
+
+          def delete_batches(args_prefix, objects):
+              for offset in range(0, len(objects), 100):
+                  with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as payload:
+                      json.dump(objects[offset:offset + 100], payload)
+                      payload.flush()
+                      aws([*args_prefix, "--image-ids" if "ecr" in args_prefix[0] else "--delete", f"file://{payload.name}"])
+
+          # Remove every current and noncurrent version, plus delete markers.
+          for bucket in (
+              "tek-watch-prod-uploads",
+              "tek-watch-prod-admin",
+              "tek-watch-prod-dashboard",
+          ):
+              head = subprocess.run(
+                  ["aws", "s3api", "head-bucket", "--bucket", bucket],
+                  text=True, capture_output=True
+              )
+              if head.returncode:
+                  if any(message in head.stderr for message in ("NotFound", "Not Found", "NoSuchBucket", "404")):
+                      continue
+                  raise RuntimeError(head.stderr.strip() or f"Could not inspect {bucket}")
+              listing = aws(["s3api", "list-object-versions", "--bucket", bucket])
+              versions = [
+                  {"Key": item["Key"], "VersionId": item.get("VersionId")}
+                  for item in listing.get("Versions", []) + listing.get("DeleteMarkers", [])
+              ]
+              for offset in range(0, len(versions), 1000):
+                  with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as payload:
+                      json.dump({"Objects": versions[offset:offset + 1000], "Quiet": True}, payload)
+                      payload.flush()
+                      aws(["s3api", "delete-objects", "--bucket", bucket, "--delete", f"file://{payload.name}"])
+
+          # Remove image manifests from the three TekWatch private ECR repos.
+          for repository in ("tek-watch-agent", "tek-watch-api", "tek-watch-ingest-consumer"):
+              repo = aws(
+                  ["ecr", "describe-repositories", "--region", "eu-west-2", "--repository-names", repository],
+                  allow_missing=True,
+              )
+              if repo is None:
+                  continue
+              images = aws([
+                  "ecr", "list-images", "--region", "eu-west-2",
+                  "--repository-name", repository,
+              ]).get("imageIds", [])
+              for offset in range(0, len(images), 100):
+                  with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as payload:
+                      json.dump(images[offset:offset + 100], payload)
+                      payload.flush()
+                      aws([
+                          "ecr", "batch-delete-image", "--region", "eu-west-2",
+                          "--repository-name", repository, "--image-ids", f"file://{payload.name}",
+                      ])
+
+          # ECR Public is served from us-east-1 and supports digest-based deletion.
+          public_repo = aws([
+              "ecr-public", "describe-repositories", "--region", "us-east-1",
+              "--repository-names", "tek-watch-agent",
+          ], allow_missing=True)
+          if public_repo is not None:
+              images = aws([
+                  "ecr-public", "describe-images", "--region", "us-east-1",
+                  "--repository-name", "tek-watch-agent",
+              ]).get("imageDetails", [])
+              digests = [
+                  {"imageDigest": image["imageDigest"]}
+                  for image in images if image.get("imageDigest")
+              ]
+              for offset in range(0, len(digests), 100):
+                  with tempfile.NamedTemporaryFile(mode="w", suffix=".json") as payload:
+                      json.dump(digests[offset:offset + 100], payload)
+                      payload.flush()
+                      aws([
+                          "ecr-public", "batch-delete-image", "--region", "us-east-1",
+                          "--repository-name", "tek-watch-agent", "--image-ids", f"file://{payload.name}",
+                      ])
+          PY
+
       - name: Destroy prod infrastructure
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: terraform destroy -input=false -lock-timeout=5m -var-file="environments/prod.tfvars" -auto-approve
