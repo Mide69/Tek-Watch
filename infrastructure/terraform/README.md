@@ -145,7 +145,16 @@ After first `terraform apply`:
 
 ## Destroying
 
-```bash
-# Dev only — never destroy staging/prod without explicit approval
-terraform destroy -var-file="environments/dev.tfvars"
-```
+Use GitHub Actions → **Terraform Infrastructure** → **Run workflow**. Select
+`all` and `destroy` to destroy the dev, staging, and prod application stacks
+in sequence, then remove the TekWatch-specific GitHub Actions admin role. This
+permanently deletes application resources and their stored data, including
+customer records and evidence held in DynamoDB and Timestream, Cognito users,
+and S3-hosted site assets.
+
+The workflow retains the versioned Terraform state bucket
+(`tek-watch-terraform-state`), the state-lock table
+(`tek-watch-terraform-locks`), and the account-wide GitHub OIDC provider.
+These are kept so state history remains available and other AWS workloads that
+share the OIDC provider are not affected. Review and remove the backend only
+after confirming no other state or recovery requirement depends on it.
